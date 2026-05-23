@@ -31,11 +31,6 @@ public class MainMenuGui extends ChestGui {
                         .lore("<gray>Spend XP on perks.").build(),
                 e -> new SkillsGui(plugin).open(p));
 
-        set(13, ItemBuilder.of(Material.BONE)
-                        .name("<gold>Pets")
-                        .lore("<gray>Summon and assign tasks.").build(),
-                e -> new PetSelectGui(plugin).open(p));
-
         set(14, ItemBuilder.of(Material.WRITTEN_BOOK)
                         .name("<yellow>Daily Quest")
                         .lore("<gray>Check today's challenge.").build(),

@@ -12,9 +12,11 @@ import org.bukkit.Sound;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -148,5 +150,46 @@ public class BossManager implements Listener {
             if (e != null) e.remove();
         }
         active.clear();
+    }
+
+    /**
+     * Escape valve: if any single participant dies 3 times during a fight, the
+     * boss withdraws and everyone who took part gets a participation reward
+     * (40% of full kill coins). Prevents a too-hard encounter from grinding the
+     * island to a halt.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        Player victim = event.getEntity();
+        for (BossFight fight : new java.util.ArrayList<>(active.values())) {
+            if (!fight.participants().contains(victim.getUniqueId())) continue;
+            int deaths = fight.recordDeath(victim.getUniqueId());
+            if (deaths < 3) {
+                org.bukkit.entity.LivingEntity entity = fight.entity();
+                int hp = entity == null ? 0 : (int) entity.getHealth();
+                Msg.title(victim, "<red>Death " + deaths + "/3",
+                        "<gray>One more and the boss withdraws.");
+                continue;
+            }
+            // 3rd death — despawn boss, give participation rewards, end fight.
+            active.remove(fight.entityId());
+            org.bukkit.entity.LivingEntity entity = fight.entity();
+            if (entity != null) entity.remove();
+            fight.clearBar();
+
+            com.nova.novablock.island.Island island = plugin.islands().get(fight.islandId());
+            long fullReward = fight.boss().onDefeat(fight);
+            long participation = Math.max(50, (long) (fullReward * 0.4));
+            if (island != null) plugin.economy().award(island, participation);
+
+            for (UUID id : fight.participants()) {
+                Player p = Bukkit.getPlayer(id);
+                if (p == null) continue;
+                Msg.title(p, "<gray>" + fight.boss().displayName() + " withdrew",
+                        "<yellow>+" + participation + " coins <gray>(participation)");
+                p.playSound(p.getLocation(), Sound.ENTITY_WITHER_HURT, 0.6f, 0.7f);
+                plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.COMBAT, 50L);
+            }
+        }
     }
 }

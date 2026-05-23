@@ -46,7 +46,6 @@ public class WelcomeGui extends ChestGui {
                 .name("<yellow>What's in it?")
                 .lore("<gray>• 12 themed phases",
                         "<gray>• Boss fights & loot rooms",
-                        "<gray>• Pets that fight, mine, and follow you",
                         "<gray>• Skills, prophecies, daily quests, shop")
                 .build(), null);
 

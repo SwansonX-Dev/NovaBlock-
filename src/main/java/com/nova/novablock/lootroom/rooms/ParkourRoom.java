@@ -4,6 +4,7 @@ import com.nova.novablock.island.Island;
 import com.nova.novablock.lootroom.LootRoom;
 import com.nova.novablock.lootroom.LootRoomRun;
 import com.nova.novablock.util.Msg;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
@@ -12,9 +13,40 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * Deterministic 18-jump parkour course. The previous random generator could
+ * produce diagonal +1y jumps with a 2-block gap, which isn't physically
+ * possible in vanilla Minecraft — so some players literally couldn't finish.
+ *
+ * <p>Each entry is a relative {dx, dy, dz} from the previous block. The
+ * jumps are tuned for the standard 1-block-gap straight jump (dx=2),
+ * 1-block-gap turn (dz=2 after dx=2), and 2-block-gap running jumps
+ * (dx=3 or dx=4) on flat ground only.
+ */
 public class ParkourRoom implements LootRoom {
+
+    /** {dx, dy, dz} from the previous block. Designed by hand, all confirmed jumpable. */
+    private static final int[][] COURSE = {
+            {2, 0, 0},   // 1: simple straight
+            {2, 0, 0},   // 2: another straight
+            {0, 0, 2},   // 3: 90° turn
+            {2, 0, 0},   // 4: straight again
+            {2, 1, 0},   // 5: jump up one
+            {0, 0, 2},   // 6: turn after climbing
+            {3, 0, 0},   // 7: 2-block running gap (flat)
+            {0, -1, 2},  // 8: down one + turn
+            {2, 0, 0},   // 9: straight
+            {2, 0, 0},   // 10: straight
+            {0, 1, 2},   // 11: turn + up one
+            {2, 0, 0},   // 12: straight
+            {3, 0, 0},   // 13: running gap (flat)
+            {0, 0, 2},   // 14: turn
+            {2, -1, 0},  // 15: down one
+            {2, 0, 0},   // 16: straight
+            {0, 0, 2},   // 17: turn
+            {2, 0, 0},   // 18: final approach to gold
+    };
 
     @Override public String id() { return "parkour"; }
     @Override public String displayName() { return "Parkour Rift"; }
@@ -34,18 +66,16 @@ public class ParkourRoom implements LootRoom {
 
     @Override
     public Location build(Location anchor) {
-        // Build a 30-jump staircase of floating blocks with random offsets
-        var rng = ThreadLocalRandom.current();
+        // Start block at the anchor.
         Location cur = anchor.clone();
         cur.getBlock().setType(Material.QUARTZ_BLOCK);
-        for (int i = 1; i <= 30; i++) {
-            int dx = rng.nextInt(-2, 3);
-            int dz = rng.nextInt(-2, 3);
-            if (dx == 0 && dz == 0) dx = 2;
-            cur.add(dx, rng.nextInt(0, 2) == 0 ? 1 : 0, dz);
-            cur.getBlock().setType(i == 30 ? Material.GOLD_BLOCK : Material.QUARTZ_BLOCK);
+        for (int i = 0; i < COURSE.length; i++) {
+            int[] step = COURSE[i];
+            cur.add(step[0], step[1], step[2]);
+            // Last block is gold (goal); rest are quartz.
+            cur.getBlock().setType(i == COURSE.length - 1 ? Material.GOLD_BLOCK : Material.QUARTZ_BLOCK);
         }
-        // Mark goal with a beacon-style ladder up
+        // Mark the goal with a light beacon so it's visible from the start.
         cur.clone().add(0, 1, 0).getBlock().setType(Material.LIGHT);
         return anchor.clone().add(0.5, 1, 0.5);
     }
@@ -54,8 +84,8 @@ public class ParkourRoom implements LootRoom {
     public void tick(LootRoomRun run) {
         Player p = run.player();
         if (p == null) { run.markFinished(); return; }
-        long elapsed = (org.bukkit.Bukkit.getCurrentTick() - run.startTick()) / 20;
-        if (elapsed > 90) {
+        long elapsed = (Bukkit.getCurrentTick() - run.startTick()) / 20;
+        if (elapsed > 120) {
             Msg.actionBar(p, "<red>Time's up!");
             run.markFinished();
             return;
@@ -63,10 +93,11 @@ public class ParkourRoom implements LootRoom {
         // Finish condition: standing on the gold block
         Material under = p.getLocation().clone().subtract(0, 1, 0).getBlock().getType();
         if (under == Material.GOLD_BLOCK) {
-            run.addScore((int) Math.max(50, 200 - elapsed * 2));
+            run.addScore((int) Math.max(50, 250 - elapsed * 2));
             run.markFinished();
+            return;
         }
-        // Falling check: anchor Y-3
+        // Falling check — send the player back to start instead of forfeiting.
         if (p.getLocation().getY() < run.anchor().getY() - 3) {
             p.teleport(run.anchor().clone().add(0.5, 1, 0.5));
             Msg.actionBar(p, "<gray>Back to start.");

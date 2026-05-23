@@ -142,13 +142,6 @@ public class YamlStorage implements DataStorage {
                 } catch (IllegalArgumentException ignored) {}
             }
         }
-        p.setSelectedPet(y.getString("pet.selected", null));
-        Map<String, Integer> petLevels = new HashMap<>();
-        ConfigurationSection pets = y.getConfigurationSection("pets");
-        if (pets != null) {
-            for (String key : pets.getKeys(false)) petLevels.put(key, pets.getInt(key + ".level", 1));
-        }
-        p.getPetLevels().putAll(petLevels);
         p.setQuestProgress(y.getInt("quest.progress", 0));
         p.setQuestDayStamp(y.getLong("quest.day", 0));
         p.setMenuItemEnabled(y.getBoolean("ui.menuItem", true));
@@ -165,10 +158,6 @@ public class YamlStorage implements DataStorage {
             String key = "skills." + type.name().toLowerCase();
             y.set(key + ".xp", p.getXp(type));
             y.set(key + ".level", p.getLevel(type));
-        }
-        y.set("pet.selected", p.getSelectedPet());
-        for (Map.Entry<String, Integer> e : p.getPetLevels().entrySet()) {
-            y.set("pets." + e.getKey() + ".level", e.getValue());
         }
         y.set("quest.progress", p.getQuestProgress());
         y.set("quest.day", p.getQuestDayStamp());

@@ -21,7 +21,7 @@ public enum Perk {
     // Magic
     AETHER_SIGHT(SkillType.MAGIC, 5, "Aether Sight", "See 12 upcoming blocks"),
     RIFTWALKER(SkillType.MAGIC, 10, "Riftwalker", "Loot rooms appear 20% more"),
-    ARCANE_LURE(SkillType.MAGIC, 20, "Arcane Lure", "Pets gain XP 2x faster"),
+    ARCANE_LURE(SkillType.MAGIC, 20, "Arcane Lure", "+10% XP from all skills"),
     TIMESHIFT(SkillType.MAGIC, 30, "Timeshift", "Reroll your prophecy once / day"),
 
     // Luck

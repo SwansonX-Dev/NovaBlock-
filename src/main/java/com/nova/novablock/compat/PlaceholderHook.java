@@ -2,7 +2,6 @@ package com.nova.novablock.compat;
 
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.island.Island;
-import com.nova.novablock.pet.Pet;
 import com.nova.novablock.phase.Phase;
 import com.nova.novablock.progression.PlayerProgression;
 import com.nova.novablock.progression.SkillType;
@@ -18,7 +17,6 @@ import org.bukkit.OfflinePlayer;
  *   phase, phase_name, phase_progress, phase_required
  *   blocks, coins
  *   skill_mining_level, skill_combat_level, skill_magic_level, skill_luck_level
- *   pet_name, pet_task, pet_level
  *   quest_name, quest_progress, quest_required
  *   event_name, event_seconds_left
  */
@@ -75,18 +73,6 @@ public class PlaceholderHook extends PlaceholderExpansion {
                 PlayerProgression prog = plugin.progression().get(player.getUniqueId());
                 return String.valueOf(prog.getLevel(type));
             } catch (IllegalArgumentException ignored) { return ""; }
-        }
-
-        if (key.startsWith("pet_")) {
-            if (!player.isOnline()) return "";
-            Pet pet = plugin.pets().getActive(player.getUniqueId());
-            if (pet == null) return "";
-            return switch (key) {
-                case "pet_name" -> pet.customName() != null ? pet.customName() : pet.type().displayName;
-                case "pet_task" -> pet.task().displayName;
-                case "pet_level" -> String.valueOf(pet.level());
-                default -> "";
-            };
         }
 
         if (key.startsWith("quest_")) {

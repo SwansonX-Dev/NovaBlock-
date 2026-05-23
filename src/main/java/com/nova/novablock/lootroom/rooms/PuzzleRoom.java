@@ -58,22 +58,34 @@ public class PuzzleRoom implements LootRoom {
         return anchor.clone().add(0.5, 1, -2.5);
     }
 
+    // State layout (long, 64 bits):
+    //   bits  0-15: 4-step sequence (4 bits per step, value 0-8 = pad index)
+    //   bits 16-19: current step counter (0-4; 4 = won)
+    //   bits 20-23: lastPad + 1 (0 = "not standing on any pad")
+    private static long seqOf(long s)      { return s & 0xFFFFL; }
+    private static int  stepOf(long s)     { return (int)((s >>> 16) & 0xF); }
+    private static int  lastPadOf(long s)  { return ((int)((s >>> 20) & 0xF)) - 1; }
+    private static long pack(long seq, int step, int lastPad) {
+        return (seq & 0xFFFFL) | ((long)(step & 0xF) << 16) | ((long)((lastPad + 1) & 0xF) << 20);
+    }
+    private static int  padAt(long seq, int step) { return (int)((seq >> (step * 4)) & 0xF); }
+
     @Override
     public void onStart(LootRoomRun run, Player p) {
         long sequence = 0;
         var rng = ThreadLocalRandom.current();
         for (int i = 0; i < 4; i++) {
-            sequence |= ((long) rng.nextInt(9)) << (i * 4); // 4 bits per step, 4 steps
+            sequence |= ((long) rng.nextInt(9)) << (i * 4);
         }
-        run.setState(sequence);
+        run.setState(pack(sequence, 0, -1));
         Msg.send(p, "<aqua>Watch the lights — then repeat by walking on the matching wool blocks!");
         showSequence(run, p);
     }
 
     private void showSequence(LootRoomRun run, Player p) {
-        long seq = run.state();
+        long seq = seqOf(run.state());
         for (int i = 0; i < 4; i++) {
-            int idx = (int) ((seq >> (i * 4)) & 0xF);
+            int idx = (int)((seq >> (i * 4)) & 0xF);
             int dx = (idx % 3) - 1;
             int dz = (idx / 3) - 1;
             Location at = run.anchor().clone().add(dx, 1.2, dz);
@@ -82,43 +94,65 @@ public class PuzzleRoom implements LootRoom {
                 p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 0.6f + idx * 0.15f);
             }, 20L + i * 20L);
         }
+        // Tell the player it's their turn after the sequence finishes.
+        org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!p.isOnline()) return;
+            Msg.actionBar(p, "<yellow>Your turn — step onto the pads in order!");
+        }, 20L + 4 * 20L + 10L);
     }
 
     @Override
     public void tick(LootRoomRun run) {
         Player p = run.player();
         if (p == null) { run.markFinished(); return; }
-        // Determine which wool block the player is standing on
+
+        long state = run.state();
+        int lastPad = lastPadOf(state);
+
+        // Where are we standing? Compute padIdx (-1 if off-grid).
         Location below = p.getLocation().clone().subtract(0, 1, 0);
         Material mat = below.getBlock().getType();
-        if (!mat.name().endsWith("_WOOL")) return;
+        int padIdx = -1;
+        if (mat.name().endsWith("_WOOL")) {
+            int dx = below.getBlockX() - run.anchor().getBlockX();
+            int dz = below.getBlockZ() - run.anchor().getBlockZ();
+            if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) {
+                padIdx = (dx + 1) + (dz + 1) * 3;
+            }
+        }
 
-        int dx = below.getBlockX() - run.anchor().getBlockX();
-        int dz = below.getBlockZ() - run.anchor().getBlockZ();
-        if (Math.abs(dx) > 1 || Math.abs(dz) > 1) return;
-        int padIdx = (dx + 1) + (dz + 1) * 3;
+        // Debounce: only act when the player CHANGES pads. Standing still
+        // (or sliding around off-pad) shouldn't keep firing reset / advance.
+        if (padIdx == lastPad) return;
 
-        long seq = run.state();
-        // We re-use bit 60 onward as "step pointer"
-        int step = (int) ((seq >>> 60) & 0xF);
-        int expected = (int) ((seq >> (step * 4)) & 0xF);
+        // Update lastPad regardless of correctness so the next tick has accurate state.
+        long seq = seqOf(state);
+        int step = stepOf(state);
+
+        if (padIdx == -1) {
+            // Stepped off the pad area — just remember that.
+            run.setState(pack(seq, step, -1));
+            return;
+        }
+
+        int expected = padAt(seq, step);
         if (padIdx == expected) {
             step++;
-            p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1f);
+            p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 0.8f + step * 0.15f);
+            below.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER,
+                    below.clone().add(0.5, 1.2, 0.5), 12, 0.3, 0.3, 0.3);
             if (step >= 4) {
                 run.addScore(400);
                 run.markFinished();
                 return;
             }
-            // Clear pointer and rewrite
-            seq = (seq & ~(0xFL << 60)) | ((long) step << 60);
-            run.setState(seq);
-        } else if (padIdx != expected) {
-            // wrong — reset to start
-            seq = seq & ~(0xFL << 60);
-            run.setState(seq);
+            Msg.actionBar(p, "<green>" + step + "/4");
+            run.setState(pack(seq, step, padIdx));
+        } else {
             p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_BASS, 1f, 0.5f);
-            Msg.actionBar(p, "<red>Wrong! Restarting sequence.");
+            Msg.actionBar(p, "<red>Wrong pad! Restarting — watch the sequence again.");
+            run.setState(pack(seq, 0, padIdx));
+            showSequence(run, p);
         }
     }
 }

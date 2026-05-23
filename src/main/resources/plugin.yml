@@ -3,7 +3,7 @@ version: ${project.version}
 main: com.nova.novablock.NovaBlock
 api-version: '1.21'
 authors: [Nova]
-description: A reimagined OneBlock experience with phases, bosses, loot rooms, skill trees, pets, prophecies and more.
+description: A reimagined OneBlock experience with phases, bosses, loot rooms, skill trees, prophecies and more.
 load: POSTWORLD
 depend: [xEconomy]
 softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI]
@@ -11,7 +11,7 @@ softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI]
 commands:
   oneblock:
     description: Main NovaBlock command
-    usage: /<command> [create|home|warp|phase|menu|prophecy|skills|pets|store|quests|shop|leaderboard|toggle|help]
+    usage: /<command> [create|home|warp|phase|menu|prophecy|skills|quests|shop|leaderboard|toggle|help]
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command
@@ -40,9 +40,6 @@ permissions:
     default: true
   novablock.skills:
     description: Allows viewing the skill tree
-    default: true
-  novablock.pets:
-    description: Allows summoning pets
     default: true
   novablock.shop:
     description: Allows the in-game shop

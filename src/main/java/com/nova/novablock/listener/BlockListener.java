@@ -137,6 +137,9 @@ public class BlockListener implements Listener {
         // Paxel XP — progresses tool tier as the player levels Mining
         plugin.paxels().onMine(player, broken);
 
+        // Anti-AFK tracker — counts OneBlock activity, prompts a chat captcha every 30 min.
+        plugin.antiAfk().recordMineActivity(player);
+
         // Phase progression
         if (island.data().getPhaseProgress() >= phase.getRequiredBlocks()) {
             advancePhase(player, island, phase);
@@ -149,13 +152,24 @@ public class BlockListener implements Listener {
         center.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, center.clone().add(0.5, 0.5, 0.5), 4, 0.2, 0.2, 0.2);
     }
 
-    /** Drop the block's natural drops at its location using the tool the player has. */
+    /**
+     * Drop the OneBlock's natural drops at its location using the tool the player
+     * has. If the player is holding their paxel, auto-smelt and telekinesis the
+     * drops straight into their inventory (overflow falls at the block).
+     */
     private void dropNaturally(Block block, Player player, ItemStack tool) {
         var loc = block.getLocation().add(0.5, 0.5, 0.5);
-        boolean autoSmelt = plugin.paxels().isPaxel(tool);
+        boolean paxel = plugin.paxels().isPaxel(tool);
         for (ItemStack drop : block.getDrops(tool)) {
-            if (autoSmelt) drop = plugin.paxels().maybeSmelt(drop);
-            block.getWorld().dropItemNaturally(loc, drop);
+            if (paxel) drop = plugin.paxels().maybeSmelt(drop);
+            if (paxel) {
+                var overflow = player.getInventory().addItem(drop);
+                for (ItemStack leftover : overflow.values()) {
+                    block.getWorld().dropItemNaturally(loc, leftover);
+                }
+            } else {
+                block.getWorld().dropItemNaturally(loc, drop);
+            }
         }
     }
 
@@ -198,11 +212,9 @@ public class BlockListener implements Listener {
             }
         }
         // Loot room every ~150 blocks (cooldown protected). Rift Storm = 5x rolls.
-        // Scout Fox pet = +25% rolls.
         if (broken - island.data().getLastLootRoomAt() >= 150) {
             int denom = 30;
             if (ev == SeasonManager.ServerEvent.RIFT_STORM) denom = 6;
-            if (plugin.pets().hasScoutBoost(player)) denom = Math.max(4, (int) (denom * 0.8));
             if (rng.nextInt(denom) == 0 && !phase.getLootRoomIds().isEmpty()) {
                 String roomId = phase.getLootRoomIds().get(rng.nextInt(phase.getLootRoomIds().size()));
                 plugin.lootRooms().offerEntry(player, island, roomId);

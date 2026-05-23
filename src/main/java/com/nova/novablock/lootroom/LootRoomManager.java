@@ -18,6 +18,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockExplodeEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
@@ -184,6 +188,51 @@ public class LootRoomManager implements Listener {
         LootRoomRun run = active.remove(event.getPlayer().getUniqueId());
         if (run != null) cleanupRoomMobs(run);
         pendingReturn.remove(event.getPlayer().getUniqueId());
+    }
+
+    // ---- room protection: nothing inside an active arena should be break/place/explodable ----
+
+    /** True if the location is inside the working bounds of any currently-active loot room. */
+    private boolean insideAnyRoom(Location loc) {
+        if (loc == null) return false;
+        for (LootRoomRun run : active.values()) {
+            Location a = run.anchor();
+            if (a == null || a.getWorld() == null) continue;
+            if (!a.getWorld().equals(loc.getWorld())) continue;
+            // Each room fits comfortably inside an 18-block half-width box around its anchor;
+            // the largest is the Arena at radius 11, with a small buffer.
+            if (Math.abs(loc.getBlockX() - a.getBlockX()) > 18) continue;
+            if (Math.abs(loc.getBlockZ() - a.getBlockZ()) > 18) continue;
+            if (loc.getBlockY() < a.getBlockY() - 2 || loc.getBlockY() > a.getBlockY() + 10) continue;
+            return true;
+        }
+        return false;
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBreakInRoom(BlockBreakEvent event) {
+        if (insideAnyRoom(event.getBlock().getLocation())) {
+            event.setCancelled(true);
+            Msg.actionBar(event.getPlayer(), "<red>You can't break blocks inside a rift.");
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlaceInRoom(BlockPlaceEvent event) {
+        if (insideAnyRoom(event.getBlock().getLocation())) {
+            event.setCancelled(true);
+            Msg.actionBar(event.getPlayer(), "<red>You can't place blocks inside a rift.");
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onBlockExplode(BlockExplodeEvent event) {
+        event.blockList().removeIf(b -> insideAnyRoom(b.getLocation()));
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityExplode(EntityExplodeEvent event) {
+        event.blockList().removeIf(b -> insideAnyRoom(b.getLocation()));
     }
 
     private void complete(LootRoomRun run) {

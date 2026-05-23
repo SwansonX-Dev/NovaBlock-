@@ -29,17 +29,16 @@ public final class HelpRegistrar {
     private static final class NovaHelpTopic extends HelpTopic {
         NovaHelpTopic() {
             this.name = "novablock";
-            this.shortText = "NovaBlock — phases, bosses, pets, paxel, skills";
+            this.shortText = "NovaBlock — phases, bosses, paxel, skills";
             StringBuilder sb = new StringBuilder();
             sb.append("§6§lNovaBlock\n");
             sb.append("§7Mine your OneBlock through §e12 themed phases§7 — fight bosses, ");
-            sb.append("dive into loot-room rifts, level skills, and bond with pets.\n\n");
+            sb.append("dive into loot-room rifts, and level skills.\n\n");
             sb.append("§e/ob §7or §e/nb §7— open the main menu\n");
             sb.append("§e/ob create §7— claim your island\n");
             sb.append("§e/ob home §7— teleport to your OneBlock\n");
             sb.append("§e/ob prophecy §7— see and lock upcoming blocks\n");
             sb.append("§e/ob skills §7— skill trees and perks\n");
-            sb.append("§e/ob pets §7— summon and command pets\n");
             sb.append("§e/ob shop §7— spend coins\n");
             sb.append("§e/ob quest §7— today's daily challenge\n");
             sb.append("§e/ob leaderboard §7— top islands\n");

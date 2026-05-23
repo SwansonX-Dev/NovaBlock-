@@ -41,6 +41,7 @@ import org.bukkit.persistence.PersistentDataType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * The Paxel: a shovel/axe/pickaxe in one. Player-bound, soulbound, unbreakable.
@@ -64,7 +65,23 @@ public class PaxelManager implements Listener {
     public static final NamespacedKey PAXEL_TIER = new NamespacedKey("novablock", "paxel_tier");
     public static final NamespacedKey PAXEL_VERSION_KEY = new NamespacedKey("novablock", "paxel_version");
     /** Bump when build() changes in a way that needs to invalidate existing paxels in inventories. */
-    public static final int PAXEL_VERSION = 1;
+    public static final int PAXEL_VERSION = 2;
+
+    /** Ores eligible for vein-mining. The OneBlock center is always excluded regardless of type. */
+    private static final java.util.Set<Material> ORES = java.util.Set.of(
+            Material.COAL_ORE, Material.DEEPSLATE_COAL_ORE,
+            Material.IRON_ORE, Material.DEEPSLATE_IRON_ORE,
+            Material.GOLD_ORE, Material.DEEPSLATE_GOLD_ORE, Material.NETHER_GOLD_ORE,
+            Material.DIAMOND_ORE, Material.DEEPSLATE_DIAMOND_ORE,
+            Material.EMERALD_ORE, Material.DEEPSLATE_EMERALD_ORE,
+            Material.LAPIS_ORE, Material.DEEPSLATE_LAPIS_ORE,
+            Material.REDSTONE_ORE, Material.DEEPSLATE_REDSTONE_ORE,
+            Material.COPPER_ORE, Material.DEEPSLATE_COPPER_ORE,
+            Material.NETHER_QUARTZ_ORE,
+            Material.ANCIENT_DEBRIS);
+
+    /** Hard cap on vein-mine cascade so a misuse doesn't lag the server. */
+    private static final int VEIN_MINE_LIMIT = 16;
 
     private static final Material[] TIER_MATERIALS = {
             Material.WOODEN_PICKAXE,
@@ -129,6 +146,8 @@ public class PaxelManager implements Listener {
         lore.add(Msg.mm("<aqua>Abilities").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("<gray>· Mines pickaxe + axe + shovel + hoe blocks").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("<gray>· Auto-smelt cobble & ores").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        lore.add(Msg.mm("<gray>· Telekinesis — drops + XP go to your inventory").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        lore.add(Msg.mm("<gray>· Vein-mine ores (up to 16 connected)").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("<gray>· Tiers up with your island phase").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("<gold>★ Soulbound to " + owner.getName()).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
@@ -293,6 +312,110 @@ public class PaxelManager implements Listener {
                 Msg.actionBar(p, hud);
             }
         }, 20L, 20L);
+    }
+
+    // ---------------- break handler: telekinesis + vein-mine ----------------
+
+    /**
+     * Runs at NORMAL priority. BlockListener at HIGH still owns OneBlock-center
+     * regen — we explicitly skip the center here so it doesn't double-handle.
+     * For every other paxel break we suppress vanilla drops/XP and route them
+     * directly to the player's inventory, then vein-mine ores (capped at
+     * {@link #VEIN_MINE_LIMIT} blocks, never touching the OB center).
+     */
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    public void onPaxelBreak(org.bukkit.event.block.BlockBreakEvent event) {
+        Player p = event.getPlayer();
+        ItemStack tool = p.getInventory().getItemInMainHand();
+        if (!isOwner(tool, p)) return;
+        org.bukkit.block.Block block = event.getBlock();
+
+        // Skip the OneBlock center — BlockListener owns its regen and its own drop path.
+        if (isObCenter(block)) return;
+
+        // Capture the XP value the event would have dropped, then suppress it.
+        int xp = event.getExpToDrop();
+        event.setDropItems(false);
+        event.setExpToDrop(0);
+
+        // Telekinesis the primary drop + XP.
+        collectDrops(p, tool, block, block.getDrops(tool));
+        if (xp > 0) p.giveExp(xp);
+
+        // Vein-mine: if the broken block was an ore, chain to connected same-type ores.
+        if (ORES.contains(block.getType())) {
+            veinMine(p, tool, block);
+        }
+    }
+
+    private void veinMine(Player p, ItemStack tool, org.bukkit.block.Block start) {
+        Material target = start.getType();
+        java.util.Set<org.bukkit.block.Block> visited = new java.util.HashSet<>();
+        java.util.Deque<org.bukkit.block.Block> queue = new java.util.ArrayDeque<>();
+        visited.add(start); // the starting block is already being broken by vanilla
+        queue.push(start);
+
+        java.util.List<org.bukkit.block.Block> extras = new java.util.ArrayList<>();
+        while (!queue.isEmpty() && extras.size() < VEIN_MINE_LIMIT) {
+            org.bukkit.block.Block cur = queue.pop();
+            for (int dx = -1; dx <= 1; dx++)
+            for (int dy = -1; dy <= 1; dy++)
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dy == 0 && dz == 0) continue;
+                org.bukkit.block.Block adj = cur.getRelative(dx, dy, dz);
+                if (adj.getType() != target) continue;
+                if (!visited.add(adj)) continue;
+                if (isObCenter(adj)) continue; // never vein into the OneBlock
+                extras.add(adj);
+                queue.push(adj);
+                if (extras.size() >= VEIN_MINE_LIMIT) break;
+            }
+        }
+
+        // XP from vein-mined extras is approximated by ore type (Block#getExpDrop
+        // isn't part of the API surface we compile against).
+        int veinXp = 0;
+        for (org.bukkit.block.Block b : extras) {
+            collectDrops(p, tool, b, b.getDrops(tool));
+            veinXp += approxOreXp(b.getType());
+            b.setType(Material.AIR, false);
+        }
+        if (veinXp > 0) p.giveExp(veinXp);
+    }
+
+    private static int approxOreXp(Material ore) {
+        return switch (ore) {
+            case COAL_ORE, DEEPSLATE_COAL_ORE -> ThreadLocalRandom.current().nextInt(0, 3);
+            case IRON_ORE, DEEPSLATE_IRON_ORE, COPPER_ORE, DEEPSLATE_COPPER_ORE -> 0;
+            case GOLD_ORE, DEEPSLATE_GOLD_ORE, NETHER_GOLD_ORE -> 0;
+            case DIAMOND_ORE, DEEPSLATE_DIAMOND_ORE -> ThreadLocalRandom.current().nextInt(3, 8);
+            case EMERALD_ORE, DEEPSLATE_EMERALD_ORE -> ThreadLocalRandom.current().nextInt(3, 8);
+            case LAPIS_ORE, DEEPSLATE_LAPIS_ORE -> ThreadLocalRandom.current().nextInt(2, 6);
+            case REDSTONE_ORE, DEEPSLATE_REDSTONE_ORE -> ThreadLocalRandom.current().nextInt(1, 6);
+            case NETHER_QUARTZ_ORE -> ThreadLocalRandom.current().nextInt(2, 6);
+            case ANCIENT_DEBRIS -> 0;
+            default -> 0;
+        };
+    }
+
+    private void collectDrops(Player p, ItemStack tool, org.bukkit.block.Block block, java.util.Collection<ItemStack> drops) {
+        org.bukkit.Location dropLoc = block.getLocation().add(0.5, 0.5, 0.5);
+        for (ItemStack drop : drops) {
+            ItemStack item = maybeSmelt(drop);
+            var overflow = p.getInventory().addItem(item);
+            for (ItemStack leftover : overflow.values()) {
+                block.getWorld().dropItemNaturally(dropLoc, leftover);
+            }
+        }
+    }
+
+    private boolean isObCenter(org.bukkit.block.Block block) {
+        Island island = plugin.islands().atLocation(block.getLocation());
+        if (island == null) return false;
+        org.bukkit.Location center = island.centerBlock();
+        return block.getX() == center.getBlockX()
+                && block.getY() == center.getBlockY()
+                && block.getZ() == center.getBlockZ();
     }
 
     // ---------------- listeners: lock it down ----------------

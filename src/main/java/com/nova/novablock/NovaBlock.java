@@ -1,5 +1,6 @@
 package com.nova.novablock;
 
+import com.nova.novablock.antiafk.AntiAfkManager;
 import com.nova.novablock.boss.BossManager;
 import com.nova.novablock.command.AdminCommand;
 import com.nova.novablock.command.OneBlockCommand;
@@ -17,7 +18,6 @@ import com.nova.novablock.listener.BlockListener;
 import com.nova.novablock.listener.PlayerListener;
 import com.nova.novablock.lootroom.LootRoomManager;
 import com.nova.novablock.paxel.PaxelManager;
-import com.nova.novablock.pet.PetManager;
 import com.nova.novablock.phase.PhaseManager;
 import com.nova.novablock.progression.ProgressionManager;
 import com.nova.novablock.prophecy.ProphecyManager;
@@ -43,7 +43,6 @@ public final class NovaBlock extends JavaPlugin {
     private LootRoomManager lootRoomManager;
     private ProgressionManager progressionManager;
     private QuestManager questManager;
-    private PetManager petManager;
     private PaxelManager paxelManager;
     private HotbarMenuManager hotbarManager;
     private EconomyManager economyManager;
@@ -51,6 +50,7 @@ public final class NovaBlock extends JavaPlugin {
     private EventManager eventManager;
     private SeasonManager seasonManager;
     private ScoreboardManager scoreboardManager;
+    private AntiAfkManager antiAfkManager;
 
     @Override
     public void onEnable() {
@@ -83,13 +83,13 @@ public final class NovaBlock extends JavaPlugin {
 
         this.questManager = new QuestManager(this);
         this.questManager.loadDailyQuests();
-        this.petManager = new PetManager(this);
         this.paxelManager = new PaxelManager(this);
         this.hotbarManager = new HotbarMenuManager(this);
         this.guiManager = new GuiManager(this);
         this.eventManager = new EventManager(this);
         this.seasonManager = new SeasonManager(this);
         this.scoreboardManager = new ScoreboardManager(this);
+        this.antiAfkManager = new AntiAfkManager(this);
 
         getServer().getPluginManager().registerEvents(new BlockListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
@@ -127,11 +127,11 @@ public final class NovaBlock extends JavaPlugin {
     @Override
     public void onDisable() {
         // Stop tickers first so they don't fire against objects we're about to tear down.
+        if (antiAfkManager != null) antiAfkManager.shutdown();
         if (eventManager != null) eventManager.shutdown();
         if (seasonManager != null) seasonManager.shutdown();
         if (scoreboardManager != null) scoreboardManager.shutdown();
         if (lootRoomManager != null) lootRoomManager.shutdown();
-        if (petManager != null) petManager.shutdown();
         if (bossManager != null) bossManager.shutdown();
 
         // Then persist.
@@ -154,7 +154,6 @@ public final class NovaBlock extends JavaPlugin {
     public LootRoomManager lootRooms() { return lootRoomManager; }
     public ProgressionManager progression() { return progressionManager; }
     public QuestManager quests() { return questManager; }
-    public PetManager pets() { return petManager; }
     public PaxelManager paxels() { return paxelManager; }
     public HotbarMenuManager hotbar() { return hotbarManager; }
     public EconomyManager economy() { return economyManager; }
@@ -162,4 +161,5 @@ public final class NovaBlock extends JavaPlugin {
     public EventManager events() { return eventManager; }
     public SeasonManager seasons() { return seasonManager; }
     public ScoreboardManager scoreboards() { return scoreboardManager; }
+    public AntiAfkManager antiAfk() { return antiAfkManager; }
 }

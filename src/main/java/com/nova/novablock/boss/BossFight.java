@@ -17,6 +17,8 @@ public class BossFight {
     private final UUID entityId;
     private final BossBar bar;
     private final Set<UUID> participants = new HashSet<>();
+    /** Per-player death count during this fight; used by the 3-strike escape valve. */
+    private final java.util.Map<UUID, Integer> deathsByPlayer = new java.util.HashMap<>();
     private final long startedAt = System.currentTimeMillis();
     private int phase = 1;
     /** Spawn point for tethering — bosses get teleported back if they wander too far. */
@@ -40,6 +42,14 @@ public class BossFight {
 
     public org.bukkit.Location arenaCenter() { return arenaCenter; }
     public void setArenaCenter(org.bukkit.Location l) { this.arenaCenter = l; }
+
+    /** Returns the player's new death count after incrementing. */
+    public int recordDeath(UUID playerId) {
+        int v = deathsByPlayer.getOrDefault(playerId, 0) + 1;
+        deathsByPlayer.put(playerId, v);
+        return v;
+    }
+    public int deathsBy(UUID playerId) { return deathsByPlayer.getOrDefault(playerId, 0); }
 
     public LivingEntity entity() {
         var e = org.bukkit.Bukkit.getEntity(entityId);
