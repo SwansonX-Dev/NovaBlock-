@@ -62,6 +62,9 @@ public class PaxelManager implements Listener {
 
     public static final NamespacedKey PAXEL_OWNER = new NamespacedKey("novablock", "paxel_owner");
     public static final NamespacedKey PAXEL_TIER = new NamespacedKey("novablock", "paxel_tier");
+    public static final NamespacedKey PAXEL_VERSION_KEY = new NamespacedKey("novablock", "paxel_version");
+    /** Bump when build() changes in a way that needs to invalidate existing paxels in inventories. */
+    public static final int PAXEL_VERSION = 1;
 
     private static final Material[] TIER_MATERIALS = {
             Material.WOODEN_PICKAXE,
@@ -139,6 +142,7 @@ public class PaxelManager implements Listener {
         meta.addEnchant(Enchantment.MENDING, 1, true);
         meta.getPersistentDataContainer().set(PAXEL_OWNER, PersistentDataType.STRING, owner.getUniqueId().toString());
         meta.getPersistentDataContainer().set(PAXEL_TIER, PersistentDataType.INTEGER, tier);
+        meta.getPersistentDataContainer().set(PAXEL_VERSION_KEY, PersistentDataType.INTEGER, PAXEL_VERSION);
         if (meta instanceof Damageable d) d.setDamage(0);
         stack.setItemMeta(meta);
 
@@ -186,6 +190,13 @@ public class PaxelManager implements Listener {
         return t == null ? 0 : t;
     }
 
+    /** Returns the recorded version of an existing paxel, or 0 if the key is missing (legacy paxel). */
+    public int versionOf(ItemStack item) {
+        if (!isPaxel(item)) return -1;
+        Integer v = item.getItemMeta().getPersistentDataContainer().get(PAXEL_VERSION_KEY, PersistentDataType.INTEGER);
+        return v == null ? 0 : v;
+    }
+
     /** Auto-smelt drop transform. Returns a new ItemStack of the smelted material, or the input unchanged. */
     public ItemStack maybeSmelt(ItemStack drop) {
         if (drop == null) return drop;
@@ -205,7 +216,13 @@ public class PaxelManager implements Listener {
         Msg.actionBar(p, "<gold>Your Paxel is in your inventory.");
     }
 
-    /** Check the player's inventory for a paxel and upgrade its tier if it's behind the phase. */
+    /**
+     * Check the player's inventory for a paxel and rebuild it if:
+     *  - the tier is behind the phase (phase-up upgrade), OR
+     *  - the version is older than {@link #PAXEL_VERSION} (legacy paxel from
+     *    before a behaviour change; rebuilding picks up the new tool component,
+     *    auto-smelt mapping, etc.).
+     */
     public void refreshTier(Player p) {
         PlayerInventory inv = p.getInventory();
         int target = tierFor(p);
@@ -213,14 +230,29 @@ public class PaxelManager implements Listener {
             ItemStack it = inv.getItem(i);
             if (!isOwner(it, p)) continue;
             int current = tierOf(it);
-            if (current < target) {
+            int version = versionOf(it);
+            boolean tierBehind = current < target;
+            boolean outdated = version < PAXEL_VERSION;
+            if (tierBehind || outdated) {
                 inv.setItem(i, build(p, target));
-                Msg.title(p, "<gold>Paxel Upgraded", "<" + TIER_COLORS[target] + ">" + TIER_NAMES[target]);
-                p.playSound(p.getLocation(), Sound.BLOCK_ANVIL_USE, 0.8f, 1.4f);
+                if (tierBehind) {
+                    Msg.title(p, "<gold>Paxel Upgraded", "<" + TIER_COLORS[target] + ">" + TIER_NAMES[target]);
+                    p.playSound(p.getLocation(), Sound.BLOCK_ANVIL_USE, 0.8f, 1.4f);
+                }
             }
             return;
         }
         // No paxel in inventory: re-issue one.
+        give(p);
+    }
+
+    /** Force-replace any existing paxel with a fresh one at the player's current tier. Used by /obadmin givepaxel. */
+    public void replace(Player p) {
+        PlayerInventory inv = p.getInventory();
+        for (int i = 0; i < inv.getSize(); i++) {
+            ItemStack it = inv.getItem(i);
+            if (isOwner(it, p)) inv.setItem(i, null);
+        }
         give(p);
     }
 

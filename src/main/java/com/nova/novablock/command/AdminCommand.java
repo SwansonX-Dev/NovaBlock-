@@ -104,9 +104,8 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 if (args.length < 2) { Msg.send(sender, "<red>/obadmin givepaxel <player>"); return true; }
                 Player target = Bukkit.getPlayerExact(args[1]);
                 if (target == null) { Msg.send(sender, "<red>Player not online."); return true; }
-                plugin.paxels().give(target);
-                plugin.paxels().refreshTier(target);
-                Msg.send(sender, "<green>Gave a paxel to " + target.getName() + ".");
+                plugin.paxels().replace(target);
+                Msg.send(sender, "<green>Re-issued paxel to " + target.getName() + ".");
             }
             default -> Msg.send(sender, "<red>Unknown subcommand.");
         }
