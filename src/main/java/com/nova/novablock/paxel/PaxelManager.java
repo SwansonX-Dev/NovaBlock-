@@ -1,10 +1,11 @@
 package com.nova.novablock.paxel;
 
 import com.nova.novablock.NovaBlock;
-import com.nova.novablock.progression.PlayerProgression;
-import com.nova.novablock.progression.SkillType;
+import com.nova.novablock.island.Island;
+import com.nova.novablock.phase.Phase;
 import com.nova.novablock.util.ItemBuilder;
 import com.nova.novablock.util.Msg;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
@@ -27,25 +28,31 @@ import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * The Paxel: a shovel/axe/pickaxe in one. Player-bound, soulbound, unbreakable.
  * Cannot be dropped, traded, moved out of the player's inventory, or lost on death.
- * Visually evolves wooden → netherite as the player levels Mining.
  *
- * Implementation uses a pickaxe (which already drops dirt/wood/etc with the right
- * tool semantics in 1.21) plus Efficiency for speed. We re-issue the item on join
- * if it's missing.
+ * <p>Tier is bound to the player's island phase — completing phase 0 unlocks Stone,
+ * phase 1 unlocks Iron, etc. (capped at Netherite when reaching phase 5).
+ *
+ * <p>Abilities applied while holding:
+ *  - <b>Haste</b> (amplifier scales with tier) so the pickaxe Material breaks dirt,
+ *    wood, sand, leaves and everything else at a sensible speed without needing
+ *    multiple tool types in the same slot.
+ *  - <b>Auto-smelt</b>: cobble→stone, raw ore→ingot, ancient debris→netherite scrap.
+ *  - Persistent action-bar HUD showing tier + phase progress.
  */
 public class PaxelManager implements Listener {
 
     public static final NamespacedKey PAXEL_OWNER = new NamespacedKey("novablock", "paxel_owner");
     public static final NamespacedKey PAXEL_TIER = new NamespacedKey("novablock", "paxel_tier");
 
-    /** Mining level required to reach each tier (index = tier). */
-    private static final int[] TIER_LEVELS = {0, 5, 10, 15, 20, 25};
     private static final Material[] TIER_MATERIALS = {
             Material.WOODEN_PICKAXE,
             Material.STONE_PICKAXE,
@@ -61,21 +68,36 @@ public class PaxelManager implements Listener {
             "#A0793A", "#8C8C8C", "#E0E0E0", "#FFD24D", "#7FFFE0", "#5A2A6A"
     };
 
+    /** Cobble/raw-ore → smelted-result mapping for the auto-smelt ability. */
+    private static final Map<Material, Material> SMELT_MAP = Map.ofEntries(
+            Map.entry(Material.COBBLESTONE, Material.STONE),
+            Map.entry(Material.COBBLED_DEEPSLATE, Material.DEEPSLATE),
+            Map.entry(Material.RAW_IRON, Material.IRON_INGOT),
+            Map.entry(Material.RAW_GOLD, Material.GOLD_INGOT),
+            Map.entry(Material.RAW_COPPER, Material.COPPER_INGOT),
+            Map.entry(Material.ANCIENT_DEBRIS, Material.NETHERITE_SCRAP),
+            Map.entry(Material.SAND, Material.GLASS),
+            Map.entry(Material.RED_SAND, Material.RED_STAINED_GLASS),
+            Map.entry(Material.CLAY_BALL, Material.BRICK),
+            Map.entry(Material.WET_SPONGE, Material.SPONGE)
+    );
+
     private final NovaBlock plugin;
 
     public PaxelManager(NovaBlock plugin) {
         this.plugin = plugin;
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        startHudTicker();
     }
 
-    /** Tier this player has earned based on their Mining skill level. */
+    // ---------------- tiering ----------------
+
+    /** Tier this player has earned based on their island's current phase index. */
     public int tierFor(Player p) {
-        int level = plugin.progression().get(p).getLevel(SkillType.MINING);
-        int t = 0;
-        for (int i = 0; i < TIER_LEVELS.length; i++) {
-            if (level >= TIER_LEVELS[i]) t = i;
-        }
-        return t;
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) return 0;
+        int phase = island.data().getPhaseIndex();
+        return Math.max(0, Math.min(TIER_MATERIALS.length - 1, phase));
     }
 
     /** Build a fresh paxel item for the given player at the given tier. */
@@ -90,6 +112,12 @@ public class PaxelManager implements Listener {
         List<net.kyori.adventure.text.Component> lore = new java.util.ArrayList<>();
         lore.add(Msg.mm("<gray>Shovel · Axe · Pickaxe in one.").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("<gray>Tier <yellow>" + (tier + 1) + "/" + TIER_MATERIALS.length).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        lore.add(Msg.mm("").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        lore.add(Msg.mm("<aqua>Abilities").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        lore.add(Msg.mm("<gray>· Haste " + romanNumeral(Math.min(tier + 1, 5)) + " while held").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        lore.add(Msg.mm("<gray>· Auto-smelt cobble & ores").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        lore.add(Msg.mm("<gray>· Tiers up with your island phase").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        lore.add(Msg.mm("").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("<gold>★ Soulbound to " + owner.getName()).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("<dark_gray>Cannot be dropped or traded.").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         meta.lore(lore);
@@ -123,6 +151,14 @@ public class PaxelManager implements Listener {
         return t == null ? 0 : t;
     }
 
+    /** Auto-smelt drop transform. Returns a new ItemStack of the smelted material, or the input unchanged. */
+    public ItemStack maybeSmelt(ItemStack drop) {
+        if (drop == null) return drop;
+        Material to = SMELT_MAP.get(drop.getType());
+        if (to == null) return drop;
+        return new ItemStack(to, drop.getAmount());
+    }
+
     /** Give the player a paxel if they don't already have one. */
     public void give(Player p) {
         PlayerInventory inv = p.getInventory();
@@ -134,7 +170,7 @@ public class PaxelManager implements Listener {
         Msg.actionBar(p, "<gold>Your Paxel is in your inventory.");
     }
 
-    /** Check the player's inventory for a paxel and upgrade its tier if they've leveled up. */
+    /** Check the player's inventory for a paxel and upgrade its tier if it's behind the phase. */
     public void refreshTier(Player p) {
         PlayerInventory inv = p.getInventory();
         int target = tierFor(p);
@@ -153,9 +189,57 @@ public class PaxelManager implements Listener {
         give(p);
     }
 
-    /** Called by BlockListener when the player mines — checks for tier promotion. */
+    /** Called by BlockListener after each break — currently a no-op (tier is phase-driven now). */
     public void onMine(Player p, Material broken) {
-        refreshTier(p);
+        // tier upgrades happen on phase-up; nothing to do per-break.
+    }
+
+    // ---------------- haste + HUD ticker ----------------
+
+    /**
+     * Every second, for each online player holding their paxel, refresh a 2.5s Haste
+     * effect (so it persists smoothly while held and fades when swapped away) and
+     * send an action-bar HUD with tier + phase progress.
+     */
+    private void startHudTicker() {
+        plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                ItemStack main = p.getInventory().getItemInMainHand();
+                if (!isOwner(main, p)) continue;
+                int tier = tierOf(main);
+                int amp = Math.min(4, tier);
+                p.addPotionEffect(new PotionEffect(
+                        PotionEffectType.HASTE, 50, amp, false, false, false));
+
+                Island island = plugin.islands().ofPlayer(p);
+                String hud;
+                if (island == null) {
+                    hud = "<" + TIER_COLORS[tier] + ">" + TIER_NAMES[tier]
+                            + " <gray>· <yellow>No island";
+                } else {
+                    Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
+                    int prog = island.data().getPhaseProgress();
+                    int req = phase == null ? 1 : phase.getRequiredBlocks();
+                    String phaseName = phase == null ? "?" : phase.getDisplayName();
+                    String phaseColor = phase == null ? "white" : phase.getThemeColor();
+                    hud = "<" + TIER_COLORS[tier] + ">" + TIER_NAMES[tier]
+                            + " <gray>· <" + phaseColor + ">" + phaseName
+                            + " <white>" + prog + "<gray>/<white>" + req;
+                }
+                Msg.actionBar(p, hud);
+            }
+        }, 20L, 20L);
+    }
+
+    private static String romanNumeral(int n) {
+        return switch (n) {
+            case 1 -> "I";
+            case 2 -> "II";
+            case 3 -> "III";
+            case 4 -> "IV";
+            case 5 -> "V";
+            default -> String.valueOf(n);
+        };
     }
 
     // ---------------- listeners: lock it down ----------------
@@ -192,13 +276,11 @@ public class PaxelManager implements Listener {
         ItemStack moved = event.getCurrentItem();
         ItemStack cursor = event.getCursor();
         boolean blocked = false;
-        // Block any attempt to put the paxel into a foreign inventory
         if (event.getClickedInventory() != null
                 && event.getClickedInventory().getType() != InventoryType.PLAYER
                 && event.getClickedInventory().getType() != InventoryType.CRAFTING) {
             if (isPaxel(cursor) || isPaxel(moved)) blocked = true;
         }
-        // Block shift-clicking paxel out of player inventory into a container
         if (event.isShiftClick() && isPaxel(moved)
                 && event.getView().getTopInventory().getType() != InventoryType.CRAFTING
                 && event.getView().getTopInventory().getType() != InventoryType.PLAYER) {
@@ -214,11 +296,9 @@ public class PaxelManager implements Listener {
     public void onDrag(InventoryDragEvent event) {
         ItemStack item = event.getOldCursor();
         if (!isPaxel(item)) return;
-        // Only allow drag within the player's own inventory
         for (int slot : event.getRawSlots()) {
             if (slot >= event.getView().getTopInventory().getSize()
                     && event.getView().getTopInventory().getType() == InventoryType.CRAFTING) continue;
-            // top inventory slot — block it
             if (slot < event.getView().getTopInventory().getSize()
                     && event.getView().getTopInventory().getType() != InventoryType.PLAYER
                     && event.getView().getTopInventory().getType() != InventoryType.CRAFTING) {

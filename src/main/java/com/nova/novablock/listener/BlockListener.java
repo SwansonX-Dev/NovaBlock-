@@ -81,8 +81,7 @@ public class BlockListener implements Listener {
         // in the same tick so there's never a moment when the block is AIR. This fixes
         // "Bedrock has to break it twice" (player saw the gap and swung again).
         event.setCancelled(true);
-        dropNaturally(block, player.getInventory().getItemInMainHand());
-        block.setType(Material.AIR, false);
+        dropNaturally(block, player, player.getInventory().getItemInMainHand());
 
         // Phase-specific drops & bonuses
         handleBlockEvents(player, island, broken);
@@ -102,7 +101,10 @@ public class BlockListener implements Listener {
         }
 
         // Set the new block immediately — no scheduler hop, no air gap.
-        center.getBlock().setType(next, true);
+        // applyPhysics=false: keeps physics-dependent blocks (cactus, poppy, wheat_seeds,
+        // sweet_berry_bush, dead_bush, flowering_azalea, bamboo_block, sculk_shrieker, etc.)
+        // from being destroyed for "missing support" the instant they're placed onto bedrock.
+        center.getBlock().setType(next, false);
         // Maintain the bedrock anchor underneath at all times.
         Location anchor = center.clone().add(0, -1, 0);
         if (anchor.getBlock().getType() != Material.BEDROCK) {
@@ -148,9 +150,11 @@ public class BlockListener implements Listener {
     }
 
     /** Drop the block's natural drops at its location using the tool the player has. */
-    private void dropNaturally(Block block, ItemStack tool) {
+    private void dropNaturally(Block block, Player player, ItemStack tool) {
         var loc = block.getLocation().add(0.5, 0.5, 0.5);
+        boolean autoSmelt = plugin.paxels().isPaxel(tool);
         for (ItemStack drop : block.getDrops(tool)) {
+            if (autoSmelt) drop = plugin.paxels().maybeSmelt(drop);
             block.getWorld().dropItemNaturally(loc, drop);
         }
     }
