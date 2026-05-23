@@ -28,7 +28,10 @@ public class ProphecyGui extends ChestGui {
             boolean rare = plugin.prophecies().isRare(mat);
             int idx = i;
             String name = (rare ? "<gold>★ " : "<gray>") + (i + 1) + ". " + prettyName(mat);
-            ItemBuilder ib = ItemBuilder.of(mat).name(name);
+            // Some phase blocks (SWEET_BERRY_BUSH, TALL_GRASS, etc.) are block-only
+            // Materials with no ItemStack form; substitute a visually-equivalent
+            // item for the icon while keeping the real Material for naming/locking.
+            ItemBuilder ib = ItemBuilder.of(displayItem(mat)).name(name);
             if (rare) ib.lore("<yellow>Tap to lock as your prophecy.", "<gray>Bonus coins when reached.");
             else ib.lore("<dark_gray>Not a rare block.");
             if (picked == i) ib.lore("<green>(locked in)").glow();
@@ -53,5 +56,25 @@ public class ProphecyGui extends ChestGui {
             out.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
         }
         return out.toString();
+    }
+
+    /**
+     * Map a (possibly block-only) Material to something we can safely put in an
+     * {@link org.bukkit.inventory.ItemStack}. {@link Material#isItem()} catches
+     * anything not enumerated below; we fall back to PAPER as a last resort.
+     */
+    private static Material displayItem(Material m) {
+        if (m.isItem()) return m;
+        return switch (m) {
+            case SWEET_BERRY_BUSH -> Material.SWEET_BERRIES;
+            case TALL_GRASS -> Material.SHORT_GRASS;
+            case TALL_SEAGRASS -> Material.SEAGRASS;
+            case LARGE_FERN -> Material.FERN;
+            case PISTON_HEAD, MOVING_PISTON -> Material.PISTON;
+            case REDSTONE_WIRE -> Material.REDSTONE;
+            case TRIPWIRE -> Material.STRING;
+            case POTTED_AZALEA_BUSH -> Material.AZALEA;
+            default -> Material.PAPER;
+        };
     }
 }
