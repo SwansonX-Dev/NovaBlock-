@@ -1,0 +1,2 @@
+# Reserved for future i18n. NovaBlock currently uses inline MiniMessage strings.
+prefix: "<gradient:#7B61FF:#4FC3F7><bold>NovaBlock</bold></gradient> <dark_gray>»</dark_gray> <gray>"

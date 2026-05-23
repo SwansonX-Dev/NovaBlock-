@@ -1,0 +1,57 @@
+name: NovaBlock
+version: ${project.version}
+main: com.nova.novablock.NovaBlock
+api-version: '1.21'
+authors: [Nova]
+description: A reimagined OneBlock experience with phases, bosses, loot rooms, skill trees, pets, prophecies and more.
+load: POSTWORLD
+softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI]
+
+commands:
+  oneblock:
+    description: Main NovaBlock command
+    usage: /<command> [create|home|warp|phase|menu|prophecy|skills|pets|quests|shop|leaderboard]
+    aliases: [ob, nb, novablock]
+  obadmin:
+    description: NovaBlock admin command
+    usage: /<command> [reload|setphase|spawnboss|givecoins|wipe]
+    permission: novablock.admin
+
+permissions:
+  novablock.play:
+    description: Allows playing NovaBlock
+    default: true
+  novablock.create:
+    description: Allows creating an island
+    default: true
+  novablock.home:
+    description: Allows /ob home
+    default: true
+  novablock.menu:
+    description: Allows opening the main menu
+    default: true
+  novablock.prophecy:
+    description: Allows locking prophecies
+    default: true
+  novablock.skills:
+    description: Allows viewing the skill tree
+    default: true
+  novablock.pets:
+    description: Allows summoning pets
+    default: true
+  novablock.shop:
+    description: Allows the in-game shop
+    default: true
+  novablock.leaderboard:
+    description: Allows viewing the leaderboard
+    default: true
+  novablock.admin:
+    description: All admin commands
+    default: op
+    children:
+      novablock.admin.reload: true
+      novablock.admin.setphase: true
+      novablock.admin.spawnboss: true
+      novablock.admin.givecoins: true
+      novablock.admin.event: true
+      novablock.admin.wipe: true

@@ -1,0 +1,26 @@
+# Build output
+target/
+build/
+out/
+*.class
+
+# Downloaded compile-time deps (re-fetched via Maven from pom.xml)
+.lib/
+
+# Local test server
+test-server/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

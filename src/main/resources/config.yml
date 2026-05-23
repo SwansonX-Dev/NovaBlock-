@@ -1,0 +1,17 @@
+# NovaBlock config
+# Use /obadmin reload after editing.
+
+# Distance in blocks between island slots in the OneBlock world.
+# Default keeps islands well-separated to avoid TNT/projectile crossover.
+slotSize: 256
+
+# Disable any vanilla mob spawning in the OneBlock world (recommended true).
+disableNaturalSpawning: true
+
+# Whether to keep inventory on death inside the OneBlock world.
+keepInventoryOnDeath: true
+
+# Cooldowns in blocks broken
+cooldowns:
+  bossMinBlocks: 300
+  lootRoomMinBlocks: 150
