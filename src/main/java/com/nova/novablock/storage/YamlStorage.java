@@ -74,7 +74,6 @@ public class YamlStorage implements DataStorage {
                 long blocksBroken = y.getLong("blocksBroken", 0);
                 int phaseIndex = y.getInt("phaseIndex", 0);
                 int phaseProgress = y.getInt("phaseProgress", 0);
-                long coins = y.getLong("coins", 0);
                 int level = y.getInt("level", 1);
                 long lastBossAt = y.getLong("lastBossAt", 0);
                 long lastLootRoomAt = y.getLong("lastLootRoomAt", 0);
@@ -86,7 +85,6 @@ public class YamlStorage implements DataStorage {
                 data.setBlocksBroken(blocksBroken);
                 data.setPhaseIndex(phaseIndex);
                 data.setPhaseProgress(phaseProgress);
-                data.setCoins(coins);
                 data.setLevel(level);
                 data.setLastBossAt(lastBossAt);
                 data.setLastLootRoomAt(lastLootRoomAt);
@@ -112,7 +110,6 @@ public class YamlStorage implements DataStorage {
         y.set("blocksBroken", data.getBlocksBroken());
         y.set("phaseIndex", data.getPhaseIndex());
         y.set("phaseProgress", data.getPhaseProgress());
-        y.set("coins", data.getCoins());
         y.set("level", data.getLevel());
         y.set("lastBossAt", data.getLastBossAt());
         y.set("lastLootRoomAt", data.getLastLootRoomAt());

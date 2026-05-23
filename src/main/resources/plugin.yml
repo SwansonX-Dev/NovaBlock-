@@ -5,7 +5,8 @@ api-version: '1.21'
 authors: [Nova]
 description: A reimagined OneBlock experience with phases, bosses, loot rooms, skill trees, pets, prophecies and more.
 load: POSTWORLD
-softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, Vault, xEconomy]
+depend: [xEconomy]
+softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI]
 
 commands:
   oneblock:

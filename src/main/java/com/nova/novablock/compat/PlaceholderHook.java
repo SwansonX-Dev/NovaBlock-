@@ -65,7 +65,7 @@ public class PlaceholderHook extends PlaceholderExpansion {
                 return phase == null ? "0" : String.valueOf(phase.getRequiredBlocks());
             }
             case "blocks" -> { return island == null ? "0" : String.valueOf(island.data().getBlocksBroken()); }
-            case "coins" -> { return island == null ? "0" : String.valueOf(island.data().getCoins()); }
+            case "coins" -> { return island == null ? "0" : String.valueOf(plugin.economy().balance(island)); }
         }
 
         if (key.startsWith("skill_") && key.endsWith("_level")) {

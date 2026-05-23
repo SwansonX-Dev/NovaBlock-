@@ -23,7 +23,6 @@ public class IslandData {
     private long blocksBroken;
     private int phaseIndex;
     private int phaseProgress;
-    private long coins;
     private int level;
     private long lastBossAt;
     private long lastLootRoomAt;
@@ -54,10 +53,6 @@ public class IslandData {
     public int getPhaseProgress() { return phaseProgress; }
     public void setPhaseProgress(int v) { this.phaseProgress = v; }
     public void incrementPhaseProgress() { this.phaseProgress++; }
-
-    public long getCoins() { return coins; }
-    public void setCoins(long v) { this.coins = v; }
-    public void addCoins(long v) { this.coins += v; }
 
     public int getLevel() { return level; }
     public void setLevel(int v) { this.level = v; }

@@ -1,95 +1,99 @@
 package com.nova.novablock.economy;
 
 import com.nova.novablock.NovaBlock;
-import com.nova.novablock.compat.VaultHook;
 import com.nova.novablock.island.Island;
+import dev.xsuite.economy.api.Economy;
+import dev.xsuite.economy.api.XEconomy;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
- * Two-tier economy:
- *   - If Vault (xEconomy / Essentials Economy / etc.) is present, every transaction
- *     hits the player's Vault balance. Awards to an island are split evenly among
- *     online members; if no members are online the owner's balance is credited.
- *   - Otherwise we fall back to the per-island coin field stored in IslandData.
+ * Currency routing for NovaBlock. Every transaction goes through the xEconomy
+ * native API; callers continue to think in whole "coins" (long), which we
+ * convert to xEconomy's cents at the boundary (×100).
  *
- * Other systems keep calling award(island, amount) and balance(island) — the routing
- * is transparent to them.
+ * <p>Island-scoped awards split the credit among online members; if no members
+ * are online the owner is credited. Island-scoped spends always debit the owner.
  */
 public class EconomyManager {
 
+    /** 1 NovaBlock coin == 100 xEconomy cents. */
+    private static final long CENTS_PER_COIN = 100L;
+
     private final NovaBlock plugin;
-    private final VaultHook vault;
+    private final Economy eco;
 
     public EconomyManager(NovaBlock plugin) {
         this.plugin = plugin;
-        this.vault = new VaultHook(plugin);
-        this.vault.setup();
+        this.eco = XEconomy.get();
+        if (this.eco == null) {
+            // depend: [xEconomy] in plugin.yml means we should never reach here.
+            throw new IllegalStateException(
+                    "xEconomy is required but no Economy provider is registered. " +
+                    "Make sure the xEconomy plugin is installed and loaded.");
+        }
     }
 
-    public boolean usingVault() { return vault.isReady(); }
-
-    // ----- per-island operations (legacy callers) -----
+    // ----- per-island operations -----
 
     public void award(Island island, long amount) {
         if (island == null || amount <= 0) return;
-        if (!vault.isReady()) {
-            island.data().addCoins(amount);
-            return;
-        }
-        // Split amongst online members; if none online, credit owner.
-        var members = island.data().getMembers();
-        java.util.List<UUID> online = new java.util.ArrayList<>();
-        for (UUID u : members) if (Bukkit.getPlayer(u) != null) online.add(u);
+        List<UUID> online = new ArrayList<>();
+        for (UUID u : island.data().getMembers()) if (Bukkit.getPlayer(u) != null) online.add(u);
         if (online.isEmpty()) {
-            vault.deposit(Bukkit.getOfflinePlayer(island.data().getOwner()), amount);
+            depositCoins(island.data().getOwner(), amount);
             return;
         }
         long share = Math.max(1, amount / online.size());
-        for (UUID u : online) vault.deposit(Bukkit.getOfflinePlayer(u), share);
+        for (UUID u : online) depositCoins(u, share);
     }
 
     public boolean spend(Island island, long amount) {
         if (island == null || amount <= 0) return false;
-        if (!vault.isReady()) {
-            if (island.data().getCoins() < amount) return false;
-            island.data().setCoins(island.data().getCoins() - amount);
-            return true;
-        }
-        // Fall back to the owner's balance for island-wide spends.
-        return vault.withdraw(Bukkit.getOfflinePlayer(island.data().getOwner()), amount);
+        return withdrawCoins(island.data().getOwner(), amount);
     }
 
     public long balance(Island island) {
         if (island == null) return 0;
-        if (!vault.isReady()) return island.data().getCoins();
-        return (long) vault.balance(Bukkit.getOfflinePlayer(island.data().getOwner()));
+        return balanceCoins(island.data().getOwner());
     }
 
-    // ----- per-player operations (new callers, e.g. pet store) -----
+    // ----- per-player operations -----
 
     public long balance(Player p) {
-        if (p == null) return 0;
-        if (vault.isReady()) return (long) vault.balance(p);
-        var island = plugin.islands().ofPlayer(p);
-        return island == null ? 0 : island.data().getCoins();
+        return p == null ? 0 : balanceCoins(p.getUniqueId());
     }
 
     public boolean spend(Player p, long amount) {
         if (p == null || amount <= 0) return false;
-        if (vault.isReady()) return vault.withdraw(p, amount);
-        var island = plugin.islands().ofPlayer(p);
-        if (island == null) return false;
-        return spend(island, amount);
+        return withdrawCoins(p.getUniqueId(), amount);
     }
 
     public void deposit(OfflinePlayer p, long amount) {
         if (p == null || amount <= 0) return;
-        if (vault.isReady()) { vault.deposit(p, amount); return; }
-        var island = plugin.islands().ofPlayer(p.getUniqueId());
-        if (island != null) island.data().addCoins(amount);
+        depositCoins(p.getUniqueId(), amount);
+    }
+
+    // ----- xEconomy adapters (whole coins → cents) -----
+
+    private void depositCoins(UUID id, long coins) {
+        OfflinePlayer op = Bukkit.getOfflinePlayer(id);
+        String name = op.getName() != null ? op.getName() : id.toString();
+        eco.deposit(id, name, coins * CENTS_PER_COIN);
+    }
+
+    private boolean withdrawCoins(UUID id, long coins) {
+        OfflinePlayer op = Bukkit.getOfflinePlayer(id);
+        String name = op.getName() != null ? op.getName() : id.toString();
+        return eco.withdraw(id, name, coins * CENTS_PER_COIN);
+    }
+
+    private long balanceCoins(UUID id) {
+        return eco.balanceCents(id) / CENTS_PER_COIN;
     }
 }

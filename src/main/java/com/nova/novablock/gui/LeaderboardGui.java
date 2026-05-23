@@ -36,7 +36,7 @@ public class LeaderboardGui extends ChestGui {
                     .name("<gold>#" + (i + 1) + " <yellow>" + owner)
                     .lore("<gray>Blocks broken: <white>" + island.data().getBlocksBroken(),
                             "<gray>Phase: <white>" + (island.data().getPhaseIndex() + 1),
-                            "<gray>Coins: <yellow>" + island.data().getCoins())
+                            "<gray>Coins: <yellow>" + plugin.economy().balance(island))
                     .build(), null);
         }
         set(53, ItemBuilder.of(Material.ARROW).name("<gray>Back").build(),

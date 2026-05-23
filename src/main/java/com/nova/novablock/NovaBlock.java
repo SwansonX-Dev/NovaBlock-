@@ -121,8 +121,7 @@ public final class NovaBlock extends JavaPlugin {
         }
 
         getLogger().info("NovaBlock enabled — " + phaseManager.phaseCount() + " phases, "
-                + bossManager.bossCount() + " bosses, " + lootRoomManager.roomCount() + " loot rooms."
-                + (economyManager.usingVault() ? " (Vault economy hooked)" : ""));
+                + bossManager.bossCount() + " bosses, " + lootRoomManager.roomCount() + " loot rooms.");
     }
 
     @Override

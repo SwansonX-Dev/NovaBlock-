@@ -102,7 +102,7 @@ public class ScoreboardManager {
             int req = phase == null ? 1 : phase.getRequiredBlocks();
             lines.add("<gray>" + prog2 + " / " + req + " blocks");
             lines.add("<gray>Total: <white>" + island.data().getBlocksBroken());
-            lines.add("<gold>Coins: <yellow>" + island.data().getCoins());
+            lines.add("<gold>Coins: <yellow>" + plugin.economy().balance(island));
             lines.add(" ");
         }
         for (SkillType t : SkillType.values()) {

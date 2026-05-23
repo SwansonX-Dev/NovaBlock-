@@ -6,7 +6,7 @@
 
     <groupId>com.nova</groupId>
     <artifactId>novablock</artifactId>
-    <version>0.1.1</version>
+    <version>0.2.0</version>
     <packaging>jar</packaging>
     <name>NovaBlock</name>
 
@@ -23,8 +23,8 @@
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
         <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
+            <id>placeholderapi</id>
+            <url>https://repo.extendedclip.com/releases/</url>
         </repository>
     </repositories>
 
@@ -35,13 +35,20 @@
             <version>1.21.4-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
-        <!-- Vault API – xEconomy and most other coin plugins expose their balance
-             through Vault. We treat it as soft: the plugin falls back to per-island
-             coin storage when Vault is absent. -->
+        <!-- xEconomy native API. NovaBlock hard-depends on xEconomy for currency;
+             the jar is installed alongside via xEconomy's `publishToMavenLocal`. -->
         <dependency>
-            <groupId>com.github.MilkBowl</groupId>
-            <artifactId>VaultAPI</artifactId>
-            <version>1.7.1</version>
+            <groupId>dev.xsuite</groupId>
+            <artifactId>xeconomy-api</artifactId>
+            <version>0.2.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- PlaceholderAPI – soft hook (PlaceholderHook is only registered when
+             the PAPI plugin is present at runtime). -->
+        <dependency>
+            <groupId>me.clip</groupId>
+            <artifactId>placeholderapi</artifactId>
+            <version>2.11.6</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

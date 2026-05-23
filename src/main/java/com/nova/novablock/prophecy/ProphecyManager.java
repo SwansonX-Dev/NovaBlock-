@@ -96,7 +96,7 @@ public class ProphecyManager {
 
     private void award(Player p, Island island, Material m) {
         long bonus = 250L + (long) island.data().getPhaseIndex() * 75L;
-        island.data().addCoins(bonus);
+        plugin.economy().award(island, bonus);
         p.sendActionBar(com.nova.novablock.util.Msg.mm(
                 "<gold>★ Prophecy fulfilled! +" + bonus + " coins (" + m.name() + ")"));
         p.playSound(p.getLocation(), org.bukkit.Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1.2f);
