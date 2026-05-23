@@ -12,20 +12,30 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-public class LootRoomManager {
+public class LootRoomManager implements Listener {
 
     private final NovaBlock plugin;
     private final Map<String, LootRoom> registry = new HashMap<>();
     private final Map<UUID, LootRoomRun> active = new HashMap<>();
     /** Players who have a rift offered. */
     private final Map<UUID, RiftOffer> offers = new HashMap<>();
+    /** Players who died mid-run; we'll redirect their respawn to the saved return location. */
+    private final Map<UUID, Location> pendingReturn = new HashMap<>();
     private int nextAnchorX = 100_000;
     private BukkitTask tickTask;
 
@@ -33,6 +43,7 @@ public class LootRoomManager {
         this.plugin = plugin;
         // Run at 5-tick cadence (4 Hz) so step-on detection feels instant.
         tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickAll, 20L, 5L);
+        Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
     public void registerDefaultRooms() {
@@ -128,8 +139,51 @@ public class LootRoomManager {
     public void finishEarly(Player p) {
         LootRoomRun run = active.remove(p.getUniqueId());
         if (run == null) return;
+        cleanupRoomMobs(run);
         p.teleport(run.returnLocation());
         Msg.actionBar(p, "<gray>You forfeited the rift.");
+    }
+
+    /**
+     * Kill non-player living entities near the run's anchor so arena mobs from
+     * a failed/aborted run don't keep ticking forever. Safe because each run
+     * gets its own unique anchor X.
+     */
+    private void cleanupRoomMobs(LootRoomRun run) {
+        World w = run.anchor().getWorld();
+        if (w == null) return;
+        for (Entity e : w.getNearbyEntities(run.anchor(), 24, 16, 24)) {
+            if (e instanceof Player) continue;
+            if (e instanceof LivingEntity le) le.remove();
+        }
+    }
+
+    // ---- death / respawn / quit handling ----
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onDeath(PlayerDeathEvent event) {
+        UUID id = event.getEntity().getUniqueId();
+        LootRoomRun run = active.remove(id);
+        if (run == null) return;
+        pendingReturn.put(id, run.returnLocation());
+        cleanupRoomMobs(run);
+        Msg.title(event.getEntity(), "<red>Rift Failed", "<gray>You fell in battle — no rewards.");
+    }
+
+    @EventHandler
+    public void onRespawn(PlayerRespawnEvent event) {
+        Location ret = pendingReturn.remove(event.getPlayer().getUniqueId());
+        if (ret != null && ret.getWorld() != null) {
+            event.setRespawnLocation(ret);
+        }
+    }
+
+    /** If a runner logs out mid-run, abort it cleanly so we don't leak ticking arenas. */
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        LootRoomRun run = active.remove(event.getPlayer().getUniqueId());
+        if (run != null) cleanupRoomMobs(run);
+        pendingReturn.remove(event.getPlayer().getUniqueId());
     }
 
     private void complete(LootRoomRun run) {

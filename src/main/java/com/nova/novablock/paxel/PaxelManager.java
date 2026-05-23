@@ -5,10 +5,19 @@ import com.nova.novablock.island.Island;
 import com.nova.novablock.phase.Phase;
 import com.nova.novablock.util.ItemBuilder;
 import com.nova.novablock.util.Msg;
+import io.papermc.paper.datacomponent.DataComponentTypes;
+import io.papermc.paper.datacomponent.item.Tool;
+import io.papermc.paper.registry.RegistryKey;
+import io.papermc.paper.registry.TypedKey;
+import io.papermc.paper.registry.set.RegistryKeySet;
+import io.papermc.paper.registry.set.RegistrySet;
+import net.kyori.adventure.util.TriState;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
+import org.bukkit.Tag;
+import org.bukkit.block.BlockType;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -28,9 +37,8 @@ import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -41,12 +49,14 @@ import java.util.Map;
  * <p>Tier is bound to the player's island phase — completing phase 0 unlocks Stone,
  * phase 1 unlocks Iron, etc. (capped at Netherite when reaching phase 5).
  *
- * <p>Abilities applied while holding:
- *  - <b>Haste</b> (amplifier scales with tier) so the pickaxe Material breaks dirt,
- *    wood, sand, leaves and everything else at a sensible speed without needing
- *    multiple tool types in the same slot.
+ * <p>Abilities:
+ *  - <b>Universal tool</b>: the {@code minecraft:tool} data component declares
+ *    the paxel as correct-for-drops on the pickaxe, axe, shovel and hoe block
+ *    tags, with mining speed scaling per tier. This is what actually makes one
+ *    item break dirt, wood, sand, leaves and stone at full speed — Haste alone
+ *    can't overcome vanilla's wrong-tool 5× slowdown.
  *  - <b>Auto-smelt</b>: cobble→stone, raw ore→ingot, ancient debris→netherite scrap.
- *  - Persistent action-bar HUD showing tier + phase progress.
+ *  - Persistent action-bar HUD showing tier + phase progress while held.
  */
 public class PaxelManager implements Listener {
 
@@ -109,12 +119,12 @@ public class PaxelManager implements Listener {
         meta.displayName(Msg.mm("<" + TIER_COLORS[tier] + "><bold>" + TIER_NAMES[tier]
                 + " <gray>(" + owner.getName() + ")")
                 .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
-        List<net.kyori.adventure.text.Component> lore = new java.util.ArrayList<>();
+        List<net.kyori.adventure.text.Component> lore = new ArrayList<>();
         lore.add(Msg.mm("<gray>Shovel · Axe · Pickaxe in one.").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("<gray>Tier <yellow>" + (tier + 1) + "/" + TIER_MATERIALS.length).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("<aqua>Abilities").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
-        lore.add(Msg.mm("<gray>· Haste " + romanNumeral(Math.min(tier + 1, 5)) + " while held").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        lore.add(Msg.mm("<gray>· Mines pickaxe + axe + shovel + hoe blocks").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("<gray>· Auto-smelt cobble & ores").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("<gray>· Tiers up with your island phase").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         lore.add(Msg.mm("").decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
@@ -131,7 +141,32 @@ public class PaxelManager implements Listener {
         meta.getPersistentDataContainer().set(PAXEL_TIER, PersistentDataType.INTEGER, tier);
         if (meta instanceof Damageable d) d.setDamage(0);
         stack.setItemMeta(meta);
+
+        // Universal-tool data component — what actually makes one item break dirt,
+        // wood, sand and stone at full speed. Without this, the pickaxe Material
+        // would still get vanilla's 5× wrong-tool slowdown on shovel/axe blocks
+        // and Haste alone can't dig it out of that hole.
+        float speed = 4f + tier * 2f;   // tier 0 → 4, tier 5 → 14 (faster than gold pickaxe at top tier)
+        List<Tool.Rule> rules = new ArrayList<>();
+        rules.add(Tool.rule(blocksFromTag(Tag.MINEABLE_PICKAXE), speed, TriState.TRUE));
+        rules.add(Tool.rule(blocksFromTag(Tag.MINEABLE_AXE), speed, TriState.TRUE));
+        rules.add(Tool.rule(blocksFromTag(Tag.MINEABLE_SHOVEL), speed, TriState.TRUE));
+        rules.add(Tool.rule(blocksFromTag(Tag.MINEABLE_HOE), speed, TriState.TRUE));
+        stack.setData(DataComponentTypes.TOOL, Tool.tool()
+                .addRules(rules)
+                .defaultMiningSpeed(1.5f)
+                .damagePerBlock(0)
+                .build());
+
         return stack;
+    }
+
+    private static RegistryKeySet<BlockType> blocksFromTag(Tag<Material> tag) {
+        List<TypedKey<BlockType>> keys = new ArrayList<>(tag.getValues().size());
+        for (Material m : tag.getValues()) {
+            keys.add(TypedKey.create(RegistryKey.BLOCK, m.getKey()));
+        }
+        return RegistrySet.keySet(RegistryKey.BLOCK, keys);
     }
 
     public boolean isPaxel(ItemStack item) {
@@ -194,12 +229,12 @@ public class PaxelManager implements Listener {
         // tier upgrades happen on phase-up; nothing to do per-break.
     }
 
-    // ---------------- haste + HUD ticker ----------------
+    // ---------------- HUD ticker ----------------
 
     /**
-     * Every second, for each online player holding their paxel, refresh a 2.5s Haste
-     * effect (so it persists smoothly while held and fades when swapped away) and
-     * send an action-bar HUD with tier + phase progress.
+     * Every second, send an action-bar HUD with paxel tier + phase progress for
+     * each online player holding their paxel. Transient messages (combo, +XP)
+     * still pop briefly over the persistent line.
      */
     private void startHudTicker() {
         plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
@@ -207,9 +242,6 @@ public class PaxelManager implements Listener {
                 ItemStack main = p.getInventory().getItemInMainHand();
                 if (!isOwner(main, p)) continue;
                 int tier = tierOf(main);
-                int amp = Math.min(4, tier);
-                p.addPotionEffect(new PotionEffect(
-                        PotionEffectType.HASTE, 50, amp, false, false, false));
 
                 Island island = plugin.islands().ofPlayer(p);
                 String hud;
@@ -229,17 +261,6 @@ public class PaxelManager implements Listener {
                 Msg.actionBar(p, hud);
             }
         }, 20L, 20L);
-    }
-
-    private static String romanNumeral(int n) {
-        return switch (n) {
-            case 1 -> "I";
-            case 2 -> "II";
-            case 3 -> "III";
-            case 4 -> "IV";
-            case 5 -> "V";
-            default -> String.valueOf(n);
-        };
     }
 
     // ---------------- listeners: lock it down ----------------
