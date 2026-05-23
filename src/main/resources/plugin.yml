@@ -5,17 +5,21 @@ api-version: '1.21'
 authors: [Nova]
 description: A reimagined OneBlock experience with phases, bosses, loot rooms, skill trees, pets, prophecies and more.
 load: POSTWORLD
-softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI]
+softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, Vault, xEconomy]
 
 commands:
   oneblock:
     description: Main NovaBlock command
-    usage: /<command> [create|home|warp|phase|menu|prophecy|skills|pets|quests|shop|leaderboard]
+    usage: /<command> [create|home|warp|phase|menu|prophecy|skills|pets|store|quests|shop|leaderboard|toggle|help]
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command
-    usage: /<command> [reload|setphase|spawnboss|givecoins|wipe]
+    usage: /<command> [reload|setphase|spawnboss|givecoins|wipe|givepaxel]
     permission: novablock.admin
+  sb:
+    description: Toggle the NovaBlock sidebar scoreboard
+    usage: /<command>
+    aliases: [scoreboard, sidebar]
 
 permissions:
   novablock.play:
@@ -45,6 +49,9 @@ permissions:
   novablock.leaderboard:
     description: Allows viewing the leaderboard
     default: true
+  novablock.toggle:
+    description: Allows toggling the hotbar menu item and sidebar
+    default: true
   novablock.admin:
     description: All admin commands
     default: op
@@ -55,3 +62,4 @@ permissions:
       novablock.admin.givecoins: true
       novablock.admin.event: true
       novablock.admin.wipe: true
+      novablock.admin.givepaxel: true

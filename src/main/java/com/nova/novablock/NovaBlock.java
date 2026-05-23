@@ -3,16 +3,20 @@ package com.nova.novablock;
 import com.nova.novablock.boss.BossManager;
 import com.nova.novablock.command.AdminCommand;
 import com.nova.novablock.command.OneBlockCommand;
+import com.nova.novablock.command.ScoreboardCommand;
 import com.nova.novablock.config.ConfigManager;
 import com.nova.novablock.economy.EconomyManager;
 import com.nova.novablock.event.EventManager;
 import com.nova.novablock.gui.GuiManager;
+import com.nova.novablock.help.HelpRegistrar;
+import com.nova.novablock.hotbar.HotbarMenuManager;
 import com.nova.novablock.island.InviteManager;
 import com.nova.novablock.island.IslandManager;
 import com.nova.novablock.island.IslandWorldManager;
 import com.nova.novablock.listener.BlockListener;
 import com.nova.novablock.listener.PlayerListener;
 import com.nova.novablock.lootroom.LootRoomManager;
+import com.nova.novablock.paxel.PaxelManager;
 import com.nova.novablock.pet.PetManager;
 import com.nova.novablock.phase.PhaseManager;
 import com.nova.novablock.progression.ProgressionManager;
@@ -40,6 +44,8 @@ public final class NovaBlock extends JavaPlugin {
     private ProgressionManager progressionManager;
     private QuestManager questManager;
     private PetManager petManager;
+    private PaxelManager paxelManager;
+    private HotbarMenuManager hotbarManager;
     private EconomyManager economyManager;
     private GuiManager guiManager;
     private EventManager eventManager;
@@ -78,6 +84,8 @@ public final class NovaBlock extends JavaPlugin {
         this.questManager = new QuestManager(this);
         this.questManager.loadDailyQuests();
         this.petManager = new PetManager(this);
+        this.paxelManager = new PaxelManager(this);
+        this.hotbarManager = new HotbarMenuManager(this);
         this.guiManager = new GuiManager(this);
         this.eventManager = new EventManager(this);
         this.seasonManager = new SeasonManager(this);
@@ -93,10 +101,14 @@ public final class NovaBlock extends JavaPlugin {
         AdminCommand adminCmd = new AdminCommand(this);
         getCommand("obadmin").setExecutor(adminCmd);
         getCommand("obadmin").setTabCompleter(adminCmd);
+        getCommand("sb").setExecutor(new ScoreboardCommand(this));
 
         eventManager.startTimers();
         seasonManager.startSeasonTicker();
         scoreboardManager.startTicker();
+
+        // Plug NovaBlock into the /help index so players can discover commands without leaving chat.
+        HelpRegistrar.register(this);
 
         // Optional PlaceholderAPI hook — guarded so the plugin works without PAPI installed.
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
@@ -109,7 +121,8 @@ public final class NovaBlock extends JavaPlugin {
         }
 
         getLogger().info("NovaBlock enabled — " + phaseManager.phaseCount() + " phases, "
-                + bossManager.bossCount() + " bosses, " + lootRoomManager.roomCount() + " loot rooms.");
+                + bossManager.bossCount() + " bosses, " + lootRoomManager.roomCount() + " loot rooms."
+                + (economyManager.usingVault() ? " (Vault economy hooked)" : ""));
     }
 
     @Override
@@ -143,6 +156,8 @@ public final class NovaBlock extends JavaPlugin {
     public ProgressionManager progression() { return progressionManager; }
     public QuestManager quests() { return questManager; }
     public PetManager pets() { return petManager; }
+    public PaxelManager paxels() { return paxelManager; }
+    public HotbarMenuManager hotbar() { return hotbarManager; }
     public EconomyManager economy() { return economyManager; }
     public GuiManager guis() { return guiManager; }
     public EventManager events() { return eventManager; }

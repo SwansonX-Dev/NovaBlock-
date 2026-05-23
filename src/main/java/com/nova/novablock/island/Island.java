@@ -36,7 +36,10 @@ public class Island {
         Location c = centerBlock();
         if (c.getWorld() == null) return;
         c.getBlock().setType(Material.GRASS_BLOCK, false);
-        // small bedrock skirt to prevent free-falls on first join, removed once mined
+        // Permanent bedrock directly under the centre so the OneBlock can never fall into the void
+        // even if the player breaks faster than the regen, or if a chunk reload skips a tick.
+        c.clone().add(0, -1, 0).getBlock().setType(Material.BEDROCK, false);
+        // Small bedrock skirt around the underside so first-join players don't free-fall
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
                 if (dx == 0 && dz == 0) continue;

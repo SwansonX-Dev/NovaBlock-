@@ -154,6 +154,8 @@ public class YamlStorage implements DataStorage {
         p.getPetLevels().putAll(petLevels);
         p.setQuestProgress(y.getInt("quest.progress", 0));
         p.setQuestDayStamp(y.getLong("quest.day", 0));
+        p.setMenuItemEnabled(y.getBoolean("ui.menuItem", true));
+        p.setScoreboardEnabled(y.getBoolean("ui.scoreboard", true));
         return p;
     }
 
@@ -173,6 +175,8 @@ public class YamlStorage implements DataStorage {
         }
         y.set("quest.progress", p.getQuestProgress());
         y.set("quest.day", p.getQuestDayStamp());
+        y.set("ui.menuItem", p.isMenuItemEnabled());
+        y.set("ui.scoreboard", p.isScoreboardEnabled());
         try { atomicSave(y, f); }
         catch (IOException ex) { plugin.getLogger().warning("Failed to save progression: " + ex.getMessage()); }
     }

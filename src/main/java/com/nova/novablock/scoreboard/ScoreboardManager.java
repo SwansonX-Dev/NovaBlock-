@@ -42,7 +42,24 @@ public class ScoreboardManager {
         for (Player p : Bukkit.getOnlinePlayers()) update(p);
     }
 
+    /** Toggle visibility; persisted per-player. */
+    public void toggle(Player p) {
+        var prog = plugin.progression().get(p);
+        boolean enabled = !prog.isScoreboardEnabled();
+        prog.setScoreboardEnabled(enabled);
+        plugin.progression().save(p.getUniqueId());
+        if (enabled) update(p);
+        else clear(p);
+        com.nova.novablock.util.Msg.actionBar(p, enabled
+                ? "<green>Scoreboard shown."
+                : "<gray>Scoreboard hidden. <yellow>/sb<gray> to toggle.");
+    }
+
     public void update(Player p) {
+        if (!plugin.progression().get(p).isScoreboardEnabled()) {
+            clear(p);
+            return;
+        }
         Scoreboard board = boards.computeIfAbsent(p.getUniqueId(),
                 u -> Bukkit.getScoreboardManager().getNewScoreboard());
         Objective obj = board.getObjective("nb");
@@ -91,8 +108,10 @@ public class ScoreboardManager {
         for (SkillType t : SkillType.values()) {
             lines.add("<" + t.color() + ">" + t.displayName() + " <white>Lv " + prog.getLevel(t));
         }
+        lines.add("  ");
+        lines.add("<gray>Online: <green>" + Bukkit.getOnlinePlayers().size());
         if (plugin.seasons().active() != null) {
-            lines.add(" ");
+            lines.add("   ");
             var ev = plugin.seasons().active();
             long secs = Math.max(0, (plugin.seasons().activeUntil() - System.currentTimeMillis()) / 1000);
             lines.add(ev.color + "★ " + ev.displayName + " <gray>(" + formatTime(secs) + ")");

@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
-            "reload", "setphase", "spawnboss", "givecoins", "event", "wipe");
+            "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel");
     private static final List<String> BOSSES = List.of(
             "magma_tyrant", "frostborn_sentinel", "void_herald");
     private static final List<String> EVENTS = List.of(
@@ -99,6 +99,14 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 if (island == null) { Msg.send(sender, "<red>Target has no island."); return true; }
                 plugin.islands().delete(island);
                 Msg.send(sender, "<green>Wiped.");
+            }
+            case "givepaxel" -> {
+                if (args.length < 2) { Msg.send(sender, "<red>/obadmin givepaxel <player>"); return true; }
+                Player target = Bukkit.getPlayerExact(args[1]);
+                if (target == null) { Msg.send(sender, "<red>Player not online."); return true; }
+                plugin.paxels().give(target);
+                plugin.paxels().refreshTier(target);
+                Msg.send(sender, "<green>Gave a paxel to " + target.getName() + ".");
             }
             default -> Msg.send(sender, "<red>Unknown subcommand.");
         }

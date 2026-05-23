@@ -18,8 +18,12 @@ public class Pet {
     private long xp;
     private PetTask task;
     private final Inventory storage;
-    /** Timestamp (ms) of last support-task tick. Per-pet so multiple Support pets don't clash. */
+    /** Timestamp (ms) of last support-task tick. */
     private long lastSupportTickMs;
+    /** Timestamp (ms) of last active-ability fire. */
+    private long lastActiveMs;
+    /** Free-use tick counter for per-pet passive throttling. */
+    private int tickCounter;
 
     public Pet(UUID ownerId, PetType type, UUID entityId, int level) {
         this.ownerId = ownerId;
@@ -59,6 +63,12 @@ public class Pet {
 
     public long lastSupportTickMs() { return lastSupportTickMs; }
     public void setLastSupportTickMs(long t) { this.lastSupportTickMs = t; }
+
+    public long lastActiveMs() { return lastActiveMs; }
+    public void lastActiveMs(long t) { this.lastActiveMs = t; }
+
+    public int tickCounter() { return tickCounter; }
+    public void tickCounter(int t) { this.tickCounter = t; }
 
     public Location entityLocation() {
         var e = entity();

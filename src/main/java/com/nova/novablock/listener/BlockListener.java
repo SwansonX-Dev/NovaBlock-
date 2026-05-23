@@ -4,12 +4,15 @@ import com.nova.novablock.NovaBlock;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.phase.Phase;
 import com.nova.novablock.progression.SkillType;
+import com.nova.novablock.season.SeasonManager;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
@@ -18,27 +21,42 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.inventory.ItemStack;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockListener implements Listener {
 
     private final NovaBlock plugin;
+    /** Per-island guard so a Bedrock double-break (two BREAK packets within the same tick) collapses to one. */
+    private final Map<UUID, Long> recentBreakTick = new HashMap<>();
 
     public BlockListener(NovaBlock plugin) { this.plugin = plugin; }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
-        Location loc = event.getBlock().getLocation();
+        Block block = event.getBlock();
+        Location loc = block.getLocation();
         Island island = plugin.islands().atLocation(loc);
         if (island == null) return;
 
         Location center = island.centerBlock();
+        // Always keep a bedrock anchor under the center — replace anything that isn't bedrock there.
+        if (loc.getBlockX() == center.getBlockX()
+                && loc.getBlockY() == center.getBlockY() - 1
+                && loc.getBlockZ() == center.getBlockZ()) {
+            event.setCancelled(true);
+            Msg.actionBar(player, "<red>Can't break the bedrock anchor.");
+            return;
+        }
         if (loc.getBlockX() != center.getBlockX()
                 || loc.getBlockY() != center.getBlockY()
                 || loc.getBlockZ() != center.getBlockZ()) {
-            return; // breaking some other block on the island is fine, just don't trigger regen
+            return; // some other block on the island — fine to break
         }
 
         if (!island.isMember(player)) {
@@ -47,21 +65,57 @@ public class BlockListener implements Listener {
             return;
         }
 
-        Material broken = event.getBlock().getType();
+        // Double-break debounce: if we already handled a break for this island in the same tick,
+        // suppress the duplicate (Bedrock/Geyser sometimes sends the packet twice).
+        long tick = Bukkit.getServer().getCurrentTick();
+        Long last = recentBreakTick.get(island.data().getId());
+        if (last != null && last == tick) {
+            event.setCancelled(true);
+            return;
+        }
+        recentBreakTick.put(island.data().getId(), tick);
 
-        // Drop happens naturally via vanilla; we hijack only special blocks
+        Material broken = block.getType();
+
+        // Take over the break ourselves: cancel vanilla, drop manually, then replace immediately
+        // in the same tick so there's never a moment when the block is AIR. This fixes
+        // "Bedrock has to break it twice" (player saw the gap and swung again).
+        event.setCancelled(true);
+        dropNaturally(block, player.getInventory().getItemInMainHand());
+        block.setType(Material.AIR, false);
+
+        // Phase-specific drops & bonuses
         handleBlockEvents(player, island, broken);
 
         Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
         if (phase == null) return;
 
-        // Pull the planned next material from the prophecy queue (so previews are honest)
+        // Pull planned next material from the prophecy queue so previews are honest
         Material next = island.pollNext();
         if (next == null) next = phase.rollBlock(ThreadLocalRandom.current());
+        // Lush Bloom event: occasionally substitute in a lush block regardless of phase
+        if (plugin.seasons().active() == SeasonManager.ServerEvent.LUSH_BLOOM
+                && ThreadLocalRandom.current().nextInt(6) == 0) {
+            Material[] lush = {Material.MOSS_BLOCK, Material.AZALEA, Material.FLOWERING_AZALEA,
+                    Material.BIG_DRIPLEAF, Material.SMALL_DRIPLEAF};
+            next = lush[ThreadLocalRandom.current().nextInt(lush.length)];
+        }
 
-        // Regen next tick to avoid double-break exploits
-        final Material toPlace = next;
-        Bukkit.getScheduler().runTask(plugin, () -> center.getBlock().setType(toPlace, true));
+        // Set the new block immediately — no scheduler hop, no air gap.
+        center.getBlock().setType(next, true);
+        // Maintain the bedrock anchor underneath at all times.
+        Location anchor = center.clone().add(0, -1, 0);
+        if (anchor.getBlock().getType() != Material.BEDROCK) {
+            anchor.getBlock().setType(Material.BEDROCK, false);
+        }
+
+        // Diamond Hour: chance to also drop an extra diamond when breaking anything.
+        if (plugin.seasons().active() == SeasonManager.ServerEvent.DIAMOND_HOUR
+                && ThreadLocalRandom.current().nextInt(5) == 0) {
+            center.getWorld().dropItemNaturally(center.clone().add(0, 1, 0),
+                    new ItemStack(Material.DIAMOND));
+            Msg.actionBar(player, "<aqua>★ Diamond Hour bonus!");
+        }
 
         island.data().incrementBlocksBroken();
         island.data().incrementPhaseProgress();
@@ -78,6 +132,9 @@ public class BlockListener implements Listener {
         // Quest tick
         plugin.quests().onBlockBroken(player, broken);
 
+        // Paxel XP — progresses tool tier as the player levels Mining
+        plugin.paxels().onMine(player, broken);
+
         // Phase progression
         if (island.data().getPhaseProgress() >= phase.getRequiredBlocks()) {
             advancePhase(player, island, phase);
@@ -88,6 +145,14 @@ public class BlockListener implements Listener {
 
         // FX
         center.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, center.clone().add(0.5, 0.5, 0.5), 4, 0.2, 0.2, 0.2);
+    }
+
+    /** Drop the block's natural drops at its location using the tool the player has. */
+    private void dropNaturally(Block block, ItemStack tool) {
+        var loc = block.getLocation().add(0.5, 0.5, 0.5);
+        for (ItemStack drop : block.getDrops(tool)) {
+            block.getWorld().dropItemNaturally(loc, drop);
+        }
     }
 
     private void advancePhase(Player player, Island island, Phase old) {
@@ -105,16 +170,22 @@ public class BlockListener implements Listener {
         Msg.title(player, "<" + next.getThemeColor() + ">▶ " + next.getDisplayName(),
                 "<gray>Phase " + (nextIdx + 1) + " unlocked");
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
-        plugin.economy().award(island, 500 + nextIdx * 250L);
+        long reward = 500 + nextIdx * 250L;
+        if (plugin.seasons().active() == SeasonManager.ServerEvent.DOUBLE_COINS) reward *= 2;
+        plugin.economy().award(island, reward);
         if (old.getBossId() != null) {
             plugin.bosses().spawn(old.getBossId(), island, player);
         }
+        // Paxel tier upgrade — phase-up is the natural milestone
+        plugin.paxels().refreshTier(player);
     }
 
     private void rollEncounters(Player player, Island island, Phase phase, Location center) {
         long broken = island.data().getBlocksBroken();
         var rng = ThreadLocalRandom.current();
-        // Mob spawn ~1/18 chance — once every ~45 seconds of steady mining.
+        SeasonManager.ServerEvent ev = plugin.seasons().active();
+
+        // Mob spawn ~1/18 chance (~every ~45s of steady mining)
         if (!phase.getMobs().isEmpty() && rng.nextInt(18) == 0) {
             EntityType type = phase.rollMob(rng);
             if (type != null) {
@@ -122,17 +193,23 @@ public class BlockListener implements Listener {
                 e.setMetadata("nova_natural", new org.bukkit.metadata.FixedMetadataValue(plugin, true));
             }
         }
-        // Loot room every ~150 blocks (cooldown protected)
-        if (broken - island.data().getLastLootRoomAt() >= 150 && rng.nextInt(30) == 0) {
-            if (!phase.getLootRoomIds().isEmpty()) {
+        // Loot room every ~150 blocks (cooldown protected). Rift Storm = 5x rolls.
+        // Scout Fox pet = +25% rolls.
+        if (broken - island.data().getLastLootRoomAt() >= 150) {
+            int denom = 30;
+            if (ev == SeasonManager.ServerEvent.RIFT_STORM) denom = 6;
+            if (plugin.pets().hasScoutBoost(player)) denom = Math.max(4, (int) (denom * 0.8));
+            if (rng.nextInt(denom) == 0 && !phase.getLootRoomIds().isEmpty()) {
                 String roomId = phase.getLootRoomIds().get(rng.nextInt(phase.getLootRoomIds().size()));
                 plugin.lootRooms().offerEntry(player, island, roomId);
                 island.data().setLastLootRoomAt(broken);
             }
         }
-        // Mid-phase boss every ~300 blocks
-        if (broken - island.data().getLastBossAt() >= 300 && rng.nextInt(120) == 0) {
-            if (phase.getBossId() != null) {
+        // Mid-phase boss every ~300 blocks. Blood Moon = 4x rolls.
+        if (broken - island.data().getLastBossAt() >= 300) {
+            int denom = 120;
+            if (ev == SeasonManager.ServerEvent.BLOOD_MOON) denom = 30;
+            if (rng.nextInt(denom) == 0 && phase.getBossId() != null) {
                 plugin.bosses().spawn(phase.getBossId(), island, player);
                 island.data().setLastBossAt(broken);
             }
@@ -140,40 +217,45 @@ public class BlockListener implements Listener {
     }
 
     private void handleBlockEvents(Player player, Island island, Material broken) {
+        long coins = 0;
         switch (broken) {
-            case ENDER_CHEST -> {
-                plugin.economy().award(island, 50);
-                Msg.actionBar(player, "<gold>+50 coins");
-            }
+            case ENDER_CHEST -> coins = 50;
             case BEACON -> {
-                plugin.economy().award(island, 2500);
-                player.getInventory().addItem(new org.bukkit.inventory.ItemStack(Material.NETHER_STAR));
+                coins = 2500;
+                player.getInventory().addItem(new ItemStack(Material.NETHER_STAR));
                 Msg.title(player, "<gold>★ Beacon!", "<yellow>+2500 coins + Nether Star");
             }
             case CONDUIT -> {
-                plugin.economy().award(island, 1500);
-                player.getInventory().addItem(new org.bukkit.inventory.ItemStack(Material.HEART_OF_THE_SEA));
+                coins = 1500;
+                player.getInventory().addItem(new ItemStack(Material.HEART_OF_THE_SEA));
                 Msg.actionBar(player, "<aqua>+1500 coins + Heart of the Sea");
             }
             case SHULKER_BOX -> {
-                plugin.economy().award(island, 1000);
-                player.getInventory().addItem(new org.bukkit.inventory.ItemStack(Material.DRAGON_BREATH));
+                coins = 1000;
+                player.getInventory().addItem(new ItemStack(Material.DRAGON_BREATH));
                 Msg.actionBar(player, "<light_purple>+1000 coins + Dragon Breath");
             }
             case SCULK_CATALYST -> {
-                plugin.economy().award(island, 800);
-                player.getInventory().addItem(new org.bukkit.inventory.ItemStack(Material.ECHO_SHARD));
+                coins = 800;
+                player.getInventory().addItem(new ItemStack(Material.ECHO_SHARD));
                 Msg.actionBar(player, "<dark_purple>+800 coins + Echo Shard");
             }
             case NETHERITE_BLOCK -> {
-                plugin.economy().award(island, 8000);
+                coins = 8000;
                 Msg.title(player, "<gold>✦ NETHERITE ✦", "<yellow>+8000 coins");
             }
             case CAKE -> {
-                plugin.economy().award(island, 600);
+                coins = 600;
                 Msg.actionBar(player, "<light_purple>The cake was real! +600 coins");
             }
             default -> {}
+        }
+        if (coins > 0) {
+            if (plugin.seasons().active() == SeasonManager.ServerEvent.DOUBLE_COINS) coins *= 2;
+            plugin.economy().award(island, coins);
+            if (broken == Material.ENDER_CHEST) {
+                Msg.actionBar(player, "<gold>+" + coins + " coins");
+            }
         }
     }
 

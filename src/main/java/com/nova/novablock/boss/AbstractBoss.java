@@ -30,8 +30,7 @@ public abstract class AbstractBoss implements Boss {
             entity.remove();
             return null;
         }
-        // Scaling: phase 5 boss is ~2.25x stats, phase 11 boss ~3.75x.
-        // Tuned to stay challenging but not chip-fest at high phases.
+        // Scaling: phase 5 boss ~2.25x stats, phase 11 boss ~3.75x.
         double scaling = 1.0 + island.data().getPhaseIndex() * 0.25;
         if (le.getAttribute(Attribute.MAX_HEALTH) != null) {
             le.getAttribute(Attribute.MAX_HEALTH).setBaseValue(baseHealth() * scaling);
@@ -39,6 +38,12 @@ public abstract class AbstractBoss implements Boss {
         }
         if (le.getAttribute(Attribute.ATTACK_DAMAGE) != null) {
             le.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(baseDamage() * scaling);
+        }
+        // Knockback resistance maxed so players can't punt bosses off the island.
+        // Combined with the BossFight tether (anchored at spawn), this keeps the
+        // fight on the OneBlock platform.
+        if (le.getAttribute(Attribute.KNOCKBACK_RESISTANCE) != null) {
+            le.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(1.0);
         }
         le.setRemoveWhenFarAway(false);
         le.setPersistent(true);
@@ -53,6 +58,7 @@ public abstract class AbstractBoss implements Boss {
                 1.0f, barColor(), BossBar.Overlay.PROGRESS);
 
         BossFight fight = new BossFight(this, island, le, bar);
+        fight.setArenaCenter(loc.clone());
         le.getPersistentDataContainer().set(BossManager.FIGHT_KEY, PersistentDataType.STRING, le.getUniqueId().toString());
         return fight;
     }

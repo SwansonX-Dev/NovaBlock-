@@ -19,6 +19,8 @@ public class BossFight {
     private final Set<UUID> participants = new HashSet<>();
     private final long startedAt = System.currentTimeMillis();
     private int phase = 1;
+    /** Spawn point for tethering — bosses get teleported back if they wander too far. */
+    private org.bukkit.Location arenaCenter;
 
     public BossFight(Boss boss, Island island, LivingEntity entity, BossBar bar) {
         this.boss = boss;
@@ -35,6 +37,9 @@ public class BossFight {
     public long startedAt() { return startedAt; }
     public int phase() { return phase; }
     public void setPhase(int p) { this.phase = p; }
+
+    public org.bukkit.Location arenaCenter() { return arenaCenter; }
+    public void setArenaCenter(org.bukkit.Location l) { this.arenaCenter = l; }
 
     public LivingEntity entity() {
         var e = org.bukkit.Bukkit.getEntity(entityId);

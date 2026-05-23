@@ -91,6 +91,15 @@ public class IslandManager {
         plugin.storage().saveIsland(island.data());
     }
 
+    /** Remove a non-owner member from an island. Owners must use /obadmin wipe. */
+    public boolean removeMember(Island island, UUID playerId) {
+        if (island.data().getOwner().equals(playerId)) return false;
+        if (!island.data().getMembers().remove(playerId)) return false;
+        playerToIsland.remove(playerId);
+        plugin.storage().saveIsland(island.data());
+        return true;
+    }
+
     private int[] nextSlot() {
         int[] slot = {nextSlotX, nextSlotZ};
         // simple advancing pattern (spiral-lite)

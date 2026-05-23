@@ -4,6 +4,7 @@ import com.nova.novablock.NovaBlock;
 import com.nova.novablock.gui.LeaderboardGui;
 import com.nova.novablock.gui.MainMenuGui;
 import com.nova.novablock.gui.PetSelectGui;
+import com.nova.novablock.gui.PetStoreGui;
 import com.nova.novablock.gui.ProphecyGui;
 import com.nova.novablock.gui.QuestGui;
 import com.nova.novablock.gui.ShopGui;
@@ -24,8 +25,9 @@ import java.util.stream.Collectors;
 public class OneBlockCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS = List.of(
-            "create", "home", "menu", "prophecy", "skills", "pets",
-            "quest", "shop", "leaderboard", "phase", "invite", "accept", "help");
+            "create", "home", "menu", "prophecy", "skills", "pets", "store",
+            "quest", "shop", "leaderboard", "phase", "invite", "accept", "leave",
+            "toggle", "help");
 
     private final NovaBlock plugin;
 
@@ -62,6 +64,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "prophecy" -> { if (perm(p, "novablock.prophecy")) new ProphecyGui(plugin).open(p); }
             case "skills" -> { if (perm(p, "novablock.skills")) new SkillsGui(plugin).open(p); }
             case "pets" -> { if (perm(p, "novablock.pets")) new PetSelectGui(plugin).open(p); }
+            case "store", "petstore" -> { if (perm(p, "novablock.pets")) new PetStoreGui(plugin).open(p); }
             case "quests", "quest" -> new QuestGui(plugin).open(p);
             case "shop" -> { if (perm(p, "novablock.shop")) new ShopGui(plugin).open(p); }
             case "leaderboard", "lb", "top" -> { if (perm(p, "novablock.leaderboard")) new LeaderboardGui(plugin).open(p); }
@@ -74,6 +77,11 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             }
             case "invite" -> invite(p, args);
             case "accept" -> accept(p);
+            case "leave" -> leave(p);
+            case "toggle" -> {
+                if (!p.hasPermission("novablock.toggle")) { denied(p); return true; }
+                plugin.hotbar().toggle(p);
+            }
             case "help", "?" -> sendHelp(p);
             default -> sendHelp(p);
         }
@@ -100,6 +108,21 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         Msg.send(p, "<green>Invited <yellow>" + target.getName() + "<green>. They have 60 seconds to <yellow>/ob accept</yellow>.");
         Msg.send(target, "<gold>" + p.getName() + " <gray>invited you to their island. Tap <yellow>/ob accept</yellow> within 60s.");
         target.playSound(target.getLocation(), org.bukkit.Sound.UI_TOAST_IN, 1f, 1.4f);
+    }
+
+    private void leave(Player p) {
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) { Msg.send(p, "<gray>You aren't on an island."); return; }
+        if (island.data().getOwner().equals(p.getUniqueId())) {
+            Msg.send(p, "<red>You're the owner — ask an admin to wipe the island instead.");
+            return;
+        }
+        plugin.islands().removeMember(island, p.getUniqueId());
+        Msg.send(p, "<gray>You left the island.");
+        for (java.util.UUID m : island.data().getMembers()) {
+            Player member = org.bukkit.Bukkit.getPlayer(m);
+            if (member != null) Msg.send(member, "<gray>" + p.getName() + " left the island.");
+        }
     }
 
     private void accept(Player p) {
@@ -140,12 +163,15 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         Msg.raw(p, "<yellow>/ob prophecy <gray>– see and lock upcoming blocks");
         Msg.raw(p, "<yellow>/ob skills <gray>– skill trees and perks");
         Msg.raw(p, "<yellow>/ob pets <gray>– summon and command pets");
+        Msg.raw(p, "<yellow>/ob store <gray>– buy more pets");
         Msg.raw(p, "<yellow>/ob quest <gray>– today's daily quest");
         Msg.raw(p, "<yellow>/ob shop <gray>– spend coins");
         Msg.raw(p, "<yellow>/ob leaderboard <gray>– top islands");
         Msg.raw(p, "<yellow>/ob phase <gray>– current phase status");
         Msg.raw(p, "<yellow>/ob invite <gray>– invite a player to your island");
         Msg.raw(p, "<yellow>/ob accept <gray>– accept a pending invite");
+        Msg.raw(p, "<yellow>/ob toggle <gray>– show/hide the menu hotbar item");
+        Msg.raw(p, "<yellow>/sb <gray>– show/hide the sidebar scoreboard");
     }
 
     @Override

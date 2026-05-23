@@ -70,6 +70,21 @@ public class BossManager implements Listener {
             try { fight.boss().onTick(fight); } catch (Throwable t) {
                 plugin.getLogger().warning("Boss tick error " + fight.boss().id() + ": " + t);
             }
+            // Tether: pull bosses back to spawn if they get punched off the platform
+            // or fall into the void. Combined with maxed knockback resistance this
+            // keeps the fight in one place.
+            var center = fight.arenaCenter();
+            if (center != null && entity.getWorld().equals(center.getWorld())) {
+                double horizDist = Math.hypot(
+                        entity.getLocation().getX() - center.getX(),
+                        entity.getLocation().getZ() - center.getZ());
+                boolean tooFar = horizDist > 14;
+                boolean tooLow = entity.getLocation().getY() < center.getY() - 8;
+                if (tooFar || tooLow) {
+                    entity.teleport(center);
+                    entity.setFallDistance(0);
+                }
+            }
             // Auto-add nearby owners to bossbar
             Island island = plugin.islands().get(fight.islandId());
             if (island != null) {
@@ -113,6 +128,7 @@ public class BossManager implements Listener {
                 Msg.title(p, "<gold>★ " + fight.boss().displayName() + " defeated!", "<yellow>+" + coins + " coins");
                 p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
                 plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.COMBAT, 200L);
+                plugin.quests().onBossKilled(p);
             }
         }
     }

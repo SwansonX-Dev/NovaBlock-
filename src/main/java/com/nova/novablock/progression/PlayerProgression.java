@@ -15,6 +15,8 @@ public class PlayerProgression {
     private String selectedPet;
     private int questProgress;
     private long questDayStamp;
+    private boolean menuItemEnabled = true;
+    private boolean scoreboardEnabled = true;
 
     public PlayerProgression(UUID playerId) {
         this.playerId = playerId;
@@ -46,6 +48,12 @@ public class PlayerProgression {
 
     public long getQuestDayStamp() { return questDayStamp; }
     public void setQuestDayStamp(long v) { this.questDayStamp = v; }
+
+    public boolean isMenuItemEnabled() { return menuItemEnabled; }
+    public void setMenuItemEnabled(boolean v) { this.menuItemEnabled = v; }
+
+    public boolean isScoreboardEnabled() { return scoreboardEnabled; }
+    public void setScoreboardEnabled(boolean v) { this.scoreboardEnabled = v; }
 
     /**
      * XP needed to reach the next skill level. Linear curve tuned so that:
