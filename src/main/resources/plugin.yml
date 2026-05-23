@@ -11,11 +11,11 @@ softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI]
 commands:
   oneblock:
     description: Main NovaBlock command
-    usage: /<command> [create|home|warp|phase|menu|prophecy|skills|quests|leaderboard|toggle|help]
+    usage: /<command> [create|home|warp|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|toggle|help]
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command
-    usage: /<command> [reload|setphase|spawnboss|givecoins|wipe|givepaxel]
+    usage: /<command> [reload|setphase|spawnboss|givecoins|wipe|givepaxel|flags|storage|menu]
     permission: novablock.admin
   sb:
     description: Toggle the NovaBlock sidebar scoreboard
@@ -47,6 +47,45 @@ permissions:
   novablock.toggle:
     description: Allows toggling the hotbar menu item and sidebar
     default: true
+  novablock.flags:
+    description: Allows opening the island flags GUI (toggling individual flags still requires per-flag perms)
+    default: true
+  novablock.storage:
+    description: Allows opening the island's shared virtual storage
+    default: op
+  novablock.flag.natural_mob_spawning:
+    description: Allows toggling the natural-mob-spawning flag
+    default: op
+  novablock.flag.creeper_block_damage:
+    description: Allows toggling the creeper-block-damage flag
+    default: op
+  novablock.flag.tnt_block_damage:
+    description: Allows toggling the TNT-block-damage flag
+    default: op
+  novablock.flag.mob_griefing:
+    description: Allows toggling the mob-griefing flag
+    default: op
+  novablock.flag.fire_spread:
+    description: Allows toggling the fire-spread flag
+    default: op
+  novablock.flag.pvp:
+    description: Allows toggling the PVP flag
+    default: op
+  novablock.flag.visitor_build:
+    description: Allows toggling the visitor-build flag
+    default: op
+  novablock.flag.island_fly:
+    description: Allows toggling the island-fly flag
+    default: op
+  novablock.flag.keep_inventory:
+    description: Allows toggling the keep-inventory flag
+    default: op
+  novablock.flag.always_day:
+    description: Allows toggling the always-day flag
+    default: op
+  novablock.flag.no_hunger_drain:
+    description: Allows toggling the no-hunger-drain flag
+    default: op
   novablock.admin:
     description: All admin commands
     default: op
@@ -58,3 +97,6 @@ permissions:
       novablock.admin.event: true
       novablock.admin.wipe: true
       novablock.admin.givepaxel: true
+      novablock.admin.flags: true
+      novablock.admin.storage: true
+      novablock.admin.menu: true

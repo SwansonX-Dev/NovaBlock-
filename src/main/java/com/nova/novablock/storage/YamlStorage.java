@@ -89,6 +89,14 @@ public class YamlStorage implements DataStorage {
                 data.setLastBossAt(lastBossAt);
                 data.setLastLootRoomAt(lastLootRoomAt);
                 data.getMembers().addAll(memberIds);
+                ConfigurationSection flagsSec = y.getConfigurationSection("flags");
+                if (flagsSec != null) {
+                    for (String key : flagsSec.getKeys(false)) {
+                        com.nova.novablock.island.IslandFlag flag = com.nova.novablock.island.IslandFlag.byKey(key);
+                        if (flag != null) data.setFlag(flag, flagsSec.getBoolean(key));
+                    }
+                }
+                data.setStorageBase64(y.getString("storage", ""));
                 result.add(data);
             } catch (Exception ex) {
                 plugin.getLogger().warning("Failed to load island " + f.getName() + ": " + ex.getMessage());
@@ -116,6 +124,12 @@ public class YamlStorage implements DataStorage {
         List<String> mem = new ArrayList<>();
         for (UUID u : data.getMembers()) mem.add(u.toString());
         y.set("members", mem);
+        for (var e : data.getFlags().entrySet()) {
+            y.set("flags." + e.getKey().storageKey(), e.getValue());
+        }
+        if (data.getStorageBase64() != null && !data.getStorageBase64().isEmpty()) {
+            y.set("storage", data.getStorageBase64());
+        }
         try { atomicSave(y, f); }
         catch (IOException ex) { plugin.getLogger().warning("Failed to save island " + data.getId() + ": " + ex.getMessage()); }
     }

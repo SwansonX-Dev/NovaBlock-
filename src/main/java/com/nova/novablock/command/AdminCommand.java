@@ -19,7 +19,8 @@ import java.util.stream.Collectors;
 public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
-            "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel");
+            "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
+            "flags", "storage", "menu");
     private static final List<String> BOSSES = List.of(
             "magma_tyrant", "frostborn_sentinel", "void_herald");
     private static final List<String> EVENTS = List.of(
@@ -107,9 +108,95 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 plugin.paxels().replace(target);
                 Msg.send(sender, "<green>Re-issued paxel to " + target.getName() + ".");
             }
+            case "flags" -> {
+                if (!(sender instanceof Player viewer)) { Msg.send(sender, "<red>Players only."); return true; }
+                if (args.length < 2) { Msg.send(sender, "<red>/obadmin flags <player>"); return true; }
+                Player target = Bukkit.getPlayerExact(args[1]);
+                if (target == null) { Msg.send(sender, "<red>Player not online."); return true; }
+                Island island = plugin.islands().ofPlayer(target);
+                if (island == null) { Msg.send(sender, "<red>Target has no island."); return true; }
+                // Admin override is implicit: viewer has novablock.admin, IslandFlagsGui
+                // respects per-flag perms via hasPermission so admins (who hold *) toggle freely.
+                new com.nova.novablock.gui.IslandFlagsGui(plugin, island).open(viewer);
+            }
+            case "storage" -> {
+                if (!(sender instanceof Player viewer)) { Msg.send(sender, "<red>Players only."); return true; }
+                if (args.length < 2) { Msg.send(sender, "<red>/obadmin storage <player>"); return true; }
+                Player target = Bukkit.getPlayerExact(args[1]);
+                if (target == null) { Msg.send(sender, "<red>Player not online."); return true; }
+                Island island = plugin.islands().ofPlayer(target);
+                if (island == null) { Msg.send(sender, "<red>Target has no island."); return true; }
+                plugin.islandStorage().openFor(viewer, island);
+            }
+            case "menu" -> handleMenuEdit(sender, args);
             default -> Msg.send(sender, "<red>Unknown subcommand.");
         }
         return true;
+    }
+
+    private void handleMenuEdit(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            Msg.send(sender, "<yellow>/obadmin menu <add|remove|rename|list>");
+            return;
+        }
+        switch (args[1].toLowerCase()) {
+            case "list" -> {
+                var entries = plugin.menuConfig().all();
+                if (entries.isEmpty()) { Msg.send(sender, "<gray>No custom menu items yet."); return; }
+                Msg.send(sender, "<gold>Custom menu items:");
+                for (var e : entries.values()) {
+                    Msg.send(sender, "<yellow>slot " + e.slot + " <gray>· <white>" + e.material.name()
+                            + " <gray>· <aqua>" + e.name + " <gray>· <green>/" + e.command);
+                }
+            }
+            case "add" -> {
+                if (args.length < 5) { Msg.send(sender, "<red>/obadmin menu add <slot> <material> <command...>"); return; }
+                int slot;
+                try { slot = Integer.parseInt(args[2]); }
+                catch (NumberFormatException ex) { Msg.send(sender, "<red>Slot must be an integer (0-44)."); return; }
+                if (slot < 0 || slot > 44) { Msg.send(sender, "<red>Slot must be between 0 and 44."); return; }
+                org.bukkit.Material mat = org.bukkit.Material.matchMaterial(args[3]);
+                if (mat == null) { Msg.send(sender, "<red>Unknown material: " + args[3]); return; }
+                StringBuilder cmd = new StringBuilder();
+                for (int i = 4; i < args.length; i++) { if (i > 4) cmd.append(' '); cmd.append(args[i]); }
+                String displayName = "<aqua>" + prettyMat(mat);
+                plugin.menuConfig().put(slot, mat, displayName, cmd.toString());
+                Msg.send(sender, "<green>Added menu item in slot " + slot + " running /" + cmd
+                        + ". <gray>Use </gray>/obadmin menu rename " + slot + " <name></gray> to rename.");
+            }
+            case "rename" -> {
+                if (args.length < 4) { Msg.send(sender, "<red>/obadmin menu rename <slot> <name...>"); return; }
+                int slot;
+                try { slot = Integer.parseInt(args[2]); }
+                catch (NumberFormatException ex) { Msg.send(sender, "<red>Slot must be an integer."); return; }
+                var entry = plugin.menuConfig().get(slot);
+                if (entry == null) { Msg.send(sender, "<red>No menu item in that slot."); return; }
+                StringBuilder name = new StringBuilder();
+                for (int i = 3; i < args.length; i++) { if (i > 3) name.append(' '); name.append(args[i]); }
+                entry.name = name.toString();
+                plugin.menuConfig().save();
+                Msg.send(sender, "<green>Renamed slot " + slot + " to " + name + ".");
+            }
+            case "remove" -> {
+                if (args.length < 3) { Msg.send(sender, "<red>/obadmin menu remove <slot>"); return; }
+                int slot;
+                try { slot = Integer.parseInt(args[2]); }
+                catch (NumberFormatException ex) { Msg.send(sender, "<red>Slot must be an integer."); return; }
+                Msg.send(sender, plugin.menuConfig().remove(slot)
+                        ? "<green>Removed menu item in slot " + slot + "."
+                        : "<red>No menu item in that slot.");
+            }
+            default -> Msg.send(sender, "<yellow>/obadmin menu <add|remove|rename|list>");
+        }
+    }
+
+    private static String prettyMat(org.bukkit.Material m) {
+        StringBuilder out = new StringBuilder();
+        for (String word : m.name().toLowerCase().split("_")) {
+            if (out.length() > 0) out.append(' ');
+            out.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return out.toString();
     }
 
     @Override

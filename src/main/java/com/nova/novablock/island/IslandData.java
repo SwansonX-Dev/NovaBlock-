@@ -4,7 +4,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 
+import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -19,6 +21,7 @@ public class IslandData {
     private final int slotX;
     private final int slotZ;
     private final Set<UUID> members = new HashSet<>();
+    private final Map<IslandFlag, Boolean> flags = new EnumMap<>(IslandFlag.class);
 
     private long blocksBroken;
     private int phaseIndex;
@@ -26,6 +29,8 @@ public class IslandData {
     private int level;
     private long lastBossAt;
     private long lastLootRoomAt;
+    /** Base64-encoded ItemStack[] for the island's shared virtual storage. */
+    private String storageBase64 = "";
 
     public IslandData(UUID id, UUID owner, String worldName, int slotX, int slotZ) {
         this.id = id;
@@ -42,6 +47,19 @@ public class IslandData {
     public int getSlotX() { return slotX; }
     public int getSlotZ() { return slotZ; }
     public Set<UUID> getMembers() { return members; }
+
+    /** Live flag map. Missing entries fall back to {@link IslandFlag#defaultValue}. */
+    public Map<IslandFlag, Boolean> getFlags() { return flags; }
+
+    public boolean isFlag(IslandFlag f) {
+        Boolean v = flags.get(f);
+        return v == null ? f.defaultValue : v;
+    }
+
+    public void setFlag(IslandFlag f, boolean v) { flags.put(f, v); }
+
+    public String getStorageBase64() { return storageBase64; }
+    public void setStorageBase64(String s) { this.storageBase64 = s == null ? "" : s; }
 
     public long getBlocksBroken() { return blocksBroken; }
     public void setBlocksBroken(long v) { this.blocksBroken = v; }

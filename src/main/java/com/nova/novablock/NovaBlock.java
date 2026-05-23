@@ -1,6 +1,9 @@
 package com.nova.novablock;
 
 import com.nova.novablock.antiafk.AntiAfkManager;
+import com.nova.novablock.gui.MainMenuConfig;
+import com.nova.novablock.island.IslandFlagsManager;
+import com.nova.novablock.island.IslandStorageManager;
 import com.nova.novablock.boss.BossManager;
 import com.nova.novablock.command.AdminCommand;
 import com.nova.novablock.command.OneBlockCommand;
@@ -51,6 +54,9 @@ public final class NovaBlock extends JavaPlugin {
     private SeasonManager seasonManager;
     private ScoreboardManager scoreboardManager;
     private AntiAfkManager antiAfkManager;
+    private IslandFlagsManager islandFlagsManager;
+    private IslandStorageManager islandStorageManager;
+    private MainMenuConfig menuConfig;
 
     @Override
     public void onEnable() {
@@ -90,6 +96,9 @@ public final class NovaBlock extends JavaPlugin {
         this.seasonManager = new SeasonManager(this);
         this.scoreboardManager = new ScoreboardManager(this);
         this.antiAfkManager = new AntiAfkManager(this);
+        this.islandFlagsManager = new IslandFlagsManager(this);
+        this.islandStorageManager = new IslandStorageManager(this);
+        this.menuConfig = new MainMenuConfig(this);
 
         getServer().getPluginManager().registerEvents(new BlockListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
@@ -128,6 +137,8 @@ public final class NovaBlock extends JavaPlugin {
     public void onDisable() {
         // Stop tickers first so they don't fire against objects we're about to tear down.
         if (antiAfkManager != null) antiAfkManager.shutdown();
+        if (islandFlagsManager != null) islandFlagsManager.shutdown();
+        if (islandStorageManager != null) islandStorageManager.shutdown();
         if (eventManager != null) eventManager.shutdown();
         if (seasonManager != null) seasonManager.shutdown();
         if (scoreboardManager != null) scoreboardManager.shutdown();
@@ -162,4 +173,7 @@ public final class NovaBlock extends JavaPlugin {
     public SeasonManager seasons() { return seasonManager; }
     public ScoreboardManager scoreboards() { return scoreboardManager; }
     public AntiAfkManager antiAfk() { return antiAfkManager; }
+    public IslandFlagsManager islandFlags() { return islandFlagsManager; }
+    public IslandStorageManager islandStorage() { return islandStorageManager; }
+    public MainMenuConfig menuConfig() { return menuConfig; }
 }

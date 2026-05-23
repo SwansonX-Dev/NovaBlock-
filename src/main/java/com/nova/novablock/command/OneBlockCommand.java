@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
 public class OneBlockCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS = List.of(
-            "create", "home", "menu", "prophecy", "skills",
+            "create", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "invite", "accept", "leave",
             "toggle", "help");
 
@@ -62,6 +62,8 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "menu" -> { if (perm(p, "novablock.menu")) new MainMenuGui(plugin).open(p); }
             case "prophecy" -> { if (perm(p, "novablock.prophecy")) new ProphecyGui(plugin).open(p); }
             case "skills" -> { if (perm(p, "novablock.skills")) new SkillsGui(plugin).open(p); }
+            case "flags" -> { if (perm(p, "novablock.flags")) new com.nova.novablock.gui.IslandFlagsGui(plugin).open(p); }
+            case "storage", "vault" -> com.nova.novablock.island.IslandStorageManager.tryOpen(plugin, p);
             case "quests", "quest" -> new QuestGui(plugin).open(p);
             case "leaderboard", "lb", "top" -> { if (perm(p, "novablock.leaderboard")) new LeaderboardGui(plugin).open(p); }
             case "phase" -> {
@@ -158,6 +160,8 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         Msg.raw(p, "<yellow>/ob menu <gray>– main hub menu");
         Msg.raw(p, "<yellow>/ob prophecy <gray>– see and lock upcoming blocks");
         Msg.raw(p, "<yellow>/ob skills <gray>– skill trees and perks");
+        Msg.raw(p, "<yellow>/ob flags <gray>– toggle PVP, fly, mob spawning, and more");
+        Msg.raw(p, "<yellow>/ob storage <gray>– open the island's shared storage");
         Msg.raw(p, "<yellow>/ob quest <gray>– today's daily quest");
         Msg.raw(p, "<yellow>/ob leaderboard <gray>– top islands");
         Msg.raw(p, "<yellow>/ob phase <gray>– current phase status");

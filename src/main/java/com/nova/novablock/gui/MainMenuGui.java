@@ -6,23 +6,22 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
 /**
- * Hub menu. Top row is NovaBlock-native (island features, skills, quests).
- * Bottom row routes to xEconomy commands — NovaBlock owns the gameplay,
- * xEconomy owns the money. Each button performs the underlying command so
- * permissions and UI live with the plugin that owns the feature.
+ * Hub menu. Row 1 = NovaBlock-native gameplay, row 2 = xEconomy bridges,
+ * row 3 = island settings + storage, row 4 = admin-defined custom buttons
+ * (driven by {@link MainMenuConfig}).
  */
 public class MainMenuGui extends ChestGui {
 
     private final NovaBlock plugin;
 
     public MainMenuGui(NovaBlock plugin) {
-        super("<gradient:#7B61FF:#4FC3F7><bold>NovaBlock", 4);
+        super("<gradient:#7B61FF:#4FC3F7><bold>NovaBlock", 5);
         this.plugin = plugin;
     }
 
     @Override
     protected void build(Player p) {
-        // Row 1: gameplay features
+        // Row 1: gameplay
         set(11, ItemBuilder.of(Material.GRASS_BLOCK)
                         .name("<green>Teleport Home")
                         .lore("<gray>Warp to your OneBlock.").build(),
@@ -48,8 +47,7 @@ public class MainMenuGui extends ChestGui {
                         .lore("<gray>Top islands by blocks broken.").build(),
                 e -> new LeaderboardGui(plugin).open(p));
 
-        // Row 2: xEconomy bridges — each button closes this menu and runs the
-        // matching xEconomy command. xEconomy handles permissions + UI.
+        // Row 2: xEconomy bridges
         set(20, ItemBuilder.of(Material.EMERALD)
                         .name("<green>Shop")
                         .lore("<gray>Browse the dynamic market.", "<dark_gray>/shop").build(),
@@ -74,6 +72,29 @@ public class MainMenuGui extends ChestGui {
                         .name("<aqua>Stock Exchange")
                         .lore("<gray>Buy and sell stocks.", "<dark_gray>/stocks").build(),
                 e -> { p.closeInventory(); p.performCommand("stocks"); });
+
+        // Row 3: island settings + storage
+        set(30, ItemBuilder.of(Material.COMPARATOR)
+                        .name("<#9C27B0>Island Flags")
+                        .lore("<gray>Toggle PVP, fly, mob spawning, and more.", "<dark_gray>/ob flags").build(),
+                e -> new IslandFlagsGui(plugin).open(p));
+
+        set(32, ItemBuilder.of(Material.ENDER_CHEST)
+                        .name("<#FFC940>Island Storage")
+                        .lore("<gray>Shared 54-slot chest for your island.", "<dark_gray>/ob storage").build(),
+                e -> {
+                    p.closeInventory();
+                    com.nova.novablock.island.IslandStorageManager.tryOpen(plugin, p);
+                });
+
+        // Row 4: admin-defined custom buttons (overlay)
+        for (var entry : plugin.menuConfig().all().values()) {
+            String cmd = entry.command;
+            set(entry.slot, ItemBuilder.of(entry.material)
+                            .name(entry.name)
+                            .lore(entry.lore.toArray(new String[0])).build(),
+                    e -> { p.closeInventory(); if (!cmd.isEmpty()) p.performCommand(cmd); });
+        }
 
         fill(Material.GRAY_STAINED_GLASS_PANE, " ");
     }
