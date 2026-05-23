@@ -1,18 +1,36 @@
 package com.nova.novablock.lootroom.rooms;
 
+import com.nova.novablock.island.Island;
 import com.nova.novablock.lootroom.LootRoom;
 import com.nova.novablock.lootroom.LootRoomRun;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class ParkourRoom implements LootRoom {
 
     @Override public String id() { return "parkour"; }
     @Override public String displayName() { return "Parkour Rift"; }
+
+    @Override
+    public List<ItemStack> rewardItems(Island island) {
+        int phase = island.data().getPhaseIndex();
+        List<ItemStack> out = new ArrayList<>(LootRoom.super.rewardItems(island));
+        out.add(new ItemStack(Material.SUGAR, 8 + phase * 2));
+        out.add(new ItemStack(Material.FEATHER, 4 + phase));
+        out.add(LootRoom.enchantedBook(Enchantment.FEATHER_FALLING, Math.min(4, 1 + phase / 3)));
+        if (phase >= 3) out.add(new ItemStack(Material.GOLDEN_CARROT, 4 + phase));
+        if (phase >= 6) out.add(new ItemStack(Material.SLIME_BLOCK, 4));
+        if (phase >= 9) out.add(new ItemStack(Material.ELYTRA, 1));
+        return out;
+    }
 
     @Override
     public Location build(Location anchor) {

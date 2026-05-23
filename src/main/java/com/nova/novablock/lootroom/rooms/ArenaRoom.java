@@ -99,4 +99,18 @@ public class ArenaRoom implements LootRoom {
     public int rewardCoins(com.nova.novablock.island.Island island) {
         return 1500 + island.data().getPhaseIndex() * 300;
     }
+
+    @Override
+    public java.util.List<org.bukkit.inventory.ItemStack> rewardItems(com.nova.novablock.island.Island island) {
+        int phase = island.data().getPhaseIndex();
+        java.util.List<org.bukkit.inventory.ItemStack> out = new java.util.ArrayList<>(LootRoom.super.rewardItems(island));
+        out.add(new org.bukkit.inventory.ItemStack(Material.IRON_INGOT, 4 + phase));
+        out.add(new org.bukkit.inventory.ItemStack(Material.GOLD_INGOT, 2 + phase / 2));
+        out.add(LootRoom.enchantedBook(org.bukkit.enchantments.Enchantment.SHARPNESS, Math.min(5, 1 + phase / 2)));
+        out.add(LootRoom.enchantedBook(org.bukkit.enchantments.Enchantment.UNBREAKING, Math.min(3, 1 + phase / 3)));
+        if (phase >= 4) out.add(new org.bukkit.inventory.ItemStack(Material.DIAMOND, 1 + phase / 4));
+        if (phase >= 6) out.add(new org.bukkit.inventory.ItemStack(Material.ENDER_PEARL, 2 + phase / 3));
+        if (phase >= 8) out.add(new org.bukkit.inventory.ItemStack(Material.NETHERITE_SCRAP, 1));
+        return out;
+    }
 }

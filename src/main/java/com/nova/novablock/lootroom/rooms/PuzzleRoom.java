@@ -24,6 +24,18 @@ public class PuzzleRoom implements LootRoom {
     @Override public String displayName() { return "Echo Vault"; }
 
     @Override
+    public java.util.List<org.bukkit.inventory.ItemStack> rewardItems(com.nova.novablock.island.Island island) {
+        int phase = island.data().getPhaseIndex();
+        java.util.List<org.bukkit.inventory.ItemStack> out = new java.util.ArrayList<>(LootRoom.super.rewardItems(island));
+        out.add(new org.bukkit.inventory.ItemStack(Material.AMETHYST_SHARD, 4 + phase));
+        out.add(LootRoom.enchantedBook(org.bukkit.enchantments.Enchantment.MENDING, 1));
+        if (phase >= 5) out.add(new org.bukkit.inventory.ItemStack(Material.ECHO_SHARD, 1 + phase / 5));
+        if (phase >= 7) out.add(new org.bukkit.inventory.ItemStack(Material.ENDER_PEARL, 2 + phase / 4));
+        if (phase >= 9) out.add(LootRoom.enchantedBook(org.bukkit.enchantments.Enchantment.LUCK_OF_THE_SEA, 3));
+        return out;
+    }
+
+    @Override
     public Location build(Location anchor) {
         // Floor 7x7 polished deepslate
         for (int dx = -3; dx <= 3; dx++) {

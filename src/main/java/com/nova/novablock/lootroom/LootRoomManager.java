@@ -194,13 +194,23 @@ public class LootRoomManager implements Listener {
         if (plugin.seasons().active() == com.nova.novablock.season.SeasonManager.ServerEvent.DOUBLE_COINS) reward *= 2;
         plugin.economy().award(island, reward);
         p.teleport(run.returnLocation());
-        // Drop a reward chest item
-        var chest = ItemBuilder.of(Material.CHEST)
-                .name("<gold>Rift Reward")
-                .lore("<gray>+" + reward + " coins added to your island", "<gray>Score: <yellow>" + run.score())
-                .build();
-        p.getInventory().addItem(chest);
-        Msg.title(p, "<gold>Rift Cleared!", "<yellow>+" + reward + " coins");
+
+        // Actual loot — each room defines a thematic drop list. Anything that
+        // doesn't fit in the player's inventory falls at their feet so they
+        // never silently lose a reward.
+        var loot = run.room().rewardItems(island);
+        int itemCount = 0;
+        for (var item : loot) {
+            if (item == null || item.getAmount() <= 0) continue;
+            itemCount += item.getAmount();
+            var overflow = p.getInventory().addItem(item);
+            for (var leftover : overflow.values()) {
+                p.getWorld().dropItemNaturally(p.getLocation(), leftover);
+            }
+        }
+
+        Msg.title(p, "<gold>Rift Cleared!", "<yellow>+" + reward + " coins · <aqua>" + itemCount + " items");
+        Msg.actionBar(p, "<gray>Check your inventory for loot.");
         p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
         plugin.quests().onLootRoomCompleted(p);
     }

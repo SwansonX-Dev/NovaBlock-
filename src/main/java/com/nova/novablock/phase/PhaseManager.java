@@ -105,7 +105,9 @@ public class PhaseManager {
                         b(Material.DEEPSLATE_EMERALD_ORE, 3),
                         b(Material.ANCIENT_DEBRIS, 1)
                 ),
-                Phase.mobList(EntityType.WARDEN, EntityType.ZOMBIE, EntityType.ALLAY),
+                // Wardens removed from random spawns — too punishing for casual mining.
+                // Boss-style Warden fights can still be triggered explicitly via the boss system.
+                Phase.mobList(EntityType.SILVERFISH, EntityType.ZOMBIE, EntityType.ALLAY, EntityType.ENDERMITE),
                 null, List.of("puzzle")));
 
         phases.add(p(7, "garden", "Lush Garden", "#7BFFBB", 600,
@@ -172,7 +174,9 @@ public class PhaseManager {
                         b(Material.SCULK, 10),
                         b(Material.NETHERITE_BLOCK, 1)
                 ),
-                Phase.mobList(EntityType.WARDEN, EntityType.WITHER, EntityType.RAVAGER),
+                // Warden / Wither / Ravager removed from random spawns — would
+                // routinely kill players just for mining. Reserved for explicit boss fights.
+                Phase.mobList(EntityType.VEX, EntityType.PHANTOM, EntityType.EVOKER, EntityType.SHULKER),
                 "void_herald", List.of("arena")));
     }
 
