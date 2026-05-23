@@ -39,7 +39,6 @@ public final class HelpRegistrar {
             sb.append("§e/ob home §7— teleport to your OneBlock\n");
             sb.append("§e/ob prophecy §7— see and lock upcoming blocks\n");
             sb.append("§e/ob skills §7— skill trees and perks\n");
-            sb.append("§e/ob shop §7— spend coins\n");
             sb.append("§e/ob quest §7— today's daily challenge\n");
             sb.append("§e/ob leaderboard §7— top islands\n");
             sb.append("§e/ob phase §7— current phase status\n");

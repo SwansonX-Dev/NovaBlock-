@@ -7,7 +7,6 @@ import com.nova.novablock.gui.PetSelectGui;
 import com.nova.novablock.gui.PetStoreGui;
 import com.nova.novablock.gui.ProphecyGui;
 import com.nova.novablock.gui.QuestGui;
-import com.nova.novablock.gui.ShopGui;
 import com.nova.novablock.gui.SkillsGui;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.util.Msg;
@@ -26,7 +25,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS = List.of(
             "create", "home", "menu", "prophecy", "skills",
-            "quest", "shop", "leaderboard", "phase", "invite", "accept", "leave",
+            "quest", "leaderboard", "phase", "invite", "accept", "leave",
             "toggle", "help");
 
     private final NovaBlock plugin;
@@ -64,7 +63,6 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "prophecy" -> { if (perm(p, "novablock.prophecy")) new ProphecyGui(plugin).open(p); }
             case "skills" -> { if (perm(p, "novablock.skills")) new SkillsGui(plugin).open(p); }
             case "quests", "quest" -> new QuestGui(plugin).open(p);
-            case "shop" -> { if (perm(p, "novablock.shop")) new ShopGui(plugin).open(p); }
             case "leaderboard", "lb", "top" -> { if (perm(p, "novablock.leaderboard")) new LeaderboardGui(plugin).open(p); }
             case "phase" -> {
                 Island island = plugin.islands().ofPlayer(p);
@@ -161,7 +159,6 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         Msg.raw(p, "<yellow>/ob prophecy <gray>– see and lock upcoming blocks");
         Msg.raw(p, "<yellow>/ob skills <gray>– skill trees and perks");
         Msg.raw(p, "<yellow>/ob quest <gray>– today's daily quest");
-        Msg.raw(p, "<yellow>/ob shop <gray>– spend coins");
         Msg.raw(p, "<yellow>/ob leaderboard <gray>– top islands");
         Msg.raw(p, "<yellow>/ob phase <gray>– current phase status");
         Msg.raw(p, "<yellow>/ob invite <gray>– invite a player to your island");
