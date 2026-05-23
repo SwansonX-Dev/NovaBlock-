@@ -65,6 +65,9 @@ public class IslandManager {
         return null;
     }
 
+    /** Starter bank gift for new island owners. 100 coins, or the bank's min deposit — whichever is larger. */
+    private static final long STARTER_BANK_COINS = 100L;
+
     public Island create(Player owner) {
         if (ofPlayer(owner) != null) return ofPlayer(owner);
         int[] slot = nextSlot();
@@ -76,7 +79,30 @@ public class IslandManager {
         if (first != null) island.refillUpcoming(first, 10);
         register(island);
         plugin.storage().saveIsland(data);
+        seedStarterBank(owner);
         return island;
+    }
+
+    /**
+     * Welcome gift: credit the new owner's wallet and immediately bank-deposit
+     * a starter sum so they have a non-zero bank balance to play with. No-op if
+     * xEconomy's bank service isn't installed.
+     */
+    private void seedStarterBank(Player owner) {
+        dev.xsuite.economy.api.Bank bank = dev.xsuite.economy.api.XEconomy.bank();
+        dev.xsuite.economy.api.Economy eco = dev.xsuite.economy.api.XEconomy.get();
+        if (bank == null || eco == null) return;
+        long cents = Math.max(STARTER_BANK_COINS * 100L, bank.minDepositCents());
+        // Wallet credit first so the bank deposit can debit cleanly.
+        eco.deposit(owner.getUniqueId(), owner.getName(), cents);
+        String err = bank.deposit(owner.getUniqueId(), owner.getName(), cents);
+        if (err == null) {
+            com.nova.novablock.util.Msg.send(owner,
+                    "<gold>★ Welcome — a starter bank account with <yellow>"
+                            + (cents / 100) + " coins<gold> has been opened for you.");
+        } else {
+            plugin.getLogger().fine("Starter bank deposit failed for " + owner.getName() + ": " + err);
+        }
     }
 
     public void delete(Island island) {
