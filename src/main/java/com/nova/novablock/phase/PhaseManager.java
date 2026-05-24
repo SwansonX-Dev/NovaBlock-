@@ -210,7 +210,7 @@ public class PhaseManager {
                 List.of(
                         b(Material.OBSIDIAN, 28),
                         b(Material.CRYING_OBSIDIAN, 14),
-                        b(Material.REINFORCED_DEEPSLATE, 10),
+                        b(Material.DEEPSLATE, 10),
                         b(Material.SCULK_CATALYST, 5),
                         b(Material.SCULK_SHRIEKER, 3),
                         b(Material.SCULK, 14),

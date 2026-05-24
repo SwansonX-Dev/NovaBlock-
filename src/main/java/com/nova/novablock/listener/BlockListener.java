@@ -20,20 +20,41 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockListener implements Listener {
 
     private final NovaBlock plugin;
+    private static final Set<Material> UNSAFE_ONEBLOCK_MATERIALS = EnumSet.of(
+            Material.BEDROCK,
+            Material.BARRIER,
+            Material.COMMAND_BLOCK,
+            Material.CHAIN_COMMAND_BLOCK,
+            Material.REPEATING_COMMAND_BLOCK,
+            Material.STRUCTURE_BLOCK,
+            Material.STRUCTURE_VOID,
+            Material.JIGSAW,
+            Material.LIGHT,
+            Material.END_PORTAL,
+            Material.END_PORTAL_FRAME,
+            Material.NETHER_PORTAL,
+            Material.REINFORCED_DEEPSLATE,
+            Material.MOVING_PISTON,
+            Material.PISTON_HEAD
+    );
     /** Per-island guard so a Bedrock double-break (two BREAK packets within the same tick) collapses to one. */
     private final Map<UUID, Long> recentBreakTick = new HashMap<>();
 
@@ -96,6 +117,7 @@ public class BlockListener implements Listener {
         // Pull planned next material from the prophecy queue so previews are honest
         Material next = island.pollNext();
         if (next == null) next = phase.rollBlock(ThreadLocalRandom.current());
+        next = safeOneBlockMaterial(next, phase);
         // Lush Bloom event: occasionally substitute in a lush block regardless of phase
         if (plugin.seasons().active() == SeasonManager.ServerEvent.LUSH_BLOOM
                 && ThreadLocalRandom.current().nextInt(6) == 0) {
@@ -156,6 +178,45 @@ public class BlockListener implements Listener {
 
         // FX
         center.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, center.clone().add(0.5, 0.5, 0.5), 4, 0.2, 0.2, 0.2);
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onCenterInteract(PlayerInteractEvent event) {
+        if (event.getAction() != Action.LEFT_CLICK_BLOCK) return;
+        Block block = event.getClickedBlock();
+        if (block == null || !isUnsafeOneBlockMaterial(block.getType())) return;
+        Island island = plugin.islands().atLocation(block.getLocation());
+        if (island == null || !isCenterBlock(island, block.getLocation())) return;
+        if (!island.isMember(event.getPlayer())) return;
+
+        event.setCancelled(true);
+        Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
+        Material replacement = safeOneBlockMaterial(Material.DEEPSLATE, phase);
+        block.setType(replacement, false);
+        playPlaceSound(block);
+        Msg.actionBar(event.getPlayer(), "<yellow>Fixed an invalid OneBlock material.");
+    }
+
+    private boolean isCenterBlock(Island island, Location loc) {
+        Location center = island.centerBlock();
+        return loc.getBlockX() == center.getBlockX()
+                && loc.getBlockY() == center.getBlockY()
+                && loc.getBlockZ() == center.getBlockZ();
+    }
+
+    private Material safeOneBlockMaterial(Material material, Phase phase) {
+        if (!isUnsafeOneBlockMaterial(material)) return material;
+        if (phase != null) {
+            for (var phaseBlock : phase.getBlocks()) {
+                Material candidate = phaseBlock.material();
+                if (!isUnsafeOneBlockMaterial(candidate)) return candidate;
+            }
+        }
+        return Material.STONE;
+    }
+
+    private boolean isUnsafeOneBlockMaterial(Material material) {
+        return material == null || UNSAFE_ONEBLOCK_MATERIALS.contains(material);
     }
 
     private void playBreakSound(Block block) {
