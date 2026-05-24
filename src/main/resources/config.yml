@@ -1,6 +1,9 @@
 # NovaBlock config
 # Use /obadmin reload after editing.
 
+# Dedicated world used for all newly-created OneBlock islands.
+islandWorld: oneblock
+
 # Distance in blocks between island slots in the OneBlock world.
 # Default keeps islands well-separated to avoid TNT/projectile crossover.
 slotSize: 256

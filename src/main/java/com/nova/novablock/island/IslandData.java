@@ -10,8 +10,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.nova.novablock.island.IslandWorldManager.DEFAULT_WORLD_NAME;
 import static com.nova.novablock.island.IslandWorldManager.SLOT_SIZE;
-import static com.nova.novablock.island.IslandWorldManager.WORLD_NAME;
 
 public class IslandData {
 
@@ -83,7 +83,7 @@ public class IslandData {
 
     /** Centre block (the one that regenerates). */
     public Location centerBlock() {
-        World w = Bukkit.getWorld(worldName == null ? WORLD_NAME : worldName);
+        World w = Bukkit.getWorld(worldName == null ? DEFAULT_WORLD_NAME : worldName);
         int x = slotX * SLOT_SIZE;
         int z = slotZ * SLOT_SIZE;
         return new Location(w, x + 0.5, 80, z + 0.5);

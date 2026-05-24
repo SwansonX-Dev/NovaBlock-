@@ -3,7 +3,6 @@ package com.nova.novablock.companion;
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.gui.CompanionGui;
 import com.nova.novablock.island.Island;
-import com.nova.novablock.island.IslandWorldManager;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -299,7 +298,7 @@ public class CompanionManager implements Listener {
         if (player.hasPermission("novablock.companion.build.bypass")) return true;
         Island island = plugin.islands().atLocation(location);
         if (island == null) {
-            return location.getWorld() == null || !location.getWorld().getName().equals(IslandWorldManager.WORLD_NAME);
+            return location.getWorld() == null || !location.getWorld().getName().equals(plugin.worlds().worldName());
         }
         if (isProtectedOneBlockColumn(island, location)) return false;
         return plugin.islands().canBuild(player, location);

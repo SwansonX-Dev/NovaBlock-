@@ -92,6 +92,12 @@ public class MainMenuGui extends ChestGui {
                         .lore("<gray>Gather materials, recover void items, and loop discs.", "<dark_gray>/ob companion").build(),
                 e -> new CompanionGui(plugin).open(p));
 
+        set(40, ItemBuilder.of(Material.KNOWLEDGE_BOOK)
+                        .name("<gradient:#7B61FF:#4FC3F7>Server Guide")
+                        .lore("<gray>Learn xPets, economy, stocks, paxel, companion, and more.",
+                                "<dark_gray>/ob help").build(),
+                e -> new HelpGui(plugin).open(p));
+
         // Row 4: admin-defined custom buttons (overlay)
         for (var entry : plugin.menuConfig().all().values()) {
             String cmd = entry.command;

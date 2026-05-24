@@ -1,12 +1,11 @@
 package com.nova.novablock.listener;
 
 import com.nova.novablock.NovaBlock;
-import com.nova.novablock.compat.PlayerCompat;
-import com.nova.novablock.gui.MainMenuGui;
-import com.nova.novablock.gui.WelcomeGui;
+import com.nova.novablock.gui.HelpGui;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.util.Msg;
 import org.bukkit.GameMode;
+import org.bukkit.Sound;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
@@ -26,14 +25,26 @@ public class PlayerListener implements Listener {
         var p = event.getPlayer();
         plugin.progression().get(p); // warm cache
         Island island = plugin.islands().ofPlayer(p);
+        boolean created = false;
         if (island == null) {
+            island = plugin.islands().create(p);
+            created = true;
             Msg.send(p, "<gray>Welcome to <gradient:#7B61FF:#4FC3F7>NovaBlock</gradient><gray>!");
-            // Auto-open the welcome chest GUI a moment after join. Works on Bedrock.
-            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin,
-                    () -> { if (p.isOnline()) new WelcomeGui(plugin).open(p); }, 30L);
         } else {
-            Msg.send(p, "<gray>Welcome back. Your island awaits — <yellow>/ob home</yellow>.");
+            Msg.send(p, "<gray>Welcome back. Sending you to your island.");
         }
+        Island target = island;
+        boolean firstJoinIsland = created;
+        org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!p.isOnline()) return;
+            target.teleportHome(p);
+            if (firstJoinIsland) {
+                Msg.title(p, "<gradient:#7B61FF:#4FC3F7>NovaBlock", "<gray>Your island is ready");
+                p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+            }
+            new HelpGui(plugin).open(p);
+            plugin.scoreboards().update(p);
+        }, 20L);
         plugin.scoreboards().update(p);
     }
 

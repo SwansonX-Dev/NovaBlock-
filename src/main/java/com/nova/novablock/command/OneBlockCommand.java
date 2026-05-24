@@ -1,6 +1,7 @@
 package com.nova.novablock.command;
 
 import com.nova.novablock.NovaBlock;
+import com.nova.novablock.gui.HelpGui;
 import com.nova.novablock.gui.LeaderboardGui;
 import com.nova.novablock.gui.MainMenuGui;
 import com.nova.novablock.gui.CompanionGui;
@@ -87,8 +88,8 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 if (!p.hasPermission("novablock.toggle")) { denied(p); return true; }
                 plugin.hotbar().toggle(p);
             }
-            case "help", "?" -> sendHelp(p);
-            default -> sendHelp(p);
+            case "help", "?" -> new HelpGui(plugin).open(p);
+            default -> new HelpGui(plugin).open(p);
         }
         return true;
     }
@@ -239,25 +240,6 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
 
     private void denied(Player p) {
         Msg.send(p, "<red>You don't have permission.");
-    }
-
-    private void sendHelp(Player p) {
-        Msg.raw(p, "<gradient:#7B61FF:#4FC3F7><bold>NovaBlock</bold></gradient> <dark_gray>—</dark_gray> <gray>commands");
-        Msg.raw(p, "<yellow>/ob create <gray>– make your island");
-        Msg.raw(p, "<yellow>/ob home <gray>– teleport to your OneBlock");
-        Msg.raw(p, "<yellow>/ob menu <gray>– main hub menu");
-        Msg.raw(p, "<yellow>/ob prophecy <gray>– see and lock upcoming blocks");
-        Msg.raw(p, "<yellow>/ob skills <gray>– skill trees and perks");
-        Msg.raw(p, "<yellow>/ob flags <gray>– toggle PVP, fly, mob spawning, and more");
-        Msg.raw(p, "<yellow>/ob storage <gray>– open the island's shared storage");
-        Msg.raw(p, "<yellow>/ob quest <gray>– today's daily quest");
-        Msg.raw(p, "<yellow>/ob leaderboard <gray>– top islands");
-        Msg.raw(p, "<yellow>/ob phase <gray>– current phase status");
-        Msg.raw(p, "<yellow>/ob invite <gray>– invite a player to your island");
-        Msg.raw(p, "<yellow>/ob accept <gray>– accept a pending invite");
-        Msg.raw(p, "<yellow>/ob companion <gray>– summon a material-gathering music companion");
-        Msg.raw(p, "<yellow>/ob toggle <gray>– show/hide the menu hotbar item");
-        Msg.raw(p, "<yellow>/sb <gray>– show/hide the sidebar scoreboard");
     }
 
     @Override

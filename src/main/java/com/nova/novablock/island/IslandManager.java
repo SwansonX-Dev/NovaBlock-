@@ -23,6 +23,7 @@ public class IslandManager {
 
     public void loadAll() {
         for (IslandData data : plugin.storage().loadAllIslands()) {
+            plugin.worlds().ensureWorld(data.getWorldName());
             register(new Island(plugin, data));
         }
         recalculateNextSlot();
@@ -56,10 +57,10 @@ public class IslandManager {
     /** Resolve which island a location belongs to by checking grid slot. */
     public Island atLocation(Location loc) {
         if (loc.getWorld() == null) return null;
-        if (!loc.getWorld().getName().equals(IslandWorldManager.WORLD_NAME)) return null;
         int slotX = nearestSlot(loc.getBlockX());
         int slotZ = nearestSlot(loc.getBlockZ());
         for (Island i : byId.values()) {
+            if (!loc.getWorld().getName().equals(i.data().getWorldName())) continue;
             if (i.data().getSlotX() == slotX && i.data().getSlotZ() == slotZ) return i;
         }
         return null;
@@ -82,9 +83,13 @@ public class IslandManager {
 
     public Island create(Player owner) {
         if (ofPlayer(owner) != null) return ofPlayer(owner);
+        String islandWorldName = plugin.worlds().worldName();
+        if (plugin.worlds().ensureWorld(islandWorldName) == null) {
+            throw new IllegalStateException("OneBlock island world is not loaded: " + islandWorldName);
+        }
         int[] slot = nextSlot();
         IslandData data = new IslandData(Island.newId(), owner.getUniqueId(),
-                IslandWorldManager.WORLD_NAME, slot[0], slot[1]);
+                islandWorldName, slot[0], slot[1]);
         Island island = new Island(plugin, data);
         island.ensureSpawnPlatform();
         Phase first = plugin.phases().get(0);

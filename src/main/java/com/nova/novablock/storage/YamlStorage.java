@@ -68,7 +68,7 @@ public class YamlStorage implements DataStorage {
                 }
                 UUID id = UUID.fromString(idStr);
                 UUID owner = UUID.fromString(ownerStr);
-                String worldName = y.getString("world", com.nova.novablock.island.IslandWorldManager.WORLD_NAME);
+                String worldName = y.getString("world", plugin.worlds().worldName());
                 int slotX = y.getInt("slot.x");
                 int slotZ = y.getInt("slot.z");
                 long blocksBroken = y.getLong("blocksBroken", 0);

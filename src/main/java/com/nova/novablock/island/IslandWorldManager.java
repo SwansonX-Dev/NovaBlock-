@@ -15,36 +15,51 @@ import java.util.Random;
 
 public class IslandWorldManager {
 
-    public static final String WORLD_NAME = "novablock_world";
+    public static final String DEFAULT_WORLD_NAME = "oneblock";
+    public static final String LEGACY_WORLD_NAME = "novablock_world";
     public static final int SLOT_SIZE = 256;
 
     private final NovaBlock plugin;
     private World world;
+    private String worldName = DEFAULT_WORLD_NAME;
 
     public IslandWorldManager(NovaBlock plugin) { this.plugin = plugin; }
 
     public void init() {
-        World existing = Bukkit.getWorld(WORLD_NAME);
-        if (existing != null) { this.world = existing; return; }
+        this.worldName = plugin.getConfig().getString("islandWorld", DEFAULT_WORLD_NAME);
+        if (worldName == null || worldName.isBlank()) worldName = DEFAULT_WORLD_NAME;
+        this.world = ensureWorld(worldName);
+    }
+
+    public World ensureWorld(String name) {
+        String targetName = name == null || name.isBlank() ? worldName : name;
+        World existing = Bukkit.getWorld(targetName);
+        if (existing != null) return existing;
         // Don't set worldType — our ChunkGenerator handles every step, and FLAT
         // would otherwise look for a superflat layers preset that we don't supply.
-        WorldCreator wc = new WorldCreator(WORLD_NAME)
+        WorldCreator wc = new WorldCreator(targetName)
                 .generator(new VoidGenerator())
                 .biomeProvider(new SingleBiomeProvider(Biome.PLAINS))
                 .generateStructures(false);
-        this.world = wc.createWorld();
-        if (world != null) {
-            world.setSpawnFlags(false, false);
-            world.setDifficulty(Difficulty.NORMAL);
-            world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
-            world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, true);
-            world.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, true);
-            world.setGameRule(org.bukkit.GameRule.DO_FIRE_TICK, false);
-            world.setGameRule(org.bukkit.GameRule.MOB_GRIEFING, false);
+        World created = wc.createWorld();
+        if (created != null) {
+            configure(created);
         }
+        return created;
+    }
+
+    private void configure(World world) {
+        world.setSpawnFlags(false, false);
+        world.setDifficulty(Difficulty.NORMAL);
+        world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
+        world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, true);
+        world.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, true);
+        world.setGameRule(org.bukkit.GameRule.DO_FIRE_TICK, false);
+        world.setGameRule(org.bukkit.GameRule.MOB_GRIEFING, false);
     }
 
     public World getWorld() { return world; }
+    public String worldName() { return worldName; }
 
     public static final class VoidGenerator extends ChunkGenerator {
         @Override public void generateNoise(WorldInfo w, Random r, int cx, int cz, ChunkData d) {}
