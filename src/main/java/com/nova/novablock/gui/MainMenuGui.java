@@ -60,7 +60,7 @@ public class MainMenuGui extends ChestGui {
 
         set(22, ItemBuilder.of(Material.CHEST)
                         .name("<yellow>Sell Chests")
-                        .lore("<gray>Auto-sell chests on your island.", "<dark_gray>/sellchest").build(),
+                        .lore("<gray>Buy and manage island auto-sell chests.", "<dark_gray>/sellchest").build(),
                 e -> { p.closeInventory(); p.performCommand("sellchest"); });
 
         set(23, ItemBuilder.of(Material.GOLD_BLOCK)
