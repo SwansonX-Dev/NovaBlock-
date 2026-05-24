@@ -17,4 +17,5 @@ public interface DataStorage {
 
     PlayerProgression loadProgression(UUID playerId);
     void saveProgression(PlayerProgression progression);
+    void deleteProgression(UUID playerId);
 }

@@ -6,7 +6,7 @@
 
     <groupId>com.nova</groupId>
     <artifactId>novablock</artifactId>
-    <version>0.4.3</version>
+    <version>0.4.4</version>
     <packaging>jar</packaging>
     <name>NovaBlock</name>
 
@@ -40,7 +40,7 @@
         <dependency>
             <groupId>dev.xsuite</groupId>
             <artifactId>xeconomy-api</artifactId>
-            <version>0.3.0</version>
+            <version>0.3.4</version>
             <scope>provided</scope>
         </dependency>
         <!-- PlaceholderAPI – soft hook (PlaceholderHook is only registered when

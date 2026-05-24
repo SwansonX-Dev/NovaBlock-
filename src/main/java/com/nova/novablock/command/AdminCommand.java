@@ -5,6 +5,7 @@ import com.nova.novablock.island.Island;
 import com.nova.novablock.season.SeasonManager;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -20,7 +21,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
             "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
-            "flags", "storage", "menu");
+            "flags", "storage", "menu", "freshstart");
     private static final List<String> BOSSES = List.of(
             "magma_tyrant", "frostborn_sentinel", "void_herald");
     private static final List<String> EVENTS = List.of(
@@ -35,7 +36,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         // Per-subcommand permission is checked below; allow entry if the user has
         // any admin permission at all (or the wildcard).
         if (args.length == 0) {
-            Msg.send(sender, "<yellow>/obadmin <reload|setphase|spawnboss|givecoins|event|wipe>");
+            Msg.send(sender, "<yellow>/obadmin <reload|setphase|spawnboss|givecoins|event|wipe|freshstart>");
             return true;
         }
         String sub = args[0].toLowerCase();
@@ -129,9 +130,59 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 plugin.islandStorage().openFor(viewer, island);
             }
             case "menu" -> handleMenuEdit(sender, args);
+            case "freshstart" -> handleFreshStart(sender, args);
             default -> Msg.send(sender, "<red>Unknown subcommand.");
         }
         return true;
+    }
+
+    private void handleFreshStart(CommandSender sender, String[] args) {
+        if (args.length < 3 || !args[2].equalsIgnoreCase("confirm")) {
+            Msg.send(sender, "<red>/obadmin freshstart <player> confirm");
+            Msg.send(sender, "<yellow>This wipes NovaBlock and xEconomy player data.");
+            return;
+        }
+        OfflinePlayer target = Bukkit.getPlayerExact(args[1]);
+        if (target == null) target = Bukkit.getOfflinePlayer(args[1]);
+        if (!target.hasPlayedBefore() && !target.isOnline()) {
+            Msg.send(sender, "<red>That player has never joined this server.");
+            return;
+        }
+
+        java.util.UUID id = target.getUniqueId();
+        String name = target.getName() != null ? target.getName() : args[1];
+
+        dev.xsuite.economy.api.PlayerData playerData = dev.xsuite.economy.api.XEconomy.playerData();
+        if (playerData == null) {
+            Msg.send(sender, "<red>xEconomy player-data reset service is unavailable.");
+            return;
+        }
+
+        Player online = target.getPlayer();
+        if (online != null) resetOnlineSession(online);
+
+        plugin.islands().resetPlayer(id);
+        plugin.progression().delete(id);
+        playerData.reset(id, name);
+        Msg.send(sender, "<green>Fresh-start reset completed for " + name + ".");
+    }
+
+    private void resetOnlineSession(Player player) {
+        player.closeInventory();
+        player.getInventory().clear();
+        player.getEnderChest().clear();
+        player.setExp(0f);
+        player.setLevel(0);
+        player.setTotalExperience(0);
+        player.setFoodLevel(20);
+        player.setSaturation(5f);
+        player.setFireTicks(0);
+        for (var effect : player.getActivePotionEffects()) {
+            player.removePotionEffect(effect.getType());
+        }
+        if (!Bukkit.getWorlds().isEmpty()) {
+            player.teleport(Bukkit.getWorlds().getFirst().getSpawnLocation());
+        }
     }
 
     private void handleMenuEdit(CommandSender sender, String[] args) {
@@ -208,7 +259,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
-                case "setphase", "givecoins", "wipe" -> Bukkit.getOnlinePlayers().stream()
+                case "setphase", "givecoins", "wipe", "freshstart" -> Bukkit.getOnlinePlayers().stream()
                         .map(Player::getName)
                         .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
@@ -216,6 +267,9 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 case "event" -> EVENTS.stream().filter(e -> e.startsWith(args[1].toLowerCase())).collect(Collectors.toList());
                 default -> Collections.emptyList();
             };
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("freshstart")) {
+            return "confirm".startsWith(args[2].toLowerCase()) ? List.of("confirm") : Collections.emptyList();
         }
         return Collections.emptyList();
     }

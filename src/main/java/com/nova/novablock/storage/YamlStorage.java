@@ -181,6 +181,12 @@ public class YamlStorage implements DataStorage {
         catch (IOException ex) { plugin.getLogger().warning("Failed to save progression: " + ex.getMessage()); }
     }
 
+    @Override
+    public void deleteProgression(UUID playerId) {
+        File f = new File(playerDir, playerId + ".yml");
+        if (f.exists()) f.delete();
+    }
+
     public static Location parseLoc(YamlConfiguration y, String path) {
         if (!y.contains(path)) return null;
         String world = y.getString(path + ".world");

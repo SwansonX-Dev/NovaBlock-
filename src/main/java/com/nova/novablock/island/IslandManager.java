@@ -123,6 +123,16 @@ public class IslandManager {
         plugin.storage().deleteIsland(island.data().getId());
     }
 
+    public void resetPlayer(UUID playerId) {
+        Island island = ofPlayer(playerId);
+        if (island == null) return;
+        if (island.data().getOwner().equals(playerId)) {
+            delete(island);
+        } else {
+            removeMember(island, playerId);
+        }
+    }
+
     public void addMember(Island island, UUID playerId) {
         island.data().getMembers().add(playerId);
         playerToIsland.put(playerId, island.data().getId());

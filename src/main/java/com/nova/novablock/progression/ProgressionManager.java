@@ -36,6 +36,11 @@ public class ProgressionManager {
         cache.remove(id);
     }
 
+    public void delete(UUID id) {
+        cache.remove(id);
+        plugin.storage().deleteProgression(id);
+    }
+
     public void addXp(Player player, SkillType skill, long amount) {
         PlayerProgression p = get(player);
         p.setXp(skill, p.getXp(skill) + amount);
