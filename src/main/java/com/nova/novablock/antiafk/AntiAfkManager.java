@@ -19,9 +19,9 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Anti-AFK chat challenge. After {@link #CHALLENGE_INTERVAL_MS} of mining
- * activity, the player is prompted to type a random letter in chat. If they
- * don't respond within {@link #CHALLENGE_TIMEOUT_MS} they're kicked.
+ * Anti-AFK chat challenge. After the configured interval of mining activity,
+ * the player is prompted to type a random letter in chat. If they don't respond
+ * within the configured timeout they're kicked.
  *
  * <p>"Activity" is bumped from {@link com.nova.novablock.listener.BlockListener}
  * each time the player breaks their OneBlock — that's the loop we care about
@@ -30,18 +30,38 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class AntiAfkManager implements Listener {
 
-    private static final long CHALLENGE_INTERVAL_MS = 30L * 60L * 1000L;   // 30 min
-    private static final long CHALLENGE_TIMEOUT_MS  = 60L * 1000L;          // 60s
+    private static final long DEFAULT_CHALLENGE_INTERVAL_MS = 30L * 60L * 1000L;   // 30 min
+    private static final long DEFAULT_CHALLENGE_TIMEOUT_MS  = 60L * 1000L;          // 60s
     private static final long TICK_PERIOD_TICKS     = 20L * 5L;             // every 5s
 
     private final NovaBlock plugin;
     private final Map<UUID, State> states = new HashMap<>();
     private BukkitTask tickTask;
+    private boolean enabled;
+    private long challengeIntervalMs;
+    private long challengeTimeoutMs;
 
     public AntiAfkManager(NovaBlock plugin) {
         this.plugin = plugin;
+        reload();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tickAll, TICK_PERIOD_TICKS, TICK_PERIOD_TICKS);
+    }
+
+    public void reload() {
+        var cfg = plugin.configs().main();
+        enabled = cfg.getBoolean("anti-afk.enabled", false);
+        challengeIntervalMs = Math.max(60_000L,
+                cfg.getLong("anti-afk.challenge-interval-seconds", DEFAULT_CHALLENGE_INTERVAL_MS / 1000L) * 1000L);
+        challengeTimeoutMs = Math.max(10_000L,
+                cfg.getLong("anti-afk.challenge-timeout-seconds", DEFAULT_CHALLENGE_TIMEOUT_MS / 1000L) * 1000L);
+        states.clear();
+        if (enabled) {
+            long next = System.currentTimeMillis() + challengeIntervalMs;
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                states.put(player.getUniqueId(), new State(next));
+            }
+        }
     }
 
     public void shutdown() {
@@ -51,7 +71,8 @@ public class AntiAfkManager implements Listener {
 
     /** Called by BlockListener after a successful OneBlock break. */
     public void recordMineActivity(Player p) {
-        State s = states.computeIfAbsent(p.getUniqueId(), id -> new State(System.currentTimeMillis() + CHALLENGE_INTERVAL_MS));
+        if (!enabled) return;
+        State s = states.computeIfAbsent(p.getUniqueId(), id -> new State(System.currentTimeMillis() + challengeIntervalMs));
         // If they're already being challenged we don't reset the clock; only a
         // correct chat reply clears the challenge.
         if (s.activeChallenge == 0) {
@@ -61,13 +82,14 @@ public class AntiAfkManager implements Listener {
     }
 
     private void tickAll() {
+        if (!enabled) return;
         long now = System.currentTimeMillis();
         for (Player p : Bukkit.getOnlinePlayers()) {
             State s = states.get(p.getUniqueId());
             if (s == null) continue;
             if (s.activeChallenge != 0) {
                 // Pending challenge — kick on timeout.
-                if (now - s.challengeIssuedAt > CHALLENGE_TIMEOUT_MS) {
+                if (now - s.challengeIssuedAt > challengeTimeoutMs) {
                     p.kick(Msg.mm("<red>Kicked for AFK — no chat response to the captcha."));
                 }
                 continue;
@@ -83,13 +105,14 @@ public class AntiAfkManager implements Listener {
         s.activeChallenge = letter;
         s.challengeIssuedAt = now;
         Msg.send(p, "<gold>★ Anti-AFK check: <yellow>type the letter <white><bold>" + letter
-                + " <yellow>in chat within 60s.");
+                + " <yellow>in chat within " + (challengeTimeoutMs / 1000L) + "s.");
         p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1.2f);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onChat(AsyncChatEvent event) {
         UUID id = event.getPlayer().getUniqueId();
+        if (!enabled) return;
         State s = states.get(id);
         if (s == null || s.activeChallenge == 0) return;
         String body = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
@@ -100,16 +123,18 @@ public class AntiAfkManager implements Listener {
             long now = System.currentTimeMillis();
             s.activeChallenge = 0;
             s.challengeIssuedAt = 0;
-            s.nextCheckAt = now + CHALLENGE_INTERVAL_MS;
+            s.nextCheckAt = now + challengeIntervalMs;
             Bukkit.getScheduler().runTask(plugin, () ->
-                    Msg.send(event.getPlayer(), "<green>✓ Verified — see you in 30 minutes."));
+                    Msg.send(event.getPlayer(), "<green>✓ Verified — see you in "
+                            + (challengeIntervalMs / 60_000L) + " minutes."));
         }
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
+        if (!enabled) return;
         states.put(event.getPlayer().getUniqueId(),
-                new State(System.currentTimeMillis() + CHALLENGE_INTERVAL_MS));
+                new State(System.currentTimeMillis() + challengeIntervalMs));
     }
 
     @EventHandler

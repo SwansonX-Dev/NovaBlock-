@@ -19,6 +19,11 @@ cooldowns:
   bossMinBlocks: 300
   lootRoomMinBlocks: 150
 
+anti-afk:
+  enabled: false
+  challenge-interval-seconds: 1800
+  challenge-timeout-seconds: 60
+
 companion:
   # How often the companion generates the selected material.
   # 1800 seconds = 30 minutes.
