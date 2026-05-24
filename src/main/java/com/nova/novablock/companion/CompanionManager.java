@@ -7,6 +7,8 @@ import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.permissions.Permission;
+import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.entity.Allay;
@@ -17,12 +19,18 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -36,6 +44,15 @@ public class CompanionManager implements Listener {
     private static final int MAX_STACK_GATHER = 16;
     private static final double SOFT_FOLLOW_RADIUS = 4.5;
     private static final double HARD_FOLLOW_RADIUS = 14.0;
+    private static final String USE_PERMISSION = "novablock.companion.use";
+    private static final String GATHER_WILDCARD_PERMISSION = "novablock.companion.gather.*";
+    private static final String GATHER_PERMISSION_PREFIX = "novablock.companion.gather.";
+    private static final Material FALLBACK_MATERIAL = Material.COBBLESTONE;
+    private static final Material[] GATHERABLE_MATERIALS = Arrays.stream(Material.values())
+            .filter(material -> material != Material.AIR)
+            .filter(Material::isItem)
+            .sorted(Comparator.comparing(Material::name))
+            .toArray(Material[]::new);
 
     private final NovaBlock plugin;
     private final Map<UUID, CompanionSession> sessions = new HashMap<>();
@@ -43,8 +60,10 @@ public class CompanionManager implements Listener {
 
     public CompanionManager(NovaBlock plugin) {
         this.plugin = plugin;
+        registerGatherPermissions();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         this.task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, TICK_PERIOD, TICK_PERIOD);
+        Bukkit.getScheduler().runTask(plugin, () -> Bukkit.getOnlinePlayers().forEach(this::ensureActive));
     }
 
     public void shutdown() {
@@ -59,7 +78,7 @@ public class CompanionManager implements Listener {
     }
 
     public void summon(Player player, Material material, Sound discSound) {
-        if (!player.hasPermission("novablock.companion.use")) {
+        if (!player.hasPermission(USE_PERMISSION)) {
             denied(player);
             return;
         }
@@ -80,20 +99,24 @@ public class CompanionManager implements Listener {
     }
 
     public void stop(Player player) {
-        CompanionSession session = sessions.remove(player.getUniqueId());
+        CompanionSession session = sessions.get(player.getUniqueId());
         if (session == null) {
-            Msg.send(player, "<gray>You do not have an active companion.");
+            ensureActive(player);
+            Msg.send(player, "<gray>Your companion stays active. Music has been stopped.");
             return;
         }
-        session.removeEntity();
         if (session.discSound != null) player.stopSound(session.discSound, SoundCategory.RECORDS);
-        Msg.send(player, "<gray>Your companion returned home.");
+        session.discSound = null;
+        session.musicReplayTicks = 0;
+        session.musicTicks = 0;
+        spawnEntityIfNeeded(player, session);
+        Msg.send(player, "<gray>Your companion stays active. Music has been stopped.");
     }
 
     public void setMaterial(Player player, Material material) {
-        CompanionSession session = sessions.get(player.getUniqueId());
+        CompanionSession session = ensureActive(player);
         if (session == null) {
-            Msg.send(player, "<gray>Use <yellow>/ob companion summon " + material.name().toLowerCase(Locale.ROOT) + "</yellow> first.");
+            denied(player);
             return;
         }
         if (!canGather(player, material)) return;
@@ -105,9 +128,9 @@ public class CompanionManager implements Listener {
     }
 
     public void setMusic(Player player, Sound discSound) {
-        CompanionSession session = sessions.get(player.getUniqueId());
+        CompanionSession session = ensureActive(player);
         if (session == null) {
-            Msg.send(player, "<gray>Summon your companion first.");
+            denied(player);
             return;
         }
         Sound old = session.discSound;
@@ -122,6 +145,24 @@ public class CompanionManager implements Listener {
         if (old != null) player.stopSound(old, SoundCategory.RECORDS);
         playDisc(player, session);
         Msg.send(player, "<green>Companion music loop enabled.");
+    }
+
+    private CompanionSession ensureActive(Player player) {
+        if (!player.hasPermission(USE_PERMISSION)) {
+            CompanionSession old = sessions.remove(player.getUniqueId());
+            if (old != null) old.removeEntity();
+            return null;
+        }
+
+        CompanionSession session = sessions.get(player.getUniqueId());
+        if (session == null) {
+            session = new CompanionSession(defaultMaterial(player), null, 0);
+            sessions.put(player.getUniqueId(), session);
+        } else if (!hasGatherPermission(player, session.material)) {
+            session.material = defaultMaterial(player);
+        }
+        spawnEntityIfNeeded(player, session);
+        return session;
     }
 
     public boolean isActive(Player player) {
@@ -144,19 +185,20 @@ public class CompanionManager implements Listener {
             Msg.send(player, "<red>That material cannot be gathered as an item.");
             return false;
         }
-        String node = "novablock.companion.gather." + material.name().toLowerCase(Locale.ROOT);
-        if (player.hasPermission("novablock.companion.gather.*") || player.hasPermission(node)) return true;
+        String node = gatherPermission(material);
+        if (player.hasPermission(GATHER_WILDCARD_PERMISSION) || player.hasPermission(node)) return true;
         Msg.send(player, "<red>You need <yellow>" + node + "</yellow> to gather that material.");
         return false;
     }
 
     public boolean hasGatherPermission(Player player, Material material) {
         if (material == null || !material.isItem() || material == Material.AIR) return false;
-        String node = "novablock.companion.gather." + material.name().toLowerCase(Locale.ROOT);
-        return player.hasPermission("novablock.companion.gather.*") || player.hasPermission(node);
+        String node = gatherPermission(material);
+        return player.hasPermission(GATHER_WILDCARD_PERMISSION) || player.hasPermission(node);
     }
 
     private void tick() {
+        Bukkit.getOnlinePlayers().forEach(this::ensureActive);
         sessions.entrySet().removeIf(entry -> {
             Player player = Bukkit.getPlayer(entry.getKey());
             CompanionSession session = entry.getValue();
@@ -164,9 +206,11 @@ public class CompanionManager implements Listener {
                 session.removeEntity();
                 return true;
             }
-            if (session.entity == null || session.entity.isDead()) {
-                spawnEntity(player, session);
+            if (!player.hasPermission(USE_PERMISSION)) {
+                session.removeEntity();
+                return true;
             }
+            spawnEntityIfNeeded(player, session);
 
             followPlayer(player, session);
 
@@ -187,7 +231,14 @@ public class CompanionManager implements Listener {
         });
     }
 
+    private void spawnEntityIfNeeded(Player player, CompanionSession session) {
+        if (session.entity == null || session.entity.isDead()) {
+            spawnEntity(player, session);
+        }
+    }
+
     private void spawnEntity(Player player, CompanionSession session) {
+        session.removeEntity();
         Location spawn = orbitTarget(player, session).add(0, 0.2, 0);
         Allay allay = (Allay) player.getWorld().spawnEntity(spawn, EntityType.ALLAY);
         allay.customName(Msg.mm("<aqua>" + player.getName() + "'s Companion"));
@@ -251,6 +302,16 @@ public class CompanionManager implements Listener {
         if (!canWorkAt(player, player.getLocation())) {
             Msg.actionBar(player, "<red>Companion paused: no build permission here.");
             return;
+        }
+        if (!hasGatherPermission(player, session.material)) {
+            session.material = defaultMaterial(player);
+            if (!hasGatherPermission(player, session.material)) {
+                Msg.actionBar(player, "<red>Companion paused: no gather materials unlocked.");
+                return;
+            }
+            if (session.entity != null && !session.entity.isDead()) {
+                session.entity.getEquipment().setItemInMainHand(new ItemStack(session.material));
+            }
         }
         ItemStack item = new ItemStack(session.material, amountFor(session.material));
         Map<Integer, ItemStack> overflow = player.getInventory().addItem(item);
@@ -346,6 +407,43 @@ public class CompanionManager implements Listener {
         Msg.send(player, "<red>You don't have permission.");
     }
 
+    private Material defaultMaterial(Player player) {
+        if (hasGatherPermission(player, FALLBACK_MATERIAL)) return FALLBACK_MATERIAL;
+        for (Material material : GATHERABLE_MATERIALS) {
+            if (hasGatherPermission(player, material)) return material;
+        }
+        return FALLBACK_MATERIAL;
+    }
+
+    public static String gatherPermission(Material material) {
+        return GATHER_PERMISSION_PREFIX + material.name().toLowerCase(Locale.ROOT);
+    }
+
+    private void registerGatherPermissions() {
+        PluginManager permissions = Bukkit.getPluginManager();
+        Map<String, Boolean> children = new LinkedHashMap<>();
+        for (Material material : GATHERABLE_MATERIALS) {
+            String node = gatherPermission(material);
+            children.put(node, true);
+            if (permissions.getPermission(node) == null) {
+                permissions.addPermission(new Permission(node,
+                        "Allows companions to gather " + material.name().toLowerCase(Locale.ROOT),
+                        PermissionDefault.FALSE));
+            }
+        }
+
+        Permission wildcard = permissions.getPermission(GATHER_WILDCARD_PERMISSION);
+        if (wildcard == null) {
+            permissions.addPermission(new Permission(GATHER_WILDCARD_PERMISSION,
+                    "Allows companions to gather any item material",
+                    PermissionDefault.OP,
+                    children));
+        } else {
+            wildcard.getChildren().putAll(children);
+            wildcard.recalculatePermissibles();
+        }
+    }
+
     @EventHandler(ignoreCancelled = true)
     public void onItemVoid(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Item item)) return;
@@ -381,6 +479,18 @@ public class CompanionManager implements Listener {
             }
         }
         return nearest;
+    }
+
+    @EventHandler
+    public void onJoin(PlayerJoinEvent event) {
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (event.getPlayer().isOnline()) ensureActive(event.getPlayer());
+        }, 30L);
+    }
+
+    @EventHandler
+    public void onWorldChange(PlayerChangedWorldEvent event) {
+        Bukkit.getScheduler().runTask(plugin, () -> ensureActive(event.getPlayer()));
     }
 
     @EventHandler

@@ -47,7 +47,8 @@ public class CompanionMaterialGui extends ChestGui {
             return;
         }
 
-        int start = page * PAGE_SIZE;
+        int currentPage = Math.min(page, pageCount(allowedMaterials) - 1);
+        int start = currentPage * PAGE_SIZE;
         int end = Math.min(start + PAGE_SIZE, allowedMaterials.size());
         for (int i = start; i < end; i++) {
             Material material = allowedMaterials.get(i);
@@ -64,18 +65,18 @@ public class CompanionMaterialGui extends ChestGui {
             });
         }
 
-        if (page > 0) {
+        if (currentPage > 0) {
             set(45, ItemBuilder.of(Material.ARROW).name("<gray>Previous").build(),
-                    e -> new CompanionMaterialGui(plugin, page - 1).open(p));
+                    e -> new CompanionMaterialGui(plugin, currentPage - 1).open(p));
         }
         set(49, ItemBuilder.of(Material.COMPASS)
-                        .name("<aqua>Page " + (page + 1) + "/" + pageCount(allowedMaterials))
+                        .name("<aqua>Page " + (currentPage + 1) + "/" + pageCount(allowedMaterials))
                         .lore("<gray>Only materials you can gather are shown.")
                         .build(),
                 null);
         if (end < allowedMaterials.size()) {
             set(53, ItemBuilder.of(Material.ARROW).name("<gray>Next").build(),
-                    e -> new CompanionMaterialGui(plugin, page + 1).open(p));
+                    e -> new CompanionMaterialGui(plugin, currentPage + 1).open(p));
         }
         set(48, ItemBuilder.of(Material.BARRIER).name("<gray>Back").build(),
                 e -> new CompanionGui(plugin).open(p));

@@ -263,11 +263,12 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             String sub = args[1].toLowerCase(Locale.ROOT);
             String prefix = args[2].toLowerCase(Locale.ROOT);
             if (sub.equals("summon") || sub.equals("start") || sub.equals("material") || sub.equals("gather")) {
+                if (!(sender instanceof Player player)) return Collections.emptyList();
                 return Arrays.stream(Material.values())
                         .filter(Material::isItem)
+                        .filter(material -> plugin.companions().hasGatherPermission(player, material))
                         .map(m -> m.name().toLowerCase(Locale.ROOT))
                         .filter(n -> n.startsWith(prefix))
-                        .limit(50)
                         .collect(Collectors.toList());
             }
             if (sub.equals("music") || sub.equals("disc")) {
