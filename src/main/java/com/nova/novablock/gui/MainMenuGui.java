@@ -87,6 +87,11 @@ public class MainMenuGui extends ChestGui {
                     com.nova.novablock.island.IslandStorageManager.tryOpen(plugin, p);
                 });
 
+        set(31, ItemBuilder.of(Material.ALLAY_SPAWN_EGG)
+                        .name("<aqua>Companion")
+                        .lore("<gray>Gather materials, recover void items, and loop discs.", "<dark_gray>/ob companion").build(),
+                e -> new CompanionGui(plugin).open(p));
+
         // Row 4: admin-defined custom buttons (overlay)
         for (var entry : plugin.menuConfig().all().values()) {
             String cmd = entry.command;

@@ -280,13 +280,19 @@ public class BlockListener implements Listener {
     public void onPlace(BlockPlaceEvent event) {
         Island island = plugin.islands().atLocation(event.getBlock().getLocation());
         if (island == null) return;
+        if (!island.isMember(event.getPlayer())) return;
+
         Location placed = event.getBlock().getLocation();
         Location center = island.centerBlock();
-        if (placed.getBlockX() == center.getBlockX()
-                && placed.getBlockY() == center.getBlockY() + 1
-                && placed.getBlockZ() == center.getBlockZ()) {
+
+        boolean inRegenColumn = placed.getBlockX() == center.getBlockX()
+                && placed.getBlockZ() == center.getBlockZ()
+                && placed.getBlockY() >= center.getBlockY() - 1
+                && placed.getBlockY() <= center.getBlockY() + 1;
+
+        if (inRegenColumn) {
             event.setCancelled(true);
-            Msg.actionBar(event.getPlayer(), "<red>Can't place directly above the OneBlock.");
+            Msg.actionBar(event.getPlayer(), "<red>Keep the OneBlock column clear.");
         }
     }
 }

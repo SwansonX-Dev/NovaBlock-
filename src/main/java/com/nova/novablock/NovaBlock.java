@@ -8,6 +8,7 @@ import com.nova.novablock.boss.BossManager;
 import com.nova.novablock.command.AdminCommand;
 import com.nova.novablock.command.OneBlockCommand;
 import com.nova.novablock.command.ScoreboardCommand;
+import com.nova.novablock.companion.CompanionManager;
 import com.nova.novablock.config.ConfigManager;
 import com.nova.novablock.economy.EconomyManager;
 import com.nova.novablock.event.EventManager;
@@ -57,6 +58,7 @@ public final class NovaBlock extends JavaPlugin {
     private IslandFlagsManager islandFlagsManager;
     private IslandStorageManager islandStorageManager;
     private MainMenuConfig menuConfig;
+    private CompanionManager companionManager;
 
     @Override
     public void onEnable() {
@@ -99,6 +101,7 @@ public final class NovaBlock extends JavaPlugin {
         this.islandFlagsManager = new IslandFlagsManager(this);
         this.islandStorageManager = new IslandStorageManager(this);
         this.menuConfig = new MainMenuConfig(this);
+        this.companionManager = new CompanionManager(this);
 
         getServer().getPluginManager().registerEvents(new BlockListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
@@ -142,6 +145,7 @@ public final class NovaBlock extends JavaPlugin {
         if (eventManager != null) eventManager.shutdown();
         if (seasonManager != null) seasonManager.shutdown();
         if (scoreboardManager != null) scoreboardManager.shutdown();
+        if (companionManager != null) companionManager.shutdown();
         if (lootRoomManager != null) lootRoomManager.shutdown();
         if (bossManager != null) bossManager.shutdown();
 
@@ -176,4 +180,5 @@ public final class NovaBlock extends JavaPlugin {
     public IslandFlagsManager islandFlags() { return islandFlagsManager; }
     public IslandStorageManager islandStorage() { return islandStorageManager; }
     public MainMenuConfig menuConfig() { return menuConfig; }
+    public CompanionManager companions() { return companionManager; }
 }

@@ -3,13 +3,14 @@ package com.nova.novablock.command;
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.gui.LeaderboardGui;
 import com.nova.novablock.gui.MainMenuGui;
-import com.nova.novablock.gui.PetSelectGui;
-import com.nova.novablock.gui.PetStoreGui;
+import com.nova.novablock.gui.CompanionGui;
 import com.nova.novablock.gui.ProphecyGui;
 import com.nova.novablock.gui.QuestGui;
 import com.nova.novablock.gui.SkillsGui;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.util.Msg;
+import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -17,8 +18,10 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 public class OneBlockCommand implements CommandExecutor, TabCompleter {
@@ -26,7 +29,10 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBCOMMANDS = List.of(
             "create", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "invite", "accept", "leave",
-            "toggle", "help");
+            "companion", "toggle", "help");
+
+    private static final List<String> COMPANION_SUBCOMMANDS = List.of(
+            "gui", "summon", "material", "music", "stop");
 
     private final NovaBlock plugin;
 
@@ -76,6 +82,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "invite" -> invite(p, args);
             case "accept" -> accept(p);
             case "leave" -> leave(p);
+            case "companion", "pet" -> companion(p, args);
             case "toggle" -> {
                 if (!p.hasPermission("novablock.toggle")) { denied(p); return true; }
                 plugin.hotbar().toggle(p);
@@ -123,6 +130,87 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void companion(Player p, String[] args) {
+        if (!p.hasPermission("novablock.companion.use")) {
+            denied(p);
+            return;
+        }
+        if (args.length < 2) {
+            new CompanionGui(plugin).open(p);
+            return;
+        }
+        if (args[1].equalsIgnoreCase("gui") || args[1].equalsIgnoreCase("menu")) {
+            new CompanionGui(plugin).open(p);
+            return;
+        }
+        switch (args[1].toLowerCase(Locale.ROOT)) {
+            case "summon", "start" -> {
+                if (args.length < 3) {
+                    Msg.send(p, "<gray>Usage: <yellow>/ob companion summon <material> [disc]</yellow>");
+                    return;
+                }
+                Material material = parseMaterial(args[2]);
+                if (material == null) {
+                    Msg.send(p, "<red>Unknown material.");
+                    return;
+                }
+                Sound disc = args.length >= 4 ? parseDisc(args[3]) : Sound.MUSIC_DISC_CAT;
+                if (args.length >= 4 && disc == null) {
+                    Msg.send(p, "<red>Unknown music disc.");
+                    return;
+                }
+                plugin.companions().summon(p, material, disc);
+            }
+            case "material", "gather" -> {
+                if (args.length < 3) {
+                    Msg.send(p, "<gray>Usage: <yellow>/ob companion material <material></yellow>");
+                    return;
+                }
+                Material material = parseMaterial(args[2]);
+                if (material == null) {
+                    Msg.send(p, "<red>Unknown material.");
+                    return;
+                }
+                plugin.companions().setMaterial(p, material);
+            }
+            case "music", "disc" -> {
+                if (args.length < 3) {
+                    Msg.send(p, "<gray>Usage: <yellow>/ob companion music <disc|off></yellow>");
+                    return;
+                }
+                if (args[2].equalsIgnoreCase("off") || args[2].equalsIgnoreCase("none")) {
+                    plugin.companions().setMusic(p, null);
+                    return;
+                }
+                Sound disc = parseDisc(args[2]);
+                if (disc == null) {
+                    Msg.send(p, "<red>Unknown music disc.");
+                    return;
+                }
+                plugin.companions().setMusic(p, disc);
+            }
+            case "stop", "dismiss" -> plugin.companions().stop(p);
+            default -> Msg.send(p, "<gray>Usage: <yellow>/ob companion summon <material> [disc]</yellow>");
+        }
+    }
+
+    private Material parseMaterial(String input) {
+        if (input == null) return null;
+        return Material.matchMaterial(input.toUpperCase(Locale.ROOT));
+    }
+
+    private Sound parseDisc(String input) {
+        if (input == null) return null;
+        String key = input.toUpperCase(Locale.ROOT);
+        if (!key.startsWith("MUSIC_DISC_")) key = "MUSIC_DISC_" + key;
+        try {
+            Sound sound = Sound.valueOf(key);
+            return sound.name().startsWith("MUSIC_DISC_") ? sound : null;
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
     private void accept(Player p) {
         if (plugin.islands().ofPlayer(p) != null) {
             Msg.send(p, "<red>You already have an island. Leave it first.");
@@ -167,6 +255,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         Msg.raw(p, "<yellow>/ob phase <gray>– current phase status");
         Msg.raw(p, "<yellow>/ob invite <gray>– invite a player to your island");
         Msg.raw(p, "<yellow>/ob accept <gray>– accept a pending invite");
+        Msg.raw(p, "<yellow>/ob companion <gray>– summon a material-gathering music companion");
         Msg.raw(p, "<yellow>/ob toggle <gray>– show/hide the menu hotbar item");
         Msg.raw(p, "<yellow>/sb <gray>– show/hide the sidebar scoreboard");
     }
@@ -184,6 +273,39 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                     .filter(n -> n.toLowerCase().startsWith(prefix))
                     .collect(Collectors.toList());
         }
+        if (args.length == 2 && (args[0].equalsIgnoreCase("companion") || args[0].equalsIgnoreCase("pet"))) {
+            String prefix = args[1].toLowerCase(Locale.ROOT);
+            return COMPANION_SUBCOMMANDS.stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
+        }
+        if (args.length == 3 && (args[0].equalsIgnoreCase("companion") || args[0].equalsIgnoreCase("pet"))) {
+            String sub = args[1].toLowerCase(Locale.ROOT);
+            String prefix = args[2].toLowerCase(Locale.ROOT);
+            if (sub.equals("summon") || sub.equals("start") || sub.equals("material") || sub.equals("gather")) {
+                return Arrays.stream(Material.values())
+                        .filter(Material::isItem)
+                        .map(m -> m.name().toLowerCase(Locale.ROOT))
+                        .filter(n -> n.startsWith(prefix))
+                        .limit(50)
+                        .collect(Collectors.toList());
+            }
+            if (sub.equals("music") || sub.equals("disc")) {
+                return discTabs(prefix);
+            }
+        }
+        if (args.length == 4
+                && (args[0].equalsIgnoreCase("companion") || args[0].equalsIgnoreCase("pet"))
+                && (args[1].equalsIgnoreCase("summon") || args[1].equalsIgnoreCase("start"))) {
+            return discTabs(args[3].toLowerCase(Locale.ROOT));
+        }
         return Collections.emptyList();
+    }
+
+    private List<String> discTabs(String prefix) {
+        return Arrays.stream(Sound.values())
+                .map(Sound::name)
+                .filter(n -> n.startsWith("MUSIC_DISC_"))
+                .map(n -> n.substring("MUSIC_DISC_".length()).toLowerCase(Locale.ROOT))
+                .filter(n -> n.startsWith(prefix))
+                .collect(Collectors.toList());
     }
 }

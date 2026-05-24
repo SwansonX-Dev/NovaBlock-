@@ -209,16 +209,14 @@ public class IslandFlagsManager implements Listener {
     public void onVisitorBreak(BlockBreakEvent event) {
         Island island = islandAt(event.getBlock().getLocation());
         if (island == null) return;
-        if (island.isMember(event.getPlayer())) return;
-        if (!island.data().isFlag(IslandFlag.VISITOR_BUILD)) event.setCancelled(true);
+        if (!plugin.islands().canBuild(event.getPlayer(), event.getBlock().getLocation())) event.setCancelled(true);
     }
 
     @EventHandler(ignoreCancelled = true)
     public void onVisitorPlace(BlockPlaceEvent event) {
         Island island = islandAt(event.getBlock().getLocation());
         if (island == null) return;
-        if (island.isMember(event.getPlayer())) return;
-        if (!island.data().isFlag(IslandFlag.VISITOR_BUILD)) event.setCancelled(true);
+        if (!plugin.islands().canBuild(event.getPlayer(), event.getBlock().getLocation())) event.setCancelled(true);
     }
 
     // ---- KEEP_INVENTORY ----

@@ -57,12 +57,24 @@ public class IslandManager {
     public Island atLocation(Location loc) {
         if (loc.getWorld() == null) return null;
         if (!loc.getWorld().getName().equals(IslandWorldManager.WORLD_NAME)) return null;
-        int slotX = Math.floorDiv(loc.getBlockX(), IslandWorldManager.SLOT_SIZE);
-        int slotZ = Math.floorDiv(loc.getBlockZ(), IslandWorldManager.SLOT_SIZE);
+        int slotX = nearestSlot(loc.getBlockX());
+        int slotZ = nearestSlot(loc.getBlockZ());
         for (Island i : byId.values()) {
             if (i.data().getSlotX() == slotX && i.data().getSlotZ() == slotZ) return i;
         }
         return null;
+    }
+
+    private int nearestSlot(int blockCoord) {
+        int halfSlot = IslandWorldManager.SLOT_SIZE / 2;
+        return Math.floorDiv(blockCoord + halfSlot, IslandWorldManager.SLOT_SIZE);
+    }
+
+    public boolean canBuild(Player player, Location loc) {
+        if (player.hasPermission("novablock.build.bypass") || player.hasPermission("novablock.admin")) return true;
+        Island island = atLocation(loc);
+        if (island == null) return true;
+        return island.isMember(player) || island.data().isFlag(IslandFlag.VISITOR_BUILD);
     }
 
     /** Starter bank gift for new island owners. 100 coins, or the bank's min deposit — whichever is larger. */
