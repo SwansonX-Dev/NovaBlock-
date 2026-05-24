@@ -65,7 +65,7 @@ public class PaxelManager implements Listener {
     public static final NamespacedKey PAXEL_TIER = new NamespacedKey("novablock", "paxel_tier");
     public static final NamespacedKey PAXEL_VERSION_KEY = new NamespacedKey("novablock", "paxel_version");
     /** Bump when build() changes in a way that needs to invalidate existing paxels in inventories. */
-    public static final int PAXEL_VERSION = 2;
+    public static final int PAXEL_VERSION = 3;
 
     /** Ores eligible for vein-mining. The OneBlock center is always excluded regardless of type. */
     private static final java.util.Set<Material> ORES = java.util.Set.of(
@@ -339,7 +339,7 @@ public class PaxelManager implements Listener {
         event.setExpToDrop(0);
 
         // Telekinesis the primary drop + XP.
-        collectDrops(p, tool, block, block.getDrops(tool));
+        collectDrops(p, tool, block, dropsForPaxel(block, tool));
         if (xp > 0) p.giveExp(xp);
 
         // Vein-mine: if the broken block was an ore, chain to connected same-type ores.
@@ -376,7 +376,7 @@ public class PaxelManager implements Listener {
         // isn't part of the API surface we compile against).
         int veinXp = 0;
         for (org.bukkit.block.Block b : extras) {
-            collectDrops(p, tool, b, b.getDrops(tool));
+            collectDrops(p, tool, b, dropsForPaxel(b, tool));
             veinXp += approxOreXp(b.getType());
             b.setType(Material.AIR, false);
         }
@@ -406,6 +406,55 @@ public class PaxelManager implements Listener {
             for (ItemStack leftover : overflow.values()) {
                 block.getWorld().dropItemNaturally(dropLoc, leftover);
             }
+        }
+    }
+
+    private java.util.Collection<ItemStack> dropsForPaxel(org.bukkit.block.Block block, ItemStack paxel) {
+        java.util.Collection<ItemStack> drops = block.getDrops(paxel);
+        if (!drops.isEmpty()) return drops;
+        ItemStack fallbackTool = fallbackToolFor(block.getType(), tierOf(paxel));
+        return fallbackTool == null ? drops : block.getDrops(fallbackTool);
+    }
+
+    private ItemStack fallbackToolFor(Material blockType, int tier) {
+        Material tool = fallbackToolMaterial(blockType, tier);
+        return tool == null ? null : new ItemStack(tool);
+    }
+
+    private Material fallbackToolMaterial(Material blockType, int tier) {
+        ToolSet set = switch (Math.max(0, Math.min(TIER_MATERIALS.length - 1, tier))) {
+            case 0 -> ToolSet.WOOD;
+            case 1 -> ToolSet.STONE;
+            case 2 -> ToolSet.IRON;
+            case 3 -> ToolSet.GOLD;
+            case 4 -> ToolSet.DIAMOND;
+            default -> ToolSet.NETHERITE;
+        };
+        if (Tag.MINEABLE_AXE.isTagged(blockType)) return set.axe;
+        if (Tag.MINEABLE_SHOVEL.isTagged(blockType)) return set.shovel;
+        if (Tag.MINEABLE_HOE.isTagged(blockType)) return set.hoe;
+        if (Tag.MINEABLE_PICKAXE.isTagged(blockType)) return set.pickaxe;
+        return null;
+    }
+
+    private enum ToolSet {
+        WOOD(Material.WOODEN_PICKAXE, Material.WOODEN_AXE, Material.WOODEN_SHOVEL, Material.WOODEN_HOE),
+        STONE(Material.STONE_PICKAXE, Material.STONE_AXE, Material.STONE_SHOVEL, Material.STONE_HOE),
+        IRON(Material.IRON_PICKAXE, Material.IRON_AXE, Material.IRON_SHOVEL, Material.IRON_HOE),
+        GOLD(Material.GOLDEN_PICKAXE, Material.GOLDEN_AXE, Material.GOLDEN_SHOVEL, Material.GOLDEN_HOE),
+        DIAMOND(Material.DIAMOND_PICKAXE, Material.DIAMOND_AXE, Material.DIAMOND_SHOVEL, Material.DIAMOND_HOE),
+        NETHERITE(Material.NETHERITE_PICKAXE, Material.NETHERITE_AXE, Material.NETHERITE_SHOVEL, Material.NETHERITE_HOE);
+
+        final Material pickaxe;
+        final Material axe;
+        final Material shovel;
+        final Material hoe;
+
+        ToolSet(Material pickaxe, Material axe, Material shovel, Material hoe) {
+            this.pickaxe = pickaxe;
+            this.axe = axe;
+            this.shovel = shovel;
+            this.hoe = hoe;
         }
     }
 

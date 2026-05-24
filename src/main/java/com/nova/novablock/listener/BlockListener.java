@@ -13,6 +13,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
+import org.bukkit.block.Container;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
@@ -23,6 +24,8 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -82,6 +85,7 @@ public class BlockListener implements Listener {
         // "Bedrock has to break it twice" (player saw the gap and swung again).
         event.setCancelled(true);
         dropNaturally(block, player, player.getInventory().getItemInMainHand());
+        playBreakSound(block);
 
         // Phase-specific drops & bonuses
         handleBlockEvents(player, island, broken);
@@ -105,6 +109,8 @@ public class BlockListener implements Listener {
         // sweet_berry_bush, dead_bush, flowering_azalea, bamboo_block, sculk_shrieker, etc.)
         // from being destroyed for "missing support" the instant they're placed onto bedrock.
         center.getBlock().setType(next, false);
+        fillPhaseChest(center.getBlock(), phase);
+        playPlaceSound(center.getBlock());
         // Maintain the bedrock anchor underneath at all times.
         Location anchor = center.clone().add(0, -1, 0);
         if (anchor.getBlock().getType() != Material.BEDROCK) {
@@ -152,6 +158,18 @@ public class BlockListener implements Listener {
         center.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, center.clone().add(0.5, 0.5, 0.5), 4, 0.2, 0.2, 0.2);
     }
 
+    private void playBreakSound(Block block) {
+        var group = block.getBlockData().getSoundGroup();
+        block.getWorld().playSound(block.getLocation().add(0.5, 0.5, 0.5),
+                group.getBreakSound(), group.getVolume(), group.getPitch());
+    }
+
+    private void playPlaceSound(Block block) {
+        var group = block.getBlockData().getSoundGroup();
+        block.getWorld().playSound(block.getLocation().add(0.5, 0.5, 0.5),
+                group.getPlaceSound(), group.getVolume(), group.getPitch());
+    }
+
     /**
      * Drop the OneBlock's natural drops at its location using the tool the player
      * has. If the player is holding their paxel, auto-smelt and telekinesis the
@@ -160,17 +178,150 @@ public class BlockListener implements Listener {
     private void dropNaturally(Block block, Player player, ItemStack tool) {
         var loc = block.getLocation().add(0.5, 0.5, 0.5);
         boolean paxel = plugin.paxels().isPaxel(tool);
+        if (block.getState() instanceof Container container) {
+            for (ItemStack content : container.getInventory().getContents()) {
+                if (content == null || content.getType().isAir()) continue;
+                giveOrDrop(player, block, loc, content, paxel);
+            }
+            container.getInventory().clear();
+        }
         for (ItemStack drop : block.getDrops(tool)) {
             if (paxel) drop = plugin.paxels().maybeSmelt(drop);
-            if (paxel) {
-                var overflow = player.getInventory().addItem(drop);
-                for (ItemStack leftover : overflow.values()) {
-                    block.getWorld().dropItemNaturally(loc, leftover);
-                }
-            } else {
-                block.getWorld().dropItemNaturally(loc, drop);
-            }
+            giveOrDrop(player, block, loc, drop, paxel);
         }
+    }
+
+    private void giveOrDrop(Player player, Block block, Location loc, ItemStack item, boolean paxel) {
+        if (paxel) {
+            var overflow = player.getInventory().addItem(item);
+            for (ItemStack leftover : overflow.values()) {
+                block.getWorld().dropItemNaturally(loc, leftover);
+            }
+        } else {
+            block.getWorld().dropItemNaturally(loc, item);
+        }
+    }
+
+    private void fillPhaseChest(Block block, Phase phase) {
+        if (block.getType() != Material.CHEST || !(block.getState() instanceof Container container)) return;
+        var inventory = container.getInventory();
+        inventory.clear();
+        List<ItemStack> loot = phaseLoot(phase);
+        var rng = ThreadLocalRandom.current();
+        for (ItemStack item : loot) {
+            if (item == null || item.getAmount() <= 0) continue;
+            int slot;
+            int guard = 0;
+            do {
+                slot = rng.nextInt(inventory.getSize());
+                guard++;
+            } while (inventory.getItem(slot) != null && guard < 40);
+            inventory.setItem(slot, item);
+        }
+        container.update(true, false);
+    }
+
+    private List<ItemStack> phaseLoot(Phase phase) {
+        int idx = phase.getIndex();
+        String id = phase.getId();
+        var rng = ThreadLocalRandom.current();
+        List<ItemStack> loot = new ArrayList<>();
+        loot.add(stack(Material.BREAD, 2 + rng.nextInt(3)));
+        loot.add(stack(Material.TORCH, 8 + rng.nextInt(9)));
+        switch (id) {
+            case "plains" -> {
+                loot.add(stack(Material.OAK_SAPLING, 2 + rng.nextInt(3)));
+                loot.add(stack(Material.WHEAT_SEEDS, 4 + rng.nextInt(5)));
+                loot.add(stack(Material.CARROT, 2 + rng.nextInt(4)));
+                loot.add(stack(Material.POTATO, 2 + rng.nextInt(4)));
+                loot.add(stack(Material.PUMPKIN_SEEDS, 2 + rng.nextInt(3)));
+                loot.add(stack(Material.MELON_SEEDS, 2 + rng.nextInt(3)));
+                loot.add(stack(Material.WATER_BUCKET, 1));
+                loot.add(stack(Material.BONE_MEAL, 6 + rng.nextInt(7)));
+            }
+            case "underground" -> {
+                loot.add(stack(Material.IRON_INGOT, 6 + rng.nextInt(7)));
+                loot.add(stack(Material.RAW_IRON, 8 + rng.nextInt(9)));
+                loot.add(stack(Material.COAL, 12 + rng.nextInt(13)));
+                loot.add(stack(Material.DIRT, 12 + rng.nextInt(9)));
+                loot.add(stack(Material.BONE_MEAL, 8 + rng.nextInt(9)));
+                loot.add(stack(Material.SUGAR_CANE, 2 + rng.nextInt(4)));
+                loot.add(stack(Material.WATER_BUCKET, 1));
+                loot.add(stack(Material.LAVA_BUCKET, 1));
+            }
+            case "snow" -> {
+                loot.add(stack(Material.IRON_INGOT, 4 + rng.nextInt(7)));
+                loot.add(stack(Material.WATER_BUCKET, 1));
+                loot.add(stack(Material.LAVA_BUCKET, 1));
+                loot.add(stack(Material.SPRUCE_SAPLING, 2 + rng.nextInt(3)));
+                loot.add(stack(Material.BEETROOT_SEEDS, 3 + rng.nextInt(4)));
+                loot.add(stack(Material.SWEET_BERRIES, 3 + rng.nextInt(5)));
+                loot.add(stack(Material.SNOWBALL, 8 + rng.nextInt(9)));
+            }
+            case "desert" -> {
+                loot.add(stack(Material.SAND, 16 + rng.nextInt(17)));
+                loot.add(stack(Material.CACTUS, 2 + rng.nextInt(4)));
+                loot.add(stack(Material.SUGAR_CANE, 4 + rng.nextInt(5)));
+                loot.add(stack(Material.MELON_SEEDS, 2 + rng.nextInt(3)));
+                loot.add(stack(Material.LAVA_BUCKET, 1));
+                loot.add(stack(Material.GOLD_INGOT, 3 + rng.nextInt(5)));
+            }
+            case "ocean" -> {
+                loot.add(stack(Material.WATER_BUCKET, 1));
+                loot.add(stack(Material.KELP, 8 + rng.nextInt(9)));
+                loot.add(stack(Material.PRISMARINE_SHARD, 6 + rng.nextInt(7)));
+                loot.add(stack(Material.IRON_INGOT, 3 + rng.nextInt(5)));
+            }
+            case "nether" -> {
+                loot.add(stack(Material.LAVA_BUCKET, 1));
+                loot.add(stack(Material.QUARTZ, 8 + rng.nextInt(9)));
+                loot.add(stack(Material.GLOWSTONE_DUST, 8 + rng.nextInt(9)));
+                loot.add(stack(Material.GOLD_INGOT, 4 + rng.nextInt(5)));
+            }
+            case "ancient" -> {
+                loot.add(stack(Material.IRON_INGOT, 10 + rng.nextInt(9)));
+                loot.add(stack(Material.DIAMOND, 1 + rng.nextInt(3)));
+                loot.add(stack(Material.REDSTONE, 12 + rng.nextInt(13)));
+                loot.add(stack(Material.LAPIS_LAZULI, 8 + rng.nextInt(9)));
+            }
+            case "garden" -> {
+                loot.add(stack(Material.BAMBOO, 8 + rng.nextInt(9)));
+                loot.add(stack(Material.BIG_DRIPLEAF, 2 + rng.nextInt(3)));
+                loot.add(stack(Material.CLAY_BALL, 8 + rng.nextInt(9)));
+                loot.add(stack(Material.WATER_BUCKET, 1));
+            }
+            case "stronghold" -> {
+                loot.add(stack(Material.ENDER_PEARL, 2 + rng.nextInt(3)));
+                loot.add(stack(Material.BOOK, 3 + rng.nextInt(4)));
+                loot.add(stack(Material.IRON_INGOT, 6 + rng.nextInt(7)));
+                loot.add(stack(Material.OBSIDIAN, 3 + rng.nextInt(4)));
+            }
+            case "end" -> {
+                loot.add(stack(Material.ENDER_PEARL, 4 + rng.nextInt(5)));
+                loot.add(stack(Material.CHORUS_FRUIT, 6 + rng.nextInt(7)));
+                loot.add(stack(Material.OBSIDIAN, 4 + rng.nextInt(5)));
+                loot.add(stack(Material.PURPUR_BLOCK, 8 + rng.nextInt(9)));
+            }
+            case "celestial" -> {
+                loot.add(stack(Material.AMETHYST_SHARD, 8 + rng.nextInt(9)));
+                loot.add(stack(Material.GLOWSTONE_DUST, 12 + rng.nextInt(13)));
+                loot.add(stack(Material.EXPERIENCE_BOTTLE, 4 + rng.nextInt(5)));
+                loot.add(stack(Material.DIAMOND, 2 + rng.nextInt(3)));
+            }
+            case "void" -> {
+                loot.add(stack(Material.ECHO_SHARD, 1 + rng.nextInt(2)));
+                loot.add(stack(Material.ENDER_PEARL, 6 + rng.nextInt(7)));
+                loot.add(stack(Material.OBSIDIAN, 8 + rng.nextInt(9)));
+                loot.add(stack(Material.NETHERITE_SCRAP, 1));
+            }
+            default -> {}
+        }
+        if (idx >= 1) loot.add(stack(Material.IRON_INGOT, 3 + rng.nextInt(4)));
+        return loot;
+    }
+
+    private static ItemStack stack(Material material, int amount) {
+        return new ItemStack(material, Math.max(1, amount));
     }
 
     private void advancePhase(Player player, Island island, Phase old) {

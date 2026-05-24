@@ -13,17 +13,20 @@ public class LootRoomRun {
     private final UUID islandId;
     private final Location anchor;
     private final Location returnLocation;
+    private final String worldName;
     private final long startTick;
     private boolean finished;
     private int score;
     private long state; // free use bitfield for room implementations
 
-    public LootRoomRun(LootRoom room, UUID playerId, Island island, Location anchor, Location returnLocation, long startTick) {
+    public LootRoomRun(LootRoom room, UUID playerId, Island island, Location anchor,
+                       Location returnLocation, String worldName, long startTick) {
         this.room = room;
         this.playerId = playerId;
         this.islandId = island.data().getId();
         this.anchor = anchor;
         this.returnLocation = returnLocation;
+        this.worldName = worldName;
         this.startTick = startTick;
     }
 
@@ -32,6 +35,7 @@ public class LootRoomRun {
     public UUID islandId() { return islandId; }
     public Location anchor() { return anchor; }
     public Location returnLocation() { return returnLocation; }
+    public String worldName() { return worldName; }
     public long startTick() { return startTick; }
     public boolean finished() { return finished; }
     public void markFinished() { this.finished = true; }

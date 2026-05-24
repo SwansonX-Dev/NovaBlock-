@@ -2,16 +2,21 @@ package com.nova.novablock.lootroom;
 
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.island.Island;
+import com.nova.novablock.island.IslandWorldManager;
 import com.nova.novablock.lootroom.rooms.ArenaRoom;
 import com.nova.novablock.lootroom.rooms.ParkourRoom;
 import com.nova.novablock.lootroom.rooms.PuzzleRoom;
 import com.nova.novablock.util.ItemBuilder;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
+import org.bukkit.Difficulty;
+import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.World;
+import org.bukkit.WorldCreator;
+import org.bukkit.block.Biome;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -27,6 +32,10 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -40,7 +49,8 @@ public class LootRoomManager implements Listener {
     private final Map<UUID, RiftOffer> offers = new HashMap<>();
     /** Players who died mid-run; we'll redirect their respawn to the saved return location. */
     private final Map<UUID, Location> pendingReturn = new HashMap<>();
-    private int nextAnchorX = 100_000;
+    /** Runs waiting for respawn before their instance world can be deleted. */
+    private final Map<UUID, LootRoomRun> pendingCleanup = new HashMap<>();
     private BukkitTask tickTask;
 
     public LootRoomManager(NovaBlock plugin) {
@@ -53,7 +63,7 @@ public class LootRoomManager implements Listener {
     public void registerDefaultRooms() {
         register(new ParkourRoom());
         register(new ArenaRoom(plugin));
-        register(new PuzzleRoom(plugin));
+        register(new PuzzleRoom());
     }
 
     public void register(LootRoom room) { registry.put(room.id(), room); }
@@ -118,6 +128,7 @@ public class LootRoomManager implements Listener {
             }
             if (run.finished()) {
                 complete(run);
+                cleanupRunWorld(run);
                 it.remove();
             }
         }
@@ -129,10 +140,17 @@ public class LootRoomManager implements Listener {
         LootRoom room = registry.get(offer.roomId);
         Island island = plugin.islands().get(offer.islandId);
         if (room == null || island == null) return;
-        Location anchor = nextAnchor();
+        if (active.containsKey(p.getUniqueId())) finishEarly(p);
+        World instance = createInstanceWorld(p);
+        if (instance == null) {
+            Msg.send(p, "<red>Could not create a private rift world. Try again.");
+            return;
+        }
+        Location anchor = new Location(instance, 0, 100, 0);
         Location entry = room.build(anchor);
         Location returnLoc = p.getLocation().clone();
-        LootRoomRun run = new LootRoomRun(room, p.getUniqueId(), island, anchor, returnLoc, Bukkit.getCurrentTick());
+        LootRoomRun run = new LootRoomRun(room, p.getUniqueId(), island, anchor,
+                returnLoc, instance.getName(), Bukkit.getCurrentTick());
         active.put(p.getUniqueId(), run);
         p.teleport(entry);
         room.onStart(run, p);
@@ -145,6 +163,7 @@ public class LootRoomManager implements Listener {
         if (run == null) return;
         cleanupRoomMobs(run);
         p.teleport(run.returnLocation());
+        cleanupRunWorld(run);
         Msg.actionBar(p, "<gray>You forfeited the rift.");
     }
 
@@ -170,6 +189,7 @@ public class LootRoomManager implements Listener {
         LootRoomRun run = active.remove(id);
         if (run == null) return;
         pendingReturn.put(id, run.returnLocation());
+        pendingCleanup.put(id, run);
         cleanupRoomMobs(run);
         Msg.title(event.getEntity(), "<red>Rift Failed", "<gray>You fell in battle — no rewards.");
     }
@@ -180,13 +200,22 @@ public class LootRoomManager implements Listener {
         if (ret != null && ret.getWorld() != null) {
             event.setRespawnLocation(ret);
         }
+        LootRoomRun run = pendingCleanup.remove(event.getPlayer().getUniqueId());
+        if (run != null) {
+            Bukkit.getScheduler().runTask(plugin, () -> cleanupRunWorld(run));
+        }
     }
 
     /** If a runner logs out mid-run, abort it cleanly so we don't leak ticking arenas. */
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         LootRoomRun run = active.remove(event.getPlayer().getUniqueId());
-        if (run != null) cleanupRoomMobs(run);
+        if (run != null) {
+            cleanupRoomMobs(run);
+            cleanupRunWorld(run);
+        }
+        LootRoomRun pending = pendingCleanup.remove(event.getPlayer().getUniqueId());
+        if (pending != null) cleanupRunWorld(pending);
         pendingReturn.remove(event.getPlayer().getUniqueId());
     }
 
@@ -194,7 +223,11 @@ public class LootRoomManager implements Listener {
 
     /** True if the location is inside the working bounds of any currently-active loot room. */
     private boolean insideAnyRoom(Location loc) {
-        if (loc == null) return false;
+        return runAt(loc) != null;
+    }
+
+    private LootRoomRun runAt(Location loc) {
+        if (loc == null) return null;
         for (LootRoomRun run : active.values()) {
             Location a = run.anchor();
             if (a == null || a.getWorld() == null) continue;
@@ -204,17 +237,18 @@ public class LootRoomManager implements Listener {
             if (Math.abs(loc.getBlockX() - a.getBlockX()) > 18) continue;
             if (Math.abs(loc.getBlockZ() - a.getBlockZ()) > 18) continue;
             if (loc.getBlockY() < a.getBlockY() - 2 || loc.getBlockY() > a.getBlockY() + 10) continue;
-            return true;
+            return run;
         }
-        return false;
+        return null;
     }
 
     @EventHandler(ignoreCancelled = true)
     public void onBreakInRoom(BlockBreakEvent event) {
-        if (insideAnyRoom(event.getBlock().getLocation())) {
-            event.setCancelled(true);
-            Msg.actionBar(event.getPlayer(), "<red>You can't break blocks inside a rift.");
-        }
+        LootRoomRun run = runAt(event.getBlock().getLocation());
+        if (run == null) return;
+        if ("puzzle".equals(run.room().id()) && event.getBlock().getType() == Material.AMETHYST_BLOCK) return;
+        event.setCancelled(true);
+        Msg.actionBar(event.getPlayer(), "<red>You can't break blocks inside a rift.");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -264,9 +298,62 @@ public class LootRoomManager implements Listener {
         plugin.quests().onLootRoomCompleted(p);
     }
 
-    private Location nextAnchor() {
-        nextAnchorX += 64;
-        return new Location(plugin.worlds().getWorld(), nextAnchorX, 100, 100_000);
+    private World createInstanceWorld(Player player) {
+        String name = "novablock_loot_" + player.getUniqueId().toString().replace("-", "").substring(0, 12)
+                + "_" + Long.toUnsignedString(System.currentTimeMillis(), 36);
+        WorldCreator creator = new WorldCreator(name)
+                .generator(new IslandWorldManager.VoidGenerator())
+                .biomeProvider(new IslandWorldManager.SingleBiomeProvider(Biome.PLAINS))
+                .generateStructures(false);
+        World world = creator.createWorld();
+        if (world == null) return null;
+        world.setSpawnFlags(false, false);
+        world.setDifficulty(Difficulty.NORMAL);
+        world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
+        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+        world.setGameRule(GameRule.KEEP_INVENTORY, true);
+        world.setGameRule(GameRule.DO_FIRE_TICK, false);
+        world.setGameRule(GameRule.MOB_GRIEFING, false);
+        world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
+        world.setGameRule(GameRule.ANNOUNCE_ADVANCEMENTS, false);
+        return world;
+    }
+
+    private void cleanupRunWorld(LootRoomRun run) {
+        cleanupRoomMobs(run);
+        World world = Bukkit.getWorld(run.worldName());
+        if (world == null) return;
+        for (Player player : world.getPlayers()) {
+            Location ret = run.returnLocation();
+            if (ret.getWorld() != null) player.teleport(ret);
+        }
+        Path folder = world.getWorldFolder().toPath();
+        if (!Bukkit.unloadWorld(world, false)) {
+            plugin.getLogger().warning("Could not unload loot room world " + run.worldName());
+            return;
+        }
+        try {
+            deleteDirectory(folder);
+        } catch (IOException e) {
+            plugin.getLogger().warning("Could not delete loot room world " + run.worldName() + ": " + e.getMessage());
+        }
+    }
+
+    private void deleteDirectory(Path folder) throws IOException {
+        if (!Files.exists(folder)) return;
+        try (var paths = Files.walk(folder)) {
+            paths.sorted(Comparator.reverseOrder())
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof IOException io) throw io;
+            throw e;
+        }
     }
 
     public LootRoomRun getRun(Player p) { return active.get(p.getUniqueId()); }
@@ -277,8 +364,12 @@ public class LootRoomManager implements Listener {
         for (LootRoomRun run : active.values()) {
             Player p = run.player();
             if (p != null) p.teleport(run.returnLocation());
+            cleanupRunWorld(run);
         }
         active.clear();
+        for (LootRoomRun run : pendingCleanup.values()) cleanupRunWorld(run);
+        pendingCleanup.clear();
+        pendingReturn.clear();
         // Remove pending rift markers from the world.
         for (RiftOffer offer : offers.values()) offer.clearMarker();
         offers.clear();

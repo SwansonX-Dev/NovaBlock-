@@ -1,104 +1,94 @@
 package com.nova.novablock.lootroom.rooms;
 
-import com.nova.novablock.NovaBlock;
 import com.nova.novablock.lootroom.LootRoom;
 import com.nova.novablock.lootroom.LootRoomRun;
 import com.nova.novablock.util.Msg;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * 3x3 pressure-plate "Simon Says" puzzle.
- * Sequence is encoded into LootRoomRun.state — high 8 bits = round, low 24 bits = sequence (8 steps × 3 bits each).
+ * Replacement for the old Echo Vault Simon-Says room.
+ *
+ * <p>Crystal Cache is intentionally simple: the room places eight glowing
+ * amethyst targets around a small arena. The player clears the rift by breaking
+ * all targets before the timer expires. This keeps the "puzzle" room slot in
+ * phase configs while avoiding pressure-plate debounce and delayed-sequence
+ * edge cases.
  */
 public class PuzzleRoom implements LootRoom {
 
-    private final NovaBlock plugin;
-
-    public PuzzleRoom(NovaBlock plugin) { this.plugin = plugin; }
+    private static final int TARGETS = 8;
+    private static final int TIME_LIMIT_SECONDS = 75;
+    private static final int[] TARGETS_OFFSET = {-3, -2, -1, 0, 1, 2, 3};
 
     @Override public String id() { return "puzzle"; }
-    @Override public String displayName() { return "Echo Vault"; }
+    @Override public String displayName() { return "Crystal Cache"; }
 
     @Override
-    public java.util.List<org.bukkit.inventory.ItemStack> rewardItems(com.nova.novablock.island.Island island) {
+    public List<ItemStack> rewardItems(com.nova.novablock.island.Island island) {
         int phase = island.data().getPhaseIndex();
-        java.util.List<org.bukkit.inventory.ItemStack> out = new java.util.ArrayList<>(LootRoom.super.rewardItems(island));
-        out.add(new org.bukkit.inventory.ItemStack(Material.AMETHYST_SHARD, 4 + phase));
-        out.add(LootRoom.enchantedBook(org.bukkit.enchantments.Enchantment.MENDING, 1));
-        if (phase >= 5) out.add(new org.bukkit.inventory.ItemStack(Material.ECHO_SHARD, 1 + phase / 5));
-        if (phase >= 7) out.add(new org.bukkit.inventory.ItemStack(Material.ENDER_PEARL, 2 + phase / 4));
+        List<ItemStack> out = new ArrayList<>(LootRoom.super.rewardItems(island));
+        out.add(new ItemStack(Material.AMETHYST_SHARD, 6 + phase));
+        out.add(new ItemStack(Material.LAPIS_LAZULI, 8 + phase * 2));
+        out.add(LootRoom.enchantedBook(org.bukkit.enchantments.Enchantment.FORTUNE, Math.min(3, 1 + phase / 4)));
+        if (phase >= 5) out.add(new ItemStack(Material.ECHO_SHARD, 1 + phase / 5));
+        if (phase >= 7) out.add(new ItemStack(Material.ENDER_PEARL, 2 + phase / 4));
         if (phase >= 9) out.add(LootRoom.enchantedBook(org.bukkit.enchantments.Enchantment.LUCK_OF_THE_SEA, 3));
         return out;
     }
 
     @Override
     public Location build(Location anchor) {
-        // Floor 7x7 polished deepslate
-        for (int dx = -3; dx <= 3; dx++) {
-            for (int dz = -3; dz <= 3; dz++) {
-                anchor.clone().add(dx, 0, dz).getBlock().setType(Material.POLISHED_DEEPSLATE);
+        for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                anchor.clone().add(dx, 0, dz).getBlock().setType(Material.SMOOTH_BASALT);
+                for (int dy = 1; dy <= 5; dy++) {
+                    anchor.clone().add(dx, dy, dz).getBlock().setType(Material.AIR);
+                }
             }
         }
-        // Coloured wool 3x3 pad in the center
-        Material[] wools = {
-                Material.RED_WOOL, Material.ORANGE_WOOL, Material.YELLOW_WOOL,
-                Material.GREEN_WOOL, Material.CYAN_WOOL, Material.LIGHT_BLUE_WOOL,
-                Material.BLUE_WOOL, Material.PURPLE_WOOL, Material.MAGENTA_WOOL
-        };
-        int i = 0;
-        for (int dz = -1; dz <= 1; dz++) {
-            for (int dx = -1; dx <= 1; dx++) {
-                anchor.clone().add(dx, 0, dz).getBlock().setType(wools[i++]);
+
+        for (int dx = -5; dx <= 5; dx++) {
+            for (int dz = -5; dz <= 5; dz++) {
+                if (Math.abs(dx) == 5 || Math.abs(dz) == 5) {
+                    for (int dy = 1; dy <= 3; dy++) {
+                        anchor.clone().add(dx, dy, dz).getBlock().setType(Material.TINTED_GLASS);
+                    }
+                }
             }
         }
-        return anchor.clone().add(0.5, 1, -2.5);
+
+        target(anchor, -3, 1, -3);
+        target(anchor, 0, 1, -3);
+        target(anchor, 3, 1, -3);
+        target(anchor, -3, 2, 0);
+        target(anchor, 3, 2, 0);
+        target(anchor, -3, 1, 3);
+        target(anchor, 0, 2, 3);
+        target(anchor, 3, 1, 3);
+
+        anchor.clone().add(0, 4, 0).getBlock().setType(Material.SEA_LANTERN);
+        return anchor.clone().add(0.5, 1, 0.5);
     }
 
-    // State layout (long, 64 bits):
-    //   bits  0-15: 4-step sequence (4 bits per step, value 0-8 = pad index)
-    //   bits 16-19: current step counter (0-4; 4 = won)
-    //   bits 20-23: lastPad + 1 (0 = "not standing on any pad")
-    private static long seqOf(long s)      { return s & 0xFFFFL; }
-    private static int  stepOf(long s)     { return (int)((s >>> 16) & 0xF); }
-    private static int  lastPadOf(long s)  { return ((int)((s >>> 20) & 0xF)) - 1; }
-    private static long pack(long seq, int step, int lastPad) {
-        return (seq & 0xFFFFL) | ((long)(step & 0xF) << 16) | ((long)((lastPad + 1) & 0xF) << 20);
+    private void target(Location anchor, int dx, int dy, int dz) {
+        Location at = anchor.clone().add(dx, dy, dz);
+        at.getBlock().setType(Material.AMETHYST_BLOCK);
+        at.clone().add(0, 1, 0).getBlock().setType(Material.LIGHT);
     }
-    private static int  padAt(long seq, int step) { return (int)((seq >> (step * 4)) & 0xF); }
 
     @Override
     public void onStart(LootRoomRun run, Player p) {
-        long sequence = 0;
-        var rng = ThreadLocalRandom.current();
-        for (int i = 0; i < 4; i++) {
-            sequence |= ((long) rng.nextInt(9)) << (i * 4);
-        }
-        run.setState(pack(sequence, 0, -1));
-        Msg.send(p, "<aqua>Watch the lights — then repeat by walking on the matching wool blocks!");
-        showSequence(run, p);
-    }
-
-    private void showSequence(LootRoomRun run, Player p) {
-        long seq = seqOf(run.state());
-        for (int i = 0; i < 4; i++) {
-            int idx = (int)((seq >> (i * 4)) & 0xF);
-            int dx = (idx % 3) - 1;
-            int dz = (idx / 3) - 1;
-            Location at = run.anchor().clone().add(dx, 1.2, dz);
-            org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                at.getWorld().spawnParticle(org.bukkit.Particle.END_ROD, at, 30, 0.2, 0.2, 0.2, 0.02);
-                p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 0.6f + idx * 0.15f);
-            }, 20L + i * 20L);
-        }
-        // Tell the player it's their turn after the sequence finishes.
-        org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (!p.isOnline()) return;
-            Msg.actionBar(p, "<yellow>Your turn — step onto the pads in order!");
-        }, 20L + 4 * 20L + 10L);
+        run.setState(TARGETS);
+        Msg.send(p, "<aqua>Break all <light_purple>" + TARGETS + " crystal caches <aqua>before time runs out.");
+        p.playSound(p.getLocation(), Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1f, 1f);
     }
 
     @Override
@@ -106,53 +96,39 @@ public class PuzzleRoom implements LootRoom {
         Player p = run.player();
         if (p == null) { run.markFinished(); return; }
 
-        long state = run.state();
-        int lastPad = lastPadOf(state);
-
-        // Where are we standing? Compute padIdx (-1 if off-grid).
-        Location below = p.getLocation().clone().subtract(0, 1, 0);
-        Material mat = below.getBlock().getType();
-        int padIdx = -1;
-        if (mat.name().endsWith("_WOOL")) {
-            int dx = below.getBlockX() - run.anchor().getBlockX();
-            int dz = below.getBlockZ() - run.anchor().getBlockZ();
-            if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) {
-                padIdx = (dx + 1) + (dz + 1) * 3;
-            }
-        }
-
-        // Debounce: only act when the player CHANGES pads. Standing still
-        // (or sliding around off-pad) shouldn't keep firing reset / advance.
-        if (padIdx == lastPad) return;
-
-        // Update lastPad regardless of correctness so the next tick has accurate state.
-        long seq = seqOf(state);
-        int step = stepOf(state);
-
-        if (padIdx == -1) {
-            // Stepped off the pad area — just remember that.
-            run.setState(pack(seq, step, -1));
+        long elapsed = (Bukkit.getCurrentTick() - run.startTick()) / 20;
+        if (elapsed > TIME_LIMIT_SECONDS) {
+            Msg.actionBar(p, "<red>Time's up!");
+            run.markFinished();
             return;
         }
 
-        int expected = padAt(seq, step);
-        if (padIdx == expected) {
-            step++;
-            p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 0.8f + step * 0.15f);
-            below.getWorld().spawnParticle(org.bukkit.Particle.HAPPY_VILLAGER,
-                    below.clone().add(0.5, 1.2, 0.5), 12, 0.3, 0.3, 0.3);
-            if (step >= 4) {
-                run.addScore(400);
-                run.markFinished();
-                return;
-            }
-            Msg.actionBar(p, "<green>" + step + "/4");
-            run.setState(pack(seq, step, padIdx));
-        } else {
-            p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_BASS, 1f, 0.5f);
-            Msg.actionBar(p, "<red>Wrong pad! Restarting — watch the sequence again.");
-            run.setState(pack(seq, 0, padIdx));
-            showSequence(run, p);
+        int remaining = countTargets(run.anchor());
+        if (remaining <= 0) {
+            run.addScore(350 + (int) Math.max(0, TIME_LIMIT_SECONDS - elapsed) * 2);
+            run.markFinished();
+            return;
         }
+
+        if (remaining != run.state()) {
+            run.setState(remaining);
+            p.playSound(p.getLocation(), Sound.BLOCK_AMETHYST_CLUSTER_BREAK, 0.9f, 1.25f);
+        }
+        Msg.actionBar(p, "<aqua>Crystal caches: <yellow>" + remaining
+                + "<gray> · <yellow>" + Math.max(0, TIME_LIMIT_SECONDS - elapsed) + "s");
+    }
+
+    private int countTargets(Location anchor) {
+        int count = 0;
+        for (int x : TARGETS_OFFSET) {
+            for (int y = 1; y <= 2; y++) {
+                for (int z : TARGETS_OFFSET) {
+                    if (anchor.clone().add(x, y, z).getBlock().getType() == Material.AMETHYST_BLOCK) {
+                        count++;
+                    }
+                }
+            }
+        }
+        return count;
     }
 }
