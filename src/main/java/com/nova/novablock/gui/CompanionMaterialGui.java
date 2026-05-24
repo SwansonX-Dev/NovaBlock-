@@ -31,19 +31,30 @@ public class CompanionMaterialGui extends ChestGui {
 
     @Override
     protected void build(Player p) {
+        List<Material> allowedMaterials = MATERIALS.stream()
+                .filter(material -> plugin.companions().hasGatherPermission(p, material))
+                .toList();
+
+        if (allowedMaterials.isEmpty()) {
+            set(22, ItemBuilder.of(Material.BARRIER)
+                            .name("<red>No Materials Available")
+                            .lore("<gray>You do not have permission to gather any materials.")
+                            .build(),
+                    null);
+            set(49, ItemBuilder.of(Material.ARROW).name("<gray>Back").build(),
+                    e -> new CompanionGui(plugin).open(p));
+            fill(Material.GRAY_STAINED_GLASS_PANE, " ");
+            return;
+        }
+
         int start = page * PAGE_SIZE;
-        int end = Math.min(start + PAGE_SIZE, MATERIALS.size());
+        int end = Math.min(start + PAGE_SIZE, allowedMaterials.size());
         for (int i = start; i < end; i++) {
-            Material material = MATERIALS.get(i);
-            String node = "novablock.companion.gather." + material.name().toLowerCase(Locale.ROOT);
-            boolean allowed = p.hasPermission("novablock.companion.gather.*") || p.hasPermission(node);
+            Material material = allowedMaterials.get(i);
             ItemBuilder item = ItemBuilder.of(material)
-                    .name((allowed ? "<yellow>" : "<red>") + material.name().toLowerCase(Locale.ROOT))
-                    .lore(allowed
-                            ? new String[]{"<gray>Click to gather this material."}
-                            : new String[]{"<dark_red>Missing permission.", "<dark_gray>" + node});
+                    .name("<yellow>" + material.name().toLowerCase(Locale.ROOT))
+                    .lore("<gray>Click to gather this material.");
             set(i - start, item.build(), e -> {
-                if (!allowed) return;
                 if (plugin.companions().isActive(p)) {
                     plugin.companions().setMaterial(p, material);
                 } else {
@@ -58,12 +69,11 @@ public class CompanionMaterialGui extends ChestGui {
                     e -> new CompanionMaterialGui(plugin, page - 1).open(p));
         }
         set(49, ItemBuilder.of(Material.COMPASS)
-                        .name("<aqua>Page " + (page + 1) + "/" + pageCount())
-                        .lore("<gray>Every item material is available here.",
-                                "<gray>Access is controlled by permission.")
+                        .name("<aqua>Page " + (page + 1) + "/" + pageCount(allowedMaterials))
+                        .lore("<gray>Only materials you can gather are shown.")
                         .build(),
                 null);
-        if (end < MATERIALS.size()) {
+        if (end < allowedMaterials.size()) {
             set(53, ItemBuilder.of(Material.ARROW).name("<gray>Next").build(),
                     e -> new CompanionMaterialGui(plugin, page + 1).open(p));
         }
@@ -73,7 +83,7 @@ public class CompanionMaterialGui extends ChestGui {
         fill(Material.GRAY_STAINED_GLASS_PANE, " ");
     }
 
-    private int pageCount() {
-        return Math.max(1, (int) Math.ceil(MATERIALS.size() / (double) PAGE_SIZE));
+    private int pageCount(List<Material> materials) {
+        return Math.max(1, (int) Math.ceil(materials.size() / (double) PAGE_SIZE));
     }
 }

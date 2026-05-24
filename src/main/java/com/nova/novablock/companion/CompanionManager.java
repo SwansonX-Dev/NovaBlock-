@@ -1,6 +1,7 @@
 package com.nova.novablock.companion;
 
 import com.nova.novablock.NovaBlock;
+import com.nova.novablock.gui.CompanionGui;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.island.IslandWorldManager;
 import com.nova.novablock.util.Msg;
@@ -15,10 +16,12 @@ import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
 
 import java.util.HashMap;
 import java.util.Locale;
@@ -32,6 +35,8 @@ public class CompanionManager implements Listener {
     private static final double GROUND_PICKUP_RADIUS = 6.0;
     private static final double VOID_RECOVERY_RADIUS = 48.0;
     private static final int MAX_STACK_GATHER = 16;
+    private static final double SOFT_FOLLOW_RADIUS = 4.5;
+    private static final double HARD_FOLLOW_RADIUS = 14.0;
 
     private final NovaBlock plugin;
     private final Map<UUID, CompanionSession> sessions = new HashMap<>();
@@ -68,16 +73,8 @@ public class CompanionManager implements Listener {
         CompanionSession old = sessions.remove(player.getUniqueId());
         if (old != null) old.removeEntity();
 
-        Allay allay = (Allay) player.getWorld().spawnEntity(player.getLocation().add(1.2, 0.4, 1.2), EntityType.ALLAY);
-        allay.customName(Msg.mm("<aqua>" + player.getName() + "'s Companion"));
-        allay.setCustomNameVisible(true);
-        allay.setPersistent(false);
-        allay.setRemoveWhenFarAway(false);
-        allay.setInvulnerable(true);
-        allay.setSilent(true);
-        allay.getEquipment().setItemInMainHand(new ItemStack(material));
-
-        CompanionSession session = new CompanionSession(allay, material, discSound, musicReplayTicks(discSound));
+        CompanionSession session = new CompanionSession(material, discSound, musicReplayTicks(discSound));
+        spawnEntity(player, session);
         sessions.put(player.getUniqueId(), session);
         if (discSound != null) playDisc(player, session);
         Msg.send(player, "<green>Companion gathering <yellow>" + material.name().toLowerCase(Locale.ROOT) + "<green>.");
@@ -154,6 +151,12 @@ public class CompanionManager implements Listener {
         return false;
     }
 
+    public boolean hasGatherPermission(Player player, Material material) {
+        if (material == null || !material.isItem() || material == Material.AIR) return false;
+        String node = "novablock.companion.gather." + material.name().toLowerCase(Locale.ROOT);
+        return player.hasPermission("novablock.companion.gather.*") || player.hasPermission(node);
+    }
+
     private void tick() {
         sessions.entrySet().removeIf(entry -> {
             Player player = Bukkit.getPlayer(entry.getKey());
@@ -163,16 +166,10 @@ public class CompanionManager implements Listener {
                 return true;
             }
             if (session.entity == null || session.entity.isDead()) {
-                return true;
+                spawnEntity(player, session);
             }
 
-            Location target = player.getLocation().add(player.getLocation().getDirection().normalize().multiply(-1.5)).add(0, 0.8, 0);
-            if (!session.entity.getWorld().equals(player.getWorld())
-                    || session.entity.getLocation().distanceSquared(player.getLocation()) > 256) {
-                session.entity.teleport(target);
-            } else {
-                session.entity.teleport(target);
-            }
+            followPlayer(player, session);
 
             session.gatherTicks += TICK_PERIOD;
             if (session.gatherTicks >= GATHER_EVERY_TICKS) {
@@ -189,6 +186,58 @@ public class CompanionManager implements Listener {
             }
             return false;
         });
+    }
+
+    private void spawnEntity(Player player, CompanionSession session) {
+        Location spawn = orbitTarget(player, session).add(0, 0.2, 0);
+        Allay allay = (Allay) player.getWorld().spawnEntity(spawn, EntityType.ALLAY);
+        allay.customName(Msg.mm("<aqua>" + player.getName() + "'s Companion"));
+        allay.setCustomNameVisible(true);
+        allay.setPersistent(false);
+        allay.setRemoveWhenFarAway(false);
+        allay.setInvulnerable(true);
+        allay.setSilent(true);
+        allay.setCollidable(false);
+        allay.getEquipment().setItemInMainHand(new ItemStack(session.material));
+        session.entity = allay;
+    }
+
+    private void followPlayer(Player player, CompanionSession session) {
+        Allay allay = session.entity;
+        if (allay == null || allay.isDead()) return;
+
+        Location target = orbitTarget(player, session);
+        if (!allay.getWorld().equals(player.getWorld())
+                || allay.getLocation().distanceSquared(player.getLocation()) > HARD_FOLLOW_RADIUS * HARD_FOLLOW_RADIUS) {
+            allay.teleport(target);
+            allay.setVelocity(new Vector());
+            return;
+        }
+
+        Vector offset = target.toVector().subtract(allay.getLocation().toVector());
+        double distance = offset.length();
+        if (distance < 0.2) {
+            allay.setVelocity(new Vector());
+            return;
+        }
+
+        double speed = allay.getLocation().distanceSquared(player.getLocation()) > SOFT_FOLLOW_RADIUS * SOFT_FOLLOW_RADIUS
+                ? 0.42
+                : 0.22;
+        Vector velocity = offset.normalize().multiply(Math.min(speed, distance * 0.35));
+        velocity.setY(Math.max(-0.35, Math.min(0.35, velocity.getY())));
+        allay.setVelocity(velocity);
+    }
+
+    private Location orbitTarget(Player player, CompanionSession session) {
+        session.orbitTicks += TICK_PERIOD;
+        double angle = session.orbitTicks / 45.0;
+        Vector side = new Vector(Math.cos(angle) * 2.0, 0, Math.sin(angle) * 2.0);
+        Vector behind = player.getLocation().getDirection().setY(0);
+        if (behind.lengthSquared() > 0.01) {
+            behind.normalize().multiply(-1.2);
+        }
+        return player.getLocation().add(side).add(behind).add(0, 1.2, 0);
     }
 
     private void collectNearbyItems(Player player, CompanionSession session) {
@@ -341,6 +390,26 @@ public class CompanionManager implements Listener {
         if (session != null) session.removeEntity();
     }
 
+    @EventHandler(ignoreCancelled = true)
+    public void onCompanionClick(EntityDamageByEntityEvent event) {
+        UUID owner = ownerOfCompanion(event.getEntity().getUniqueId());
+        if (owner == null) return;
+        event.setCancelled(true);
+        if (event.getDamager() instanceof Player player && owner.equals(player.getUniqueId())) {
+            new CompanionGui(plugin).open(player);
+        }
+    }
+
+    private UUID ownerOfCompanion(UUID entityId) {
+        for (Map.Entry<UUID, CompanionSession> entry : sessions.entrySet()) {
+            CompanionSession session = entry.getValue();
+            if (session.entity != null && session.entity.getUniqueId().equals(entityId)) {
+                return entry.getKey();
+            }
+        }
+        return null;
+    }
+
     private static final class CompanionSession {
         private Allay entity;
         private Material material;
@@ -348,9 +417,9 @@ public class CompanionManager implements Listener {
         private int gatherTicks;
         private int musicTicks;
         private int musicReplayTicks;
+        private int orbitTicks;
 
-        private CompanionSession(Allay entity, Material material, Sound discSound, int musicReplayTicks) {
-            this.entity = entity;
+        private CompanionSession(Material material, Sound discSound, int musicReplayTicks) {
             this.material = material;
             this.discSound = discSound;
             this.musicReplayTicks = musicReplayTicks;
