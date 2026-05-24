@@ -21,6 +21,7 @@ public class CompanionGui extends ChestGui {
         boolean active = plugin.companions().isActive(p);
         Material material = plugin.companions().material(p);
         org.bukkit.Sound music = plugin.companions().music(p);
+        boolean customMusic = plugin.companions().usingCustomMusic(p);
 
         set(11, ItemBuilder.of(active ? Material.ALLAY_SPAWN_EGG : Material.GRAY_DYE)
                         .name(active ? "<aqua>Companion Active" : "<gray>Companion Inactive")
@@ -41,7 +42,9 @@ public class CompanionGui extends ChestGui {
 
         set(15, ItemBuilder.of(Material.MUSIC_DISC_CAT)
                         .name("<light_purple>Music Disc")
-                        .lore(music == null
+                        .lore(customMusic
+                                ? new String[]{"<gray>Current: <white>" + plugin.companions().customMusicLabel()}
+                                : music == null
                                 ? new String[]{"<gray>No music selected."}
                                 : new String[]{"<gray>Current: <white>" + music.name().replace("MUSIC_DISC_", "").toLowerCase(Locale.ROOT)})
                         .build(),

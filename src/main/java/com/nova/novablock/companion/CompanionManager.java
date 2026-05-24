@@ -16,6 +16,7 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
@@ -38,12 +39,12 @@ import java.util.UUID;
 public class CompanionManager implements Listener {
 
     private static final long TICK_PERIOD = 20L;
-    private static final int GATHER_EVERY_TICKS = 200;
-    private static final double GROUND_PICKUP_RADIUS = 6.0;
-    private static final double VOID_RECOVERY_RADIUS = 48.0;
-    private static final int MAX_STACK_GATHER = 16;
-    private static final double SOFT_FOLLOW_RADIUS = 4.5;
-    private static final double HARD_FOLLOW_RADIUS = 14.0;
+    private static final int DEFAULT_GATHER_INTERVAL_SECONDS = 1800;
+    private static final double DEFAULT_GROUND_PICKUP_RADIUS = 6.0;
+    private static final double DEFAULT_VOID_RECOVERY_RADIUS = 48.0;
+    private static final int DEFAULT_MAX_STACK_GATHER = 16;
+    private static final double DEFAULT_SOFT_FOLLOW_RADIUS = 4.5;
+    private static final double DEFAULT_HARD_FOLLOW_RADIUS = 14.0;
     private static final String USE_PERMISSION = "novablock.companion.use";
     private static final String GATHER_WILDCARD_PERMISSION = "novablock.companion.gather.*";
     private static final String GATHER_PERMISSION_PREFIX = "novablock.companion.gather.";
@@ -57,13 +58,44 @@ public class CompanionManager implements Listener {
     private final NovaBlock plugin;
     private final Map<UUID, CompanionSession> sessions = new HashMap<>();
     private BukkitTask task;
+    private int gatherEveryTicks;
+    private double groundPickupRadius;
+    private double voidRecoveryRadius;
+    private int maxStackGather;
+    private double softFollowRadius;
+    private double hardFollowRadius;
+    private float musicVolume;
+    private float musicPitch;
+    private boolean customMusicEnabled;
+    private String customMusicKey;
+    private String customMusicLabel;
+    private int customMusicReplayTicks;
 
     public CompanionManager(NovaBlock plugin) {
         this.plugin = plugin;
+        reload();
         registerGatherPermissions();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         this.task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, TICK_PERIOD, TICK_PERIOD);
         Bukkit.getScheduler().runTask(plugin, () -> Bukkit.getOnlinePlayers().forEach(this::ensureActive));
+    }
+
+    public void reload() {
+        var cfg = plugin.configs().main();
+        gatherEveryTicks = Math.max(20, cfg.getInt("companion.gather-interval-seconds", DEFAULT_GATHER_INTERVAL_SECONDS) * 20);
+        groundPickupRadius = Math.max(0.0, cfg.getDouble("companion.ground-pickup-radius", DEFAULT_GROUND_PICKUP_RADIUS));
+        voidRecoveryRadius = Math.max(0.0, cfg.getDouble("companion.void-recovery-radius", DEFAULT_VOID_RECOVERY_RADIUS));
+        maxStackGather = Math.max(1, cfg.getInt("companion.max-gather-stack", DEFAULT_MAX_STACK_GATHER));
+        softFollowRadius = Math.max(1.0, cfg.getDouble("companion.follow.soft-radius", DEFAULT_SOFT_FOLLOW_RADIUS));
+        hardFollowRadius = Math.max(softFollowRadius + 1.0,
+                cfg.getDouble("companion.follow.hard-radius", DEFAULT_HARD_FOLLOW_RADIUS));
+        musicVolume = (float) Math.max(0.0, cfg.getDouble("companion.music.volume", 0.8D));
+        musicPitch = (float) Math.max(0.1, cfg.getDouble("companion.music.pitch", 1.0D));
+        customMusicEnabled = cfg.getBoolean("companion.music.custom.enabled", false);
+        customMusicKey = cfg.getString("companion.music.custom.key", "novamc:theme");
+        customMusicLabel = cfg.getString("companion.music.custom.label", "NovaMC Theme");
+        customMusicReplayTicks = Math.max(20,
+                cfg.getInt("companion.music.custom.length-seconds", 180) * 20);
     }
 
     public void shutdown() {
@@ -106,7 +138,9 @@ public class CompanionManager implements Listener {
             return;
         }
         if (session.discSound != null) player.stopSound(session.discSound, SoundCategory.RECORDS);
+        if (session.customSoundKey != null) player.stopSound(session.customSoundKey, SoundCategory.RECORDS);
         session.discSound = null;
+        session.customSoundKey = null;
         session.musicReplayTicks = 0;
         session.musicTicks = 0;
         spawnEntityIfNeeded(player, session);
@@ -134,17 +168,56 @@ public class CompanionManager implements Listener {
             return;
         }
         Sound old = session.discSound;
+        String oldCustom = session.customSoundKey;
         session.discSound = discSound;
+        session.customSoundKey = null;
         session.musicReplayTicks = musicReplayTicks(discSound);
         session.musicTicks = 0;
         if (discSound == null) {
             if (old != null) player.stopSound(old, SoundCategory.RECORDS);
+            if (oldCustom != null) player.stopSound(oldCustom, SoundCategory.RECORDS);
             Msg.send(player, "<gray>Companion music stopped.");
             return;
         }
         if (old != null) player.stopSound(old, SoundCategory.RECORDS);
+        if (oldCustom != null) player.stopSound(oldCustom, SoundCategory.RECORDS);
         playDisc(player, session);
         Msg.send(player, "<green>Companion music loop enabled.");
+    }
+
+    public void setCustomMusic(Player player) {
+        CompanionSession session = ensureActive(player);
+        if (session == null) {
+            denied(player);
+            return;
+        }
+        if (!customMusicAvailable()) {
+            Msg.send(player, "<red>Custom companion music is not enabled.");
+            return;
+        }
+        Sound old = session.discSound;
+        String oldCustom = session.customSoundKey;
+        session.discSound = null;
+        session.customSoundKey = customMusicKey;
+        session.musicReplayTicks = customMusicReplayTicks;
+        session.musicTicks = 0;
+        if (old != null) player.stopSound(old, SoundCategory.RECORDS);
+        if (oldCustom != null) player.stopSound(oldCustom, SoundCategory.RECORDS);
+        playMusic(player, session);
+        Msg.send(player, "<green>Companion music loop enabled: <yellow>" + customMusicLabel + "<green>.");
+    }
+
+    public boolean customMusicAvailable() {
+        return customMusicEnabled && customMusicKey != null && !customMusicKey.isBlank();
+    }
+
+    public boolean usingCustomMusic(Player player) {
+        CompanionSession session = sessions.get(player.getUniqueId());
+        return session != null && session.customSoundKey != null;
+    }
+
+    public String customMusicLabel() {
+        return customMusicLabel == null || customMusicLabel.isBlank() ? "Custom Theme" : customMusicLabel;
     }
 
     private CompanionSession ensureActive(Player player) {
@@ -215,16 +288,16 @@ public class CompanionManager implements Listener {
             followPlayer(player, session);
 
             session.gatherTicks += TICK_PERIOD;
-            if (session.gatherTicks >= GATHER_EVERY_TICKS) {
+            if (session.gatherTicks >= gatherEveryTicks) {
                 session.gatherTicks = 0;
                 gather(player, session);
             }
             collectNearbyItems(player, session);
 
-            if (session.discSound != null) {
+            if (session.discSound != null || session.customSoundKey != null) {
                 session.musicTicks += TICK_PERIOD;
                 if (session.musicTicks >= session.musicReplayTicks) {
-                    playDisc(player, session);
+                    playMusic(player, session);
                 }
             }
             return false;
@@ -258,7 +331,7 @@ public class CompanionManager implements Listener {
 
         Location target = orbitTarget(player, session);
         if (!allay.getWorld().equals(player.getWorld())
-                || allay.getLocation().distanceSquared(player.getLocation()) > HARD_FOLLOW_RADIUS * HARD_FOLLOW_RADIUS) {
+                || allay.getLocation().distanceSquared(player.getLocation()) > hardFollowRadius * hardFollowRadius) {
             allay.teleport(target);
             allay.setVelocity(new Vector());
             return;
@@ -271,7 +344,7 @@ public class CompanionManager implements Listener {
             return;
         }
 
-        double speed = allay.getLocation().distanceSquared(player.getLocation()) > SOFT_FOLLOW_RADIUS * SOFT_FOLLOW_RADIUS
+        double speed = allay.getLocation().distanceSquared(player.getLocation()) > softFollowRadius * softFollowRadius
                 ? 0.42
                 : 0.22;
         Vector velocity = offset.normalize().multiply(Math.min(speed, distance * 0.35));
@@ -291,7 +364,8 @@ public class CompanionManager implements Listener {
     }
 
     private void collectNearbyItems(Player player, CompanionSession session) {
-        for (Item item : session.entity.getLocation().getNearbyEntitiesByType(Item.class, GROUND_PICKUP_RADIUS)) {
+        if (groundPickupRadius <= 0.0) return;
+        for (Item item : session.entity.getLocation().getNearbyEntitiesByType(Item.class, groundPickupRadius)) {
             if (!canWorkAt(player, item.getLocation())) continue;
             if (!canCollect(player, item)) continue;
             deliverItem(player, item, "<aqua>Companion picked up <yellow>");
@@ -352,7 +426,7 @@ public class CompanionManager implements Listener {
 
     private int amountFor(Material material) {
         int max = Math.max(1, material.getMaxStackSize());
-        return Math.min(MAX_STACK_GATHER, max);
+        return Math.min(maxStackGather, max);
     }
 
     private boolean canWorkAt(Player player, Location location) {
@@ -374,9 +448,20 @@ public class CompanionManager implements Listener {
     }
 
     private void playDisc(Player player, CompanionSession session) {
+        playMusic(player, session);
+    }
+
+    private void playMusic(Player player, CompanionSession session) {
         session.musicTicks = 0;
-        player.stopSound(session.discSound, SoundCategory.RECORDS);
-        player.playSound(player.getLocation(), session.discSound, SoundCategory.RECORDS, 0.8f, 1f);
+        if (session.discSound != null) {
+            player.stopSound(session.discSound, SoundCategory.RECORDS);
+            player.playSound(player.getLocation(), session.discSound, SoundCategory.RECORDS, musicVolume, musicPitch);
+            return;
+        }
+        if (session.customSoundKey != null) {
+            player.stopSound(session.customSoundKey, SoundCategory.RECORDS);
+            player.playSound(player.getLocation(), session.customSoundKey, SoundCategory.RECORDS, musicVolume, musicPitch);
+        }
     }
 
     private int musicReplayTicks(Sound sound) {
@@ -454,7 +539,7 @@ public class CompanionManager implements Listener {
         CompanionSession session = sessions.get(player.getUniqueId());
         if (session == null || session.entity == null || session.entity.isDead()) return;
         if (!session.entity.getWorld().equals(item.getWorld())) return;
-        if (session.entity.getLocation().distanceSquared(item.getLocation()) > VOID_RECOVERY_RADIUS * VOID_RECOVERY_RADIUS) return;
+        if (session.entity.getLocation().distanceSquared(item.getLocation()) > voidRecoveryRadius * voidRecoveryRadius) return;
         if (!canWorkAt(player, item.getLocation())) return;
 
         event.setCancelled(true);
@@ -468,7 +553,7 @@ public class CompanionManager implements Listener {
         if (thrower != null) return Bukkit.getPlayer(thrower);
 
         Player nearest = null;
-        double best = VOID_RECOVERY_RADIUS * VOID_RECOVERY_RADIUS;
+        double best = voidRecoveryRadius * voidRecoveryRadius;
         for (UUID id : sessions.keySet()) {
             Player player = Bukkit.getPlayer(id);
             if (player == null || !player.getWorld().equals(item.getWorld())) continue;
@@ -499,7 +584,7 @@ public class CompanionManager implements Listener {
         if (session != null) session.removeEntity();
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onCompanionClick(EntityDamageByEntityEvent event) {
         UUID owner = ownerOfCompanion(event.getEntity().getUniqueId());
         if (owner == null) return;
@@ -523,6 +608,7 @@ public class CompanionManager implements Listener {
         private Allay entity;
         private Material material;
         private Sound discSound;
+        private String customSoundKey;
         private int gatherTicks;
         private int musicTicks;
         private int musicReplayTicks;

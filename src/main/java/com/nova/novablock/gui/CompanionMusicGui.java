@@ -44,15 +44,27 @@ public class CompanionMusicGui extends ChestGui {
     protected void build(Player p) {
         int[] slots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32};
         Sound current = plugin.companions().music(p);
+        boolean customSelected = plugin.companions().usingCustomMusic(p);
         for (int i = 0; i < DISCS.size() && i < slots.length; i++) {
             DiscButton disc = DISCS.get(i);
-            boolean selected = disc.sound == current;
+            boolean selected = !customSelected && disc.sound == current;
             ItemBuilder item = ItemBuilder.of(disc.material)
                     .name((selected ? "<green>" : "<light_purple>") + label(disc.sound))
                     .lore(selected ? "<green>Currently looping." : "<gray>Click to loop this disc.");
             if (selected) item.glow();
             set(slots[i], item.build(), e -> {
                 plugin.companions().setMusic(p, disc.sound);
+                new CompanionGui(plugin).open(p);
+            });
+        }
+
+        if (plugin.companions().customMusicAvailable()) {
+            ItemBuilder custom = ItemBuilder.of(Material.JUKEBOX)
+                    .name((customSelected ? "<green>" : "<light_purple>") + plugin.companions().customMusicLabel())
+                    .lore(customSelected ? "<green>Currently looping." : "<gray>Click to loop this custom track.");
+            if (customSelected) custom.glow();
+            set(33, custom.build(), e -> {
+                plugin.companions().setCustomMusic(p);
                 new CompanionGui(plugin).open(p);
             });
         }

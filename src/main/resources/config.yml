@@ -18,3 +18,24 @@ keepInventoryOnDeath: true
 cooldowns:
   bossMinBlocks: 300
   lootRoomMinBlocks: 150
+
+companion:
+  # How often the companion generates the selected material.
+  # 1800 seconds = 30 minutes.
+  gather-interval-seconds: 1800
+  max-gather-stack: 16
+  ground-pickup-radius: 6.0
+  void-recovery-radius: 48.0
+  follow:
+    soft-radius: 4.5
+    hard-radius: 14.0
+  music:
+    # Music is played only to the owning player.
+    volume: 0.8
+    pitch: 1.0
+    custom:
+      # Custom music requires a server resource pack with this sound key.
+      enabled: false
+      key: novamc:theme
+      label: NovaMC Theme
+      length-seconds: 180

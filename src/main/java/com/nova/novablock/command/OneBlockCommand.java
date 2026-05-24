@@ -183,6 +183,11 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                     plugin.companions().setMusic(p, null);
                     return;
                 }
+                if (args[2].equalsIgnoreCase("custom") || args[2].equalsIgnoreCase("theme")
+                        || args[2].equalsIgnoreCase("novamc")) {
+                    plugin.companions().setCustomMusic(p);
+                    return;
+                }
                 Sound disc = parseDisc(args[2]);
                 if (disc == null) {
                     Msg.send(p, "<red>Unknown music disc.");
@@ -272,7 +277,13 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                         .collect(Collectors.toList());
             }
             if (sub.equals("music") || sub.equals("disc")) {
-                return discTabs(prefix);
+                List<String> tabs = new java.util.ArrayList<>(discTabs(prefix));
+                if (plugin.companions().customMusicAvailable()) {
+                    for (String option : List.of("custom", "theme", "novamc")) {
+                        if (option.startsWith(prefix)) tabs.add(option);
+                    }
+                }
+                return tabs;
             }
         }
         if (args.length == 4
