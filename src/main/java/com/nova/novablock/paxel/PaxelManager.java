@@ -65,7 +65,7 @@ public class PaxelManager implements Listener {
     public static final NamespacedKey PAXEL_TIER = new NamespacedKey("novablock", "paxel_tier");
     public static final NamespacedKey PAXEL_VERSION_KEY = new NamespacedKey("novablock", "paxel_version");
     /** Bump when build() changes in a way that needs to invalidate existing paxels in inventories. */
-    public static final int PAXEL_VERSION = 3;
+    public static final int PAXEL_VERSION = 4;
 
     /** Ores eligible for vein-mining. The OneBlock center is always excluded regardless of type. */
     private static final java.util.Set<Material> ORES = java.util.Set.of(
@@ -155,10 +155,10 @@ public class PaxelManager implements Listener {
         meta.lore(lore);
         meta.setUnbreakable(true);
         meta.addItemFlags(ItemFlag.HIDE_UNBREAKABLE, ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_ATTRIBUTES);
-        meta.addEnchant(Enchantment.EFFICIENCY, Math.min(5, 2 + tier), true);
+        meta.addEnchant(Enchantment.EFFICIENCY, Math.min(5, 1 + tier), true);
         if (tier >= 2) meta.addEnchant(Enchantment.FORTUNE, Math.min(3, tier - 1), true);
         meta.addEnchant(Enchantment.UNBREAKING, 3, true);
-        meta.addEnchant(Enchantment.MENDING, 1, true);
+        if (tier >= 3) meta.addEnchant(Enchantment.MENDING, 1, true);
         meta.getPersistentDataContainer().set(PAXEL_OWNER, PersistentDataType.STRING, owner.getUniqueId().toString());
         meta.getPersistentDataContainer().set(PAXEL_TIER, PersistentDataType.INTEGER, tier);
         meta.getPersistentDataContainer().set(PAXEL_VERSION_KEY, PersistentDataType.INTEGER, PAXEL_VERSION);
@@ -495,25 +495,28 @@ public class PaxelManager implements Listener {
         }
     }
 
-    /** Prevent moving the paxel into another inventory (chests, ender chests, etc.). */
+    /**
+     * Block <em>non-owners</em> from moving someone else's paxel into or out of an
+     * external inventory. The owner is allowed to stash their paxel in chests etc.
+     */
     @EventHandler
     public void onClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player p)) return;
         ItemStack moved = event.getCurrentItem();
         ItemStack cursor = event.getCursor();
-        boolean blocked = false;
-        if (event.getClickedInventory() != null
-                && event.getClickedInventory().getType() != InventoryType.PLAYER
-                && event.getClickedInventory().getType() != InventoryType.CRAFTING) {
-            if (isPaxel(cursor) || isPaxel(moved)) blocked = true;
-        }
-        if (event.isShiftClick() && isPaxel(moved)
-                && event.getView().getTopInventory().getType() != InventoryType.CRAFTING
-                && event.getView().getTopInventory().getType() != InventoryType.PLAYER) {
-            blocked = true;
-        }
-        if (blocked) {
+        boolean foreignPaxel = (isPaxel(cursor) && !isOwner(cursor, p))
+                || (isPaxel(moved) && !isOwner(moved, p));
+        if (!foreignPaxel) return;
+        // Only intervene when the click would actually move the paxel into/out of
+        // another player's inventory (i.e. clicking inside a chest/etc.) — clicks
+        // inside the player's own inventory are fine.
+        var top = event.getView().getTopInventory().getType();
+        var clicked = event.getClickedInventory() == null ? null : event.getClickedInventory().getType();
+        boolean externalTop = top != InventoryType.CRAFTING && top != InventoryType.PLAYER;
+        boolean clickInExternal = clicked != null && clicked != InventoryType.PLAYER && clicked != InventoryType.CRAFTING;
+        if (clickInExternal || (event.isShiftClick() && externalTop)) {
             event.setCancelled(true);
-            if (event.getWhoClicked() instanceof Player p) Msg.actionBar(p, "<red>The Paxel stays with you.");
+            Msg.actionBar(p, "<red>That Paxel isn't yours.");
         }
     }
 
@@ -521,6 +524,8 @@ public class PaxelManager implements Listener {
     public void onDrag(InventoryDragEvent event) {
         ItemStack item = event.getOldCursor();
         if (!isPaxel(item)) return;
+        if (!(event.getWhoClicked() instanceof Player p)) return;
+        if (isOwner(item, p)) return;
         for (int slot : event.getRawSlots()) {
             if (slot >= event.getView().getTopInventory().getSize()
                     && event.getView().getTopInventory().getType() == InventoryType.CRAFTING) continue;

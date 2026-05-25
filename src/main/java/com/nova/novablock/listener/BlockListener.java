@@ -23,6 +23,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
@@ -221,6 +222,25 @@ public class BlockListener implements Listener {
         }
     }
 
+    /**
+     * Last-resort fill before the chest UI renders to the client. Catches the
+     * Bedrock/Geyser case where the inventory packet beats our RIGHT_CLICK_BLOCK
+     * handler and the player would otherwise see an empty chest.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onChestInventoryOpen(InventoryOpenEvent event) {
+        var location = event.getInventory().getLocation();
+        if (location == null) return;
+        Block block = location.getBlock();
+        if (block.getType() != Material.CHEST) return;
+        Island island = plugin.islands().atLocation(location);
+        if (island == null || !isCenterBlock(island, location)) return;
+        if (block.getState() instanceof Container container && !isLootMarked(container)) {
+            Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
+            if (phase != null) fillPhaseChest(block, phase);
+        }
+    }
+
     private boolean isCenterBlock(Island island, Location loc) {
         Location center = island.centerBlock();
         return loc.getBlockX() == center.getBlockX()
@@ -263,6 +283,15 @@ public class BlockListener implements Listener {
     private void dropNaturally(Block block, Player player, ItemStack tool) {
         var loc = block.getLocation().add(0.5, 0.5, 0.5);
         boolean paxel = plugin.paxels().isPaxel(tool);
+        // If this is the OneBlock center chest and it never got filled (spawn-time
+        // fill raced with tile-entity init), fill it now so breaking it always pays out.
+        if (block.getType() == Material.CHEST) {
+            Island island = plugin.islands().atLocation(block.getLocation());
+            if (island != null && isCenterBlock(island, block.getLocation())) {
+                Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
+                if (phase != null) fillPhaseChest(block, phase);
+            }
+        }
         if (block.getState() instanceof Container container) {
             for (ItemStack content : container.getInventory().getContents()) {
                 if (content == null || content.getType().isAir()) continue;
