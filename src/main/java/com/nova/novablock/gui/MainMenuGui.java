@@ -97,13 +97,16 @@ public class MainMenuGui extends ChestGui {
                 });
 
         set(31, ItemBuilder.of(Material.ALLAY_SPAWN_EGG)
-                        .name("<aqua>Companion")
-                        .lore("<gray>Gather materials, recover void items, and loop discs.", "<dark_gray>/ob companion").build(),
-                e -> new CompanionGui(plugin).open(p));
+                        .name("<light_purple>Pets")
+                        .lore("<gray>Open xPets to summon and manage pets.", "<dark_gray>/pets").build(),
+                e -> {
+                    p.closeInventory();
+                    p.performCommand("pets");
+                });
 
         set(40, ItemBuilder.of(Material.KNOWLEDGE_BOOK)
                         .name("<gradient:#7B61FF:#4FC3F7>Server Guide")
-                        .lore("<gray>Learn xPets, economy, stocks, paxel, companion, and more.",
+                        .lore("<gray>Learn xPets, economy, stocks, paxel, and more.",
                                 "<dark_gray>/ob help").build(),
                 e -> new HelpGui(plugin).open(p));
 

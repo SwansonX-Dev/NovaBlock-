@@ -25,6 +25,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -57,8 +58,12 @@ public class BlockListener implements Listener {
     );
     /** Per-island guard so a Bedrock double-break (two BREAK packets within the same tick) collapses to one. */
     private final Map<UUID, Long> recentBreakTick = new HashMap<>();
+    private final NamespacedKey oneBlockLootKey;
 
-    public BlockListener(NovaBlock plugin) { this.plugin = plugin; }
+    public BlockListener(NovaBlock plugin) {
+        this.plugin = plugin;
+        this.oneBlockLootKey = new NamespacedKey(plugin, "oneblock_loot_filled");
+    }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
@@ -132,6 +137,9 @@ public class BlockListener implements Listener {
         // from being destroyed for "missing support" the instant they're placed onto bedrock.
         center.getBlock().setType(next, false);
         fillPhaseChest(center.getBlock(), phase);
+        if (next == Material.CHEST) {
+            Bukkit.getScheduler().runTask(plugin, () -> fillPhaseChest(center.getBlock(), phase));
+        }
         playPlaceSound(center.getBlock());
         // Maintain the bedrock anchor underneath at all times.
         Location anchor = center.clone().add(0, -1, 0);
@@ -195,6 +203,20 @@ public class BlockListener implements Listener {
         block.setType(replacement, false);
         playPlaceSound(block);
         Msg.actionBar(event.getPlayer(), "<yellow>Fixed an invalid OneBlock material.");
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onCenterChestOpen(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        Block block = event.getClickedBlock();
+        if (block == null || block.getType() != Material.CHEST) return;
+        Island island = plugin.islands().atLocation(block.getLocation());
+        if (island == null || !isCenterBlock(island, block.getLocation())) return;
+        if (!island.isMember(event.getPlayer())) return;
+        if (block.getState() instanceof Container container && !isLootMarked(container)) {
+            Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
+            if (phase != null) fillPhaseChest(block, phase);
+        }
     }
 
     private boolean isCenterBlock(Island island, Location loc) {
@@ -265,6 +287,7 @@ public class BlockListener implements Listener {
 
     private void fillPhaseChest(Block block, Phase phase) {
         if (block.getType() != Material.CHEST || !(block.getState() instanceof Container container)) return;
+        if (isLootMarked(container)) return;
         var inventory = container.getInventory();
         inventory.clear();
         List<ItemStack> loot = phaseLoot(phase);
@@ -279,7 +302,19 @@ public class BlockListener implements Listener {
             } while (inventory.getItem(slot) != null && guard < 40);
             inventory.setItem(slot, item);
         }
-        container.update(true, false);
+        markLootFilled(container);
+    }
+
+    private boolean isLootMarked(Container container) {
+        return container instanceof org.bukkit.block.TileState tile
+                && tile.getPersistentDataContainer().has(oneBlockLootKey, PersistentDataType.BYTE);
+    }
+
+    private void markLootFilled(Container container) {
+        if (container instanceof org.bukkit.block.TileState tile) {
+            tile.getPersistentDataContainer().set(oneBlockLootKey, PersistentDataType.BYTE, (byte) 1);
+            tile.update(true, false);
+        }
     }
 
     private List<ItemStack> phaseLoot(Phase phase) {

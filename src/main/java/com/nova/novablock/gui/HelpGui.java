@@ -49,17 +49,9 @@ public class HelpGui extends ChestGui {
                         .build(), null);
 
         set(12, ItemBuilder.of(Material.ALLAY_SPAWN_EGG)
-                        .name("<aqua>Companion")
-                        .lore("<gray>Summon a helper that gathers allowed items,",
-                                "<gray>picks up drops, and can play music.",
-                                "<dark_gray>/ob companion")
-                        .build(),
-                e -> new CompanionGui(plugin).open(p));
-
-        set(13, ItemBuilder.of(Material.BONE)
                         .name("<light_purple>xPets")
-                        .lore("<gray>Cosmetic pets live outside NovaBlock.",
-                                "<gray>Use the xPets menu to summon and manage them.",
+                        .lore("<gray>Open the pets menu to summon, manage,",
+                                "<gray>and use your unlocked pets.",
                                 "<dark_gray>/pets")
                         .build(),
                 e -> {

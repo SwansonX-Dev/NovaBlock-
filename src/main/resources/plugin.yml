@@ -11,7 +11,7 @@ softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI]
 commands:
   oneblock:
     description: Main NovaBlock command
-    usage: /<command> [create|home|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|companion|toggle|help]
+    usage: /<command> [create|home|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|pet|toggle|help]
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command
@@ -21,6 +21,10 @@ commands:
     description: Toggle the NovaBlock sidebar scoreboard
     usage: /<command>
     aliases: [scoreboard, sidebar]
+  help:
+    description: Open the server help GUI
+    usage: /<command>
+    aliases: [serverhelp, guide]
 
 permissions:
   novablock.play:
@@ -58,15 +62,6 @@ permissions:
     default: op
   novablock.build.bypass:
     description: Allows building and breaking on any NovaBlock island
-    default: op
-  novablock.companion.use:
-    description: Allows summoning and controlling a material-gathering companion
-    default: true
-  novablock.companion.build.bypass:
-    description: Allows companions to gather even where the player cannot build
-    default: op
-  novablock.companion.gather.*:
-    description: Allows companions to gather any item material
     default: op
   novablock.flag.natural_mob_spawning:
     description: Allows toggling the natural-mob-spawning flag
