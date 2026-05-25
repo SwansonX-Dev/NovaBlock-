@@ -23,3 +23,18 @@ anti-afk:
   enabled: false
   challenge-interval-seconds: 1800
   challenge-timeout-seconds: 60
+
+# Prestige — unlocked after completing the final phase.
+prestige:
+  # Each prestige adds this fraction to the coin multiplier (0.10 = +10% per level).
+  coin-multiplier-per-level: 0.10
+  # Each prestige adds this fraction to the skill XP multiplier.
+  xp-multiplier-per-level: 0.05
+  # Multiplier stops scaling above this level; players can still prestige past it for the title.
+  max-level: 10
+  # Coin lump on each prestige is base * newLevel.
+  base-coin-reward: 50000
+  # Console commands fired on prestige. %player% and %level% are substituted.
+  reward-commands:
+    - "pets give %player% novablock_prestige_%level%"
+    - "swansonstocks give %player% 10"

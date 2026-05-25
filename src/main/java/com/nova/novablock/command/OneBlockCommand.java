@@ -24,7 +24,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS = List.of(
             "create", "home", "menu", "prophecy", "skills", "flags", "storage",
-            "quest", "leaderboard", "phase", "invite", "accept", "leave",
+            "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
             "pet", "pets", "toggle", "fix", "help");
 
     private final NovaBlock plugin;
@@ -73,6 +73,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 Msg.send(p, "<gray>You are in <" + phase.getThemeColor() + ">" + phase.getDisplayName()
                         + " <gray>(<white>" + island.data().getPhaseProgress() + "/" + phase.getRequiredBlocks() + "<gray>).");
             }
+            case "prestige" -> openPrestige(p);
             case "invite" -> invite(p, args);
             case "accept" -> accept(p);
             case "leave" -> leave(p);
@@ -128,6 +129,21 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
     private void openPets(Player p) {
         p.closeInventory();
         p.performCommand("pets");
+    }
+
+    private void openPrestige(Player p) {
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) {
+            Msg.send(p, "<red>You don't have an island yet. Try <yellow>/ob create</yellow>.");
+            return;
+        }
+        if (!plugin.prestige().canPrestige(island)) {
+            var last = plugin.phases().get(plugin.phases().phaseCount() - 1);
+            Msg.send(p, "<red>You must complete <" + last.getThemeColor() + ">"
+                    + last.getDisplayName() + " <red>before you can prestige.");
+            return;
+        }
+        new com.nova.novablock.gui.PrestigeGui(plugin).open(p);
     }
 
     private void fixOneBlock(Player p) {

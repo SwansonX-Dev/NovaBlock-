@@ -104,6 +104,15 @@ public class MainMenuGui extends ChestGui {
                     p.performCommand("pets");
                 });
 
+        var island = plugin.islands().ofPlayer(p);
+        int prestige = island == null ? 0 : island.data().getPrestigeLevel();
+        set(33, ItemBuilder.of(Material.NETHER_STAR)
+                        .name("<gold>Prestige")
+                        .lore("<gray>Current level: <yellow>" + prestige,
+                                "<gray>Reach the end of Phase 12 to prestige.",
+                                "<dark_gray>/ob prestige").build(),
+                e -> { p.closeInventory(); p.performCommand("ob prestige"); });
+
         set(40, ItemBuilder.of(Material.KNOWLEDGE_BOOK)
                         .name("<gradient:#7B61FF:#4FC3F7>Server Guide")
                         .lore("<gray>Learn xPets, economy, stocks, paxel, and more.",

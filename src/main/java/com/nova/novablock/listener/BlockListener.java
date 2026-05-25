@@ -158,10 +158,12 @@ public class BlockListener implements Listener {
         island.data().incrementBlocksBroken();
         island.data().incrementPhaseProgress();
         island.recordBreak(broken);
+        double xpMult = plugin.prestige().xpMultiplier(island);
         if (island.getComboCount() >= 5) {
             int combo = island.getComboCount();
-            Msg.actionBar(player, "<aqua>Combo x" + combo + "! <gray>+" + (combo * 2) + " XP");
-            plugin.progression().addXp(player, SkillType.MINING, combo * 2L);
+            long xp = Math.round(combo * 2L * xpMult);
+            Msg.actionBar(player, "<aqua>Combo x" + combo + "! <gray>+" + xp + " XP");
+            plugin.progression().addXp(player, SkillType.MINING, xp);
         }
         plugin.progression().addXp(player, SkillType.MINING, 1L);
         plugin.prophecies().onAdvance(island, broken);
@@ -424,7 +426,7 @@ public class BlockListener implements Listener {
         int nextIdx = old.getIndex() + 1;
         Phase next = plugin.phases().get(nextIdx);
         if (next == null) {
-            Msg.title(player, "<gold>You've completed all phases!", "<gray>Prestige to keep going.");
+            Msg.title(player, "<gold>You've completed all phases!", "<gray>Use <yellow>/ob prestige</yellow> to keep going.");
             island.data().setPhaseProgress(old.getRequiredBlocks());
             return;
         }
@@ -437,6 +439,7 @@ public class BlockListener implements Listener {
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
         long reward = 500 + nextIdx * 250L;
         if (plugin.seasons().active() == SeasonManager.ServerEvent.DOUBLE_COINS) reward *= 2;
+        reward = Math.round(reward * plugin.prestige().coinMultiplier(island));
         plugin.economy().award(island, reward);
         if (old.getBossId() != null) {
             plugin.bosses().spawn(old.getBossId(), island, player);
@@ -515,6 +518,7 @@ public class BlockListener implements Listener {
         }
         if (coins > 0) {
             if (plugin.seasons().active() == SeasonManager.ServerEvent.DOUBLE_COINS) coins *= 2;
+            coins = Math.round(coins * plugin.prestige().coinMultiplier(island));
             plugin.economy().award(island, coins);
             if (broken == Material.ENDER_CHEST) {
                 Msg.actionBar(player, "<gold>+" + coins + " coins");

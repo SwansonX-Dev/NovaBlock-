@@ -208,13 +208,15 @@ public class PhaseManager {
 
         phases.add(p(11, "void", "Void Beyond", "#9C27B0", 4200,
                 List.of(
-                        b(Material.OBSIDIAN, 28),
-                        b(Material.CRYING_OBSIDIAN, 14),
-                        b(Material.DEEPSLATE, 10),
+                        b(Material.OBSIDIAN, 12),
+                        b(Material.CRYING_OBSIDIAN, 6),
+                        b(Material.DEEPSLATE, 14),
                         b(Material.SCULK_CATALYST, 5),
-                        b(Material.SCULK_SHRIEKER, 3),
-                        b(Material.SCULK, 14),
-                        b(Material.SCULK_SENSOR, 2),
+                        b(Material.SCULK_SHRIEKER, 4),
+                        b(Material.SCULK, 18),
+                        b(Material.SCULK_SENSOR, 3),
+                        b(Material.END_STONE_BRICKS, 10),
+                        b(Material.BLACKSTONE, 6),
                         b(Material.NETHERITE_BLOCK, 1),
                         b(Material.CHEST, 3)
                 ),

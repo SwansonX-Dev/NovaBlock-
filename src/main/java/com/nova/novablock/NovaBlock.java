@@ -24,6 +24,7 @@ import com.nova.novablock.listener.PlayerListener;
 import com.nova.novablock.lootroom.LootRoomManager;
 import com.nova.novablock.paxel.PaxelManager;
 import com.nova.novablock.phase.PhaseManager;
+import com.nova.novablock.progression.PrestigeManager;
 import com.nova.novablock.progression.ProgressionManager;
 import com.nova.novablock.prophecy.ProphecyManager;
 import com.nova.novablock.quest.QuestManager;
@@ -47,6 +48,7 @@ public final class NovaBlock extends JavaPlugin {
     private BossManager bossManager;
     private LootRoomManager lootRoomManager;
     private ProgressionManager progressionManager;
+    private PrestigeManager prestigeManager;
     private QuestManager questManager;
     private PaxelManager paxelManager;
     private HotbarMenuManager hotbarManager;
@@ -79,6 +81,7 @@ public final class NovaBlock extends JavaPlugin {
         this.progressionManager = new ProgressionManager(this);
         this.phaseManager = new PhaseManager(this);
         this.phaseManager.loadPhases();
+        this.prestigeManager = new PrestigeManager(this);
 
         this.prophecyManager = new ProphecyManager(this);
         this.bossManager = new BossManager(this);
@@ -171,6 +174,7 @@ public final class NovaBlock extends JavaPlugin {
     public BossManager bosses() { return bossManager; }
     public LootRoomManager lootRooms() { return lootRoomManager; }
     public ProgressionManager progression() { return progressionManager; }
+    public PrestigeManager prestige() { return prestigeManager; }
     public QuestManager quests() { return questManager; }
     public PaxelManager paxels() { return paxelManager; }
     public HotbarMenuManager hotbar() { return hotbarManager; }

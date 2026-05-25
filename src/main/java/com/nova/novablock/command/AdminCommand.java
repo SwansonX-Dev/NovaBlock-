@@ -50,6 +50,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 plugin.phases().loadPhases();
                 plugin.quests().loadDailyQuests();
                 plugin.antiAfk().reload();
+                plugin.prestige().reload();
                 Msg.send(sender, "<green>Reloaded.");
             }
             case "setphase" -> {

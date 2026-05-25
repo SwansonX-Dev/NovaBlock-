@@ -94,6 +94,10 @@ public class ScoreboardManager {
         PlayerProgression prog = plugin.progression().get(p);
         List<String> lines = new ArrayList<>();
         if (island != null) {
+            int pLvl = island.data().getPrestigeLevel();
+            if (pLvl > 0) {
+                lines.add(plugin.prestige().title(pLvl));
+            }
             Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
             String color = phase == null ? "white" : phase.getThemeColor();
             String name = phase == null ? "?" : phase.getDisplayName();
