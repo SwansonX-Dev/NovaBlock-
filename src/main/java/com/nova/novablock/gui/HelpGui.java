@@ -21,12 +21,24 @@ public class HelpGui extends ChestGui {
                         .name("<green>OneBlock Island")
                         .lore("<gray>You are sent to your island when you join.",
                                 "<gray>Mine the center block to progress phases.",
-                                "<dark_gray>/ob home")
+                                "<gray>If it disappears, use <yellow>/ob fix<gray>.",
+                                "<dark_gray>/ob home  /ob fix")
                         .build(),
                 e -> {
                     p.closeInventory();
                     var island = plugin.islands().ofPlayer(p);
                     if (island != null) island.teleportHome(p);
+                });
+
+        set(19, ItemBuilder.of(Material.ANVIL)
+                        .name("<red>Fix OneBlock")
+                        .lore("<gray>Restores your missing center block and anchor.",
+                                "<gray>Does not reset phase progress.",
+                                "<dark_gray>/ob fix")
+                        .build(),
+                e -> {
+                    p.closeInventory();
+                    p.performCommand("ob fix");
                 });
 
         set(11, ItemBuilder.of(Material.NETHERITE_PICKAXE)

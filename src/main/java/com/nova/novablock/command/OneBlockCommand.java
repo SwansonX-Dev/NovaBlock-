@@ -30,7 +30,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBCOMMANDS = List.of(
             "create", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "invite", "accept", "leave",
-            "companion", "toggle", "help");
+            "companion", "toggle", "fix", "help");
 
     private static final List<String> COMPANION_SUBCOMMANDS = List.of(
             "gui", "summon", "material", "music", "stop");
@@ -64,6 +64,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 if (!p.hasPermission("novablock.home")) { denied(p); return true; }
                 Island island = plugin.islands().ofPlayer(p);
                 if (island == null) { Msg.send(p, "<red>You don't have an island yet. Try <yellow>/ob create</yellow>."); return true; }
+                plugin.repairs().repair(island, false);
                 island.teleportHome(p);
             }
             case "menu" -> { if (perm(p, "novablock.menu")) new MainMenuGui(plugin).open(p); }
@@ -84,6 +85,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "accept" -> accept(p);
             case "leave" -> leave(p);
             case "companion", "pet" -> companion(p, args);
+            case "fix", "repair" -> fixOneBlock(p);
             case "toggle" -> {
                 if (!p.hasPermission("novablock.toggle")) { denied(p); return true; }
                 plugin.hotbar().toggle(p);
@@ -198,6 +200,23 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "stop", "dismiss" -> plugin.companions().stop(p);
             default -> Msg.send(p, "<gray>Usage: <yellow>/ob companion summon <material> [disc]</yellow>");
         }
+    }
+
+    private void fixOneBlock(Player p) {
+        if (!p.hasPermission("novablock.fix")) {
+            denied(p);
+            return;
+        }
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) {
+            Msg.send(p, "<red>You don't have an island yet. Try <yellow>/ob create</yellow>.");
+            return;
+        }
+        boolean repaired = plugin.repairs().repair(island, true);
+        Msg.send(p, repaired
+                ? "<green>Your OneBlock was restored."
+                : "<gray>Your OneBlock already looks healthy.");
+        island.teleportHome(p);
     }
 
     private Material parseMaterial(String input) {

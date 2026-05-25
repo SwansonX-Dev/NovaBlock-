@@ -18,6 +18,7 @@ import com.nova.novablock.hotbar.HotbarMenuManager;
 import com.nova.novablock.island.InviteManager;
 import com.nova.novablock.island.IslandManager;
 import com.nova.novablock.island.IslandWorldManager;
+import com.nova.novablock.island.OneBlockRepairService;
 import com.nova.novablock.listener.BlockListener;
 import com.nova.novablock.listener.PlayerListener;
 import com.nova.novablock.lootroom.LootRoomManager;
@@ -59,6 +60,7 @@ public final class NovaBlock extends JavaPlugin {
     private IslandStorageManager islandStorageManager;
     private MainMenuConfig menuConfig;
     private CompanionManager companionManager;
+    private OneBlockRepairService oneBlockRepairService;
 
     @Override
     public void onEnable() {
@@ -102,6 +104,7 @@ public final class NovaBlock extends JavaPlugin {
         this.islandStorageManager = new IslandStorageManager(this);
         this.menuConfig = new MainMenuConfig(this);
         this.companionManager = new CompanionManager(this);
+        this.oneBlockRepairService = new OneBlockRepairService(this);
 
         getServer().getPluginManager().registerEvents(new BlockListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
@@ -118,6 +121,7 @@ public final class NovaBlock extends JavaPlugin {
         eventManager.startTimers();
         seasonManager.startSeasonTicker();
         scoreboardManager.startTicker();
+        oneBlockRepairService.start();
 
         // Plug NovaBlock into the /help index so players can discover commands without leaving chat.
         HelpRegistrar.register(this);
@@ -146,6 +150,7 @@ public final class NovaBlock extends JavaPlugin {
         if (seasonManager != null) seasonManager.shutdown();
         if (scoreboardManager != null) scoreboardManager.shutdown();
         if (companionManager != null) companionManager.shutdown();
+        if (oneBlockRepairService != null) oneBlockRepairService.shutdown();
         if (lootRoomManager != null) lootRoomManager.shutdown();
         if (bossManager != null) bossManager.shutdown();
 
@@ -181,4 +186,5 @@ public final class NovaBlock extends JavaPlugin {
     public IslandStorageManager islandStorage() { return islandStorageManager; }
     public MainMenuConfig menuConfig() { return menuConfig; }
     public CompanionManager companions() { return companionManager; }
+    public OneBlockRepairService repairs() { return oneBlockRepairService; }
 }

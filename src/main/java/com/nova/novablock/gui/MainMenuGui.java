@@ -47,6 +47,15 @@ public class MainMenuGui extends ChestGui {
                         .lore("<gray>Top islands by blocks broken.").build(),
                 e -> new LeaderboardGui(plugin).open(p));
 
+        set(16, ItemBuilder.of(Material.ANVIL)
+                        .name("<red>Fix OneBlock")
+                        .lore("<gray>Restore your missing or invalid center block.",
+                                "<dark_gray>/ob fix").build(),
+                e -> {
+                    p.closeInventory();
+                    p.performCommand("ob fix");
+                });
+
         // Row 2: xEconomy bridges
         set(20, ItemBuilder.of(Material.EMERALD)
                         .name("<green>Shop")

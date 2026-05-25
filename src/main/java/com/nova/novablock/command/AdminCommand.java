@@ -21,7 +21,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
             "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
-            "flags", "storage", "menu", "freshstart");
+            "flags", "storage", "menu", "freshstart", "fix");
     private static final List<String> BOSSES = List.of(
             "magma_tyrant", "frostborn_sentinel", "void_herald");
     private static final List<String> EVENTS = List.of(
@@ -133,9 +133,32 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             }
             case "menu" -> handleMenuEdit(sender, args);
             case "freshstart" -> handleFreshStart(sender, args);
+            case "fix" -> handleFix(sender, args);
             default -> Msg.send(sender, "<red>Unknown subcommand.");
         }
         return true;
+    }
+
+    private void handleFix(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            Msg.send(sender, "<red>/obadmin fix <player|all>");
+            return;
+        }
+        if (args[1].equalsIgnoreCase("all")) {
+            int repaired = plugin.repairs().repairLoadedIslands();
+            Msg.send(sender, "<green>Checked all loaded islands. Repaired " + repaired + " OneBlock(s).");
+            return;
+        }
+        Player target = Bukkit.getPlayerExact(args[1]);
+        Island island = target == null ? null : plugin.islands().ofPlayer(target);
+        if (island == null) {
+            Msg.send(sender, "<red>Target has no island or is not online.");
+            return;
+        }
+        boolean repaired = plugin.repairs().repair(island, true);
+        Msg.send(sender, repaired
+                ? "<green>Restored " + target.getName() + "'s OneBlock."
+                : "<gray>" + target.getName() + "'s OneBlock already looks healthy.");
     }
 
     private void handleFreshStart(CommandSender sender, String[] args) {
@@ -265,6 +288,15 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                         .map(Player::getName)
                         .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
+                case "fix" -> {
+                    java.util.List<String> tabs = Bukkit.getOnlinePlayers().stream()
+                            .map(Player::getName)
+                            .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
+                    tabs.add("all");
+                    yield tabs.stream()
+                            .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase()))
+                            .collect(Collectors.toList());
+                }
                 case "spawnboss" -> BOSSES.stream().filter(b -> b.startsWith(args[1].toLowerCase())).collect(Collectors.toList());
                 case "event" -> EVENTS.stream().filter(e -> e.startsWith(args[1].toLowerCase())).collect(Collectors.toList());
                 default -> Collections.emptyList();
