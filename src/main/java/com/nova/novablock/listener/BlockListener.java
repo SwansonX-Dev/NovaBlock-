@@ -215,6 +215,7 @@ public class BlockListener implements Listener {
 
         // Quest tick
         plugin.quests().onBlockBroken(player, broken);
+        plugin.seasonalPaths().award(player, com.nova.novablock.season.SeasonalPathManager.PathSource.MINING, 1);
 
         // Paxel XP — progresses tool tier as the player levels Mining
         plugin.paxels().onMine(player, broken);
@@ -515,6 +516,7 @@ public class BlockListener implements Listener {
         // Paxel tier upgrade — phase-up is the natural milestone
         plugin.paxels().refreshTier(player);
         plugin.quests().onPhaseAdvanced(player);
+        plugin.seasonalPaths().award(player, com.nova.novablock.season.SeasonalPathManager.PathSource.PHASE, 125);
     }
 
     private void rollEncounters(Player player, Island island, Phase phase, Location center) {

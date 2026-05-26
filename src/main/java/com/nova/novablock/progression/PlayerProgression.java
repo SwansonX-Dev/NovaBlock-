@@ -1,7 +1,9 @@
 package com.nova.novablock.progression;
 
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class PlayerProgression {
@@ -17,6 +19,11 @@ public class PlayerProgression {
     private int loginStreak;
     private boolean menuItemEnabled = true;
     private boolean scoreboardEnabled = true;
+    private int atlasScore;
+    private String seasonalPathKey = "";
+    private int seasonalPathPoints;
+    private final Set<Integer> claimedSeasonalTiers = new HashSet<>();
+    private final Set<String> pendingRewardCommands = new HashSet<>();
 
     public PlayerProgression(UUID playerId) {
         this.playerId = playerId;
@@ -55,6 +62,35 @@ public class PlayerProgression {
 
     public boolean isScoreboardEnabled() { return scoreboardEnabled; }
     public void setScoreboardEnabled(boolean v) { this.scoreboardEnabled = v; }
+
+    public int getAtlasScore() { return atlasScore; }
+    public void addAtlasScore(int amount) { this.atlasScore = Math.max(0, this.atlasScore + amount); }
+    public void setAtlasScore(int value) { this.atlasScore = Math.max(0, value); }
+
+    public String getSeasonalPathKey() { return seasonalPathKey == null ? "" : seasonalPathKey; }
+    public void setSeasonalPathKey(String seasonalPathKey) { this.seasonalPathKey = seasonalPathKey == null ? "" : seasonalPathKey; }
+
+    public int getSeasonalPathPoints() { return seasonalPathPoints; }
+    public void addSeasonalPathPoints(int amount) { this.seasonalPathPoints = Math.max(0, this.seasonalPathPoints + amount); }
+    public void setSeasonalPathPoints(int value) { this.seasonalPathPoints = Math.max(0, value); }
+
+    public Set<Integer> getClaimedSeasonalTiers() { return claimedSeasonalTiers; }
+    public void setClaimedSeasonalTiers(Set<Integer> tiers) {
+        claimedSeasonalTiers.clear();
+        if (tiers != null) claimedSeasonalTiers.addAll(tiers);
+    }
+    public boolean hasClaimedSeasonalTier(int tier) { return claimedSeasonalTiers.contains(tier); }
+    public void markSeasonalTierClaimed(int tier) { claimedSeasonalTiers.add(tier); }
+
+    public Set<String> getPendingRewardCommands() { return pendingRewardCommands; }
+    public void setPendingRewardCommands(Set<String> commands) {
+        pendingRewardCommands.clear();
+        if (commands != null) pendingRewardCommands.addAll(commands);
+    }
+    public void addPendingRewardCommand(String command) {
+        if (command != null && !command.isBlank()) pendingRewardCommands.add(command);
+    }
+    public boolean removePendingRewardCommand(String command) { return pendingRewardCommands.remove(command); }
 
     /** Default linear curve. Overridden at runtime by skills.yml `xp-curve` entries. */
     private static long xpBase = 200L;

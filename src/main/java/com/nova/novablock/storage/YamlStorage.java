@@ -178,6 +178,11 @@ public class YamlStorage implements DataStorage {
         p.setLoginStreak(y.getInt("login.streak", 0));
         p.setMenuItemEnabled(y.getBoolean("ui.menuItem", true));
         p.setScoreboardEnabled(y.getBoolean("ui.scoreboard", true));
+        p.setAtlasScore(y.getInt("atlas.score", 0));
+        p.setSeasonalPathKey(y.getString("seasonal.pathKey", ""));
+        p.setSeasonalPathPoints(y.getInt("seasonal.points", 0));
+        p.setClaimedSeasonalTiers(new java.util.HashSet<>(y.getIntegerList("seasonal.claimedTiers")));
+        p.setPendingRewardCommands(new java.util.HashSet<>(y.getStringList("seasonal.pendingCommands")));
         return p;
     }
 
@@ -198,6 +203,11 @@ public class YamlStorage implements DataStorage {
         y.set("login.streak", p.getLoginStreak());
         y.set("ui.menuItem", p.isMenuItemEnabled());
         y.set("ui.scoreboard", p.isScoreboardEnabled());
+        y.set("atlas.score", p.getAtlasScore());
+        y.set("seasonal.pathKey", p.getSeasonalPathKey());
+        y.set("seasonal.points", p.getSeasonalPathPoints());
+        y.set("seasonal.claimedTiers", p.getClaimedSeasonalTiers().stream().sorted().toList());
+        y.set("seasonal.pendingCommands", p.getPendingRewardCommands().stream().sorted().toList());
         try { atomicSave(y, f); }
         catch (IOException ex) { plugin.getLogger().warning("Failed to save progression: " + ex.getMessage()); }
     }

@@ -76,6 +76,22 @@ public class PlaceholderHook extends PlaceholderExpansion {
             case "login_streak" -> {
                 return String.valueOf(plugin.progression().get(player.getUniqueId()).getLoginStreak());
             }
+            case "path_name" -> { return plugin.seasonalPaths().activePath().name(); }
+            case "path_tier" -> {
+                PlayerProgression prog = plugin.progression().get(player.getUniqueId());
+                return String.valueOf(plugin.seasonalPaths().tierFor(prog.getSeasonalPathPoints()));
+            }
+            case "path_points" -> {
+                return String.valueOf(plugin.progression().get(player.getUniqueId()).getSeasonalPathPoints());
+            }
+            case "path_pet" -> { return plugin.seasonalPaths().activePath().petId(); }
+            case "path_tag" -> { return plugin.seasonalPaths().activePath().tagId(); }
+            case "atlas_score" -> {
+                return String.valueOf(plugin.progression().get(player.getUniqueId()).getAtlasScore());
+            }
+            case "atlas_title" -> {
+                return plugin.seasonalPaths().atlasTitle(plugin.progression().get(player.getUniqueId()));
+            }
         }
 
         if (key.startsWith("skill_")) {

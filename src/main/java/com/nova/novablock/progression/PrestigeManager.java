@@ -84,6 +84,7 @@ public class PrestigeManager {
                 + Math.round(coinMultiplier(island) * 100 - 100) + "% coins, +"
                 + Math.round(xpMultiplier(island) * 100 - 100) + "% XP");
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 0.8f);
+        plugin.seasonalPaths().award(player, com.nova.novablock.season.SeasonalPathManager.PathSource.PRESTIGE, 500);
 
         Bukkit.broadcast(Msg.mm("<gold>" + title + " <gray>— <yellow>"
                 + player.getName() + " <gray>has prestiged!"));

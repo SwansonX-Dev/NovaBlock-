@@ -107,6 +107,9 @@ public class ScoreboardManager {
             lines.add("<gray>" + prog2 + " / " + req + " blocks");
             lines.add("<gray>Total: <white>" + island.data().getBlocksBroken());
             lines.add("<gold>Coins: <yellow>" + plugin.economy().balance(island));
+            var path = plugin.seasonalPaths().activePath();
+            int pathTier = plugin.seasonalPaths().tierFor(prog.getSeasonalPathPoints());
+            lines.add("<" + path.color() + ">Path: <white>" + pathTier + "/" + com.nova.novablock.season.SeasonalPathManager.TIER_COUNT);
             lines.add(" ");
         }
         for (SkillType t : SkillType.values()) {

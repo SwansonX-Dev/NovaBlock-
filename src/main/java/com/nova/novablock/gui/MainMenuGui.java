@@ -56,6 +56,17 @@ public class MainMenuGui extends ChestGui {
                     p.performCommand("ob fix");
                 });
 
+        var path = plugin.seasonalPaths().activePath();
+        var prog = plugin.progression().get(p);
+        int pathTier = plugin.seasonalPaths().tierFor(prog.getSeasonalPathPoints());
+        set(10, ItemBuilder.of(path.icon())
+                        .name("<" + path.color() + ">Monthly Path")
+                        .lore("<gray>" + path.name(),
+                                "<gray>Tier <yellow>" + pathTier + "<gray> / "
+                                        + com.nova.novablock.season.SeasonalPathManager.TIER_COUNT,
+                                "<dark_gray>/ob path").build(),
+                e -> new SeasonalPathGui(plugin).open(p));
+
         // Row 2: xEconomy bridges
         set(20, ItemBuilder.of(Material.EMERALD)
                         .name("<green>Shop")

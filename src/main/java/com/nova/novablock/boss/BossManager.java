@@ -189,6 +189,7 @@ public class BossManager implements Listener {
                     Msg.actionBar(p, "<red>♥ Second Wind <gray>(+4HP)");
                 }
                 plugin.quests().onBossKilled(p);
+                plugin.seasonalPaths().award(p, com.nova.novablock.season.SeasonalPathManager.PathSource.BOSS, 100);
             }
         }
     }

@@ -6,6 +6,7 @@ import com.nova.novablock.gui.LeaderboardGui;
 import com.nova.novablock.gui.MainMenuGui;
 import com.nova.novablock.gui.ProphecyGui;
 import com.nova.novablock.gui.QuestGui;
+import com.nova.novablock.gui.SeasonalPathGui;
 import com.nova.novablock.gui.SkillsGui;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.util.Msg;
@@ -25,7 +26,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBCOMMANDS = List.of(
             "create", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
-            "visit", "upgrades", "upgrade", "pet", "pets", "toggle", "fix", "help");
+            "visit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix", "help");
 
     private final NovaBlock plugin;
 
@@ -79,6 +80,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "leave" -> leave(p);
             case "visit" -> visit(p, args);
             case "upgrades", "upgrade" -> new com.nova.novablock.gui.UpgradesGui(plugin).open(p);
+            case "path", "pass", "season", "atlas" -> new SeasonalPathGui(plugin).open(p);
             case "pet", "pets" -> openPets(p);
             case "fix", "repair" -> fixOneBlock(p);
             case "toggle" -> {

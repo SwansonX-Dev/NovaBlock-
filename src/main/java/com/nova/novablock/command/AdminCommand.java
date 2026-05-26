@@ -21,7 +21,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
             "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
-            "flags", "storage", "menu", "freshstart", "fix");
+            "flags", "storage", "menu", "path", "freshstart", "fix");
     private static final List<String> EVENTS = List.of(
             "diamond_hour", "double_coins", "blood_moon", "lush_bloom", "rift_storm", "stop");
 
@@ -49,6 +49,8 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 plugin.quests().loadDailyQuests();
                 plugin.antiAfk().reload();
                 plugin.prestige().reload();
+                plugin.seasonalPaths().load();
+                plugin.seasonalPaths().ensureTags();
                 Msg.send(sender, "<green>Reloaded.");
             }
             case "setphase" -> {
@@ -140,11 +142,66 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 plugin.islandStorage().openFor(viewer, island);
             }
             case "menu" -> handleMenuEdit(sender, args);
+            case "path" -> handlePath(sender, args);
             case "freshstart" -> handleFreshStart(sender, args);
             case "fix" -> handleFix(sender, args);
             default -> Msg.send(sender, "<red>Unknown subcommand.");
         }
         return true;
+    }
+
+    private void handlePath(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            var path = plugin.seasonalPaths().activePath();
+            Msg.send(sender, "<yellow>/obadmin path <status|points|resetplayer|reload>");
+            Msg.send(sender, "<gray>Active: <white>" + path.name() + " <dark_gray>(" + path.key() + ")");
+            return;
+        }
+        switch (args[1].toLowerCase()) {
+            case "status" -> {
+                var path = plugin.seasonalPaths().activePath();
+                Msg.send(sender, "<gold>Active path: <white>" + path.name());
+                Msg.send(sender, "<gray>Pet: <yellow>" + path.petId() + " <gray>Tag: <aqua>" + path.tagId());
+            }
+            case "points" -> {
+                if (args.length < 4) {
+                    Msg.send(sender, "<red>/obadmin path points <player> <amount>");
+                    return;
+                }
+                Player target = Bukkit.getPlayerExact(args[2]);
+                if (target == null) {
+                    Msg.send(sender, "<red>Player not online.");
+                    return;
+                }
+                int amount;
+                try { amount = Integer.parseInt(args[3]); }
+                catch (NumberFormatException ex) {
+                    Msg.send(sender, "<red>Amount must be an integer.");
+                    return;
+                }
+                plugin.seasonalPaths().addAdminPoints(target, amount);
+                Msg.send(sender, "<green>Added " + amount + " path points to " + target.getName() + ".");
+            }
+            case "resetplayer" -> {
+                if (args.length < 3) {
+                    Msg.send(sender, "<red>/obadmin path resetplayer <player>");
+                    return;
+                }
+                Player target = Bukkit.getPlayerExact(args[2]);
+                if (target == null) {
+                    Msg.send(sender, "<red>Player not online.");
+                    return;
+                }
+                plugin.seasonalPaths().resetPlayer(target);
+                Msg.send(sender, "<green>Reset active path progress for " + target.getName() + ".");
+            }
+            case "reload" -> {
+                plugin.seasonalPaths().load();
+                plugin.seasonalPaths().ensureTags();
+                Msg.send(sender, "<green>Reloaded seasonal path state and ensured xTags definitions.");
+            }
+            default -> Msg.send(sender, "<yellow>/obadmin path <status|points|resetplayer|reload>");
+        }
     }
 
     private void handleFix(CommandSender sender, String[] args) {
@@ -296,6 +353,9 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                         .map(Player::getName)
                         .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
+                case "path" -> List.of("status", "points", "resetplayer", "reload").stream()
+                        .filter(n -> n.startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
                 case "fix" -> {
                     java.util.List<String> tabs = Bukkit.getOnlinePlayers().stream()
                             .map(Player::getName)
@@ -315,6 +375,13 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("freshstart")) {
             return "confirm".startsWith(args[2].toLowerCase()) ? List.of("confirm") : Collections.emptyList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("path")
+                && (args[1].equalsIgnoreCase("points") || args[1].equalsIgnoreCase("resetplayer"))) {
+            return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(n -> n.toLowerCase().startsWith(args[2].toLowerCase()))
+                    .collect(Collectors.toList());
         }
         return Collections.emptyList();
     }

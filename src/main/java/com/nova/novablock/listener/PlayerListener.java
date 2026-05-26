@@ -3,6 +3,7 @@ package com.nova.novablock.listener;
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.gui.HelpGui;
 import com.nova.novablock.island.Island;
+import com.nova.novablock.season.SeasonalPathManager;
 import com.nova.novablock.util.Msg;
 import org.bukkit.GameMode;
 import org.bukkit.Sound;
@@ -23,8 +24,13 @@ public class PlayerListener implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         var p = event.getPlayer();
-        plugin.progression().get(p); // warm cache
+        var prog = plugin.progression().get(p); // warm cache
+        long lastLoginDay = prog.getLastLoginDay();
         plugin.loginStreaks().recordLogin(p);
+        plugin.seasonalPaths().ensureActive(p);
+        if (prog.getLastLoginDay() != lastLoginDay) {
+            plugin.seasonalPaths().award(p, SeasonalPathManager.PathSource.LOGIN, 50);
+        }
         Island island = plugin.islands().ofPlayer(p);
         boolean created = false;
         if (island == null) {
