@@ -34,7 +34,7 @@ public class PhaseManager {
                         b(Material.MELON, 1),
                         b(Material.CHEST, 3)
                 ),
-                Phase.mobList(EntityType.COW, EntityType.PIG, EntityType.CHICKEN, EntityType.SHEEP),
+                Phase.mobList(EntityType.COW, EntityType.PIG, EntityType.CHICKEN, EntityType.SHEEP, EntityType.VILLAGER),
                 null, List.of("parkour")));
 
         phases.add(p(1, "underground", "Underground", "#8B6F47", 450,
@@ -174,7 +174,7 @@ public class PhaseManager {
                         b(Material.OBSIDIAN, 4),
                         b(Material.CHEST, 3)
                 ),
-                Phase.mobList(EntityType.SILVERFISH, EntityType.ENDERMAN, EntityType.EVOKER, EntityType.VINDICATOR),
+                Phase.mobList(EntityType.SILVERFISH, EntityType.ENDERMAN, EntityType.EVOKER, EntityType.VINDICATOR, EntityType.VILLAGER),
                 null, List.of("arena", "puzzle")));
 
         phases.add(p(9, "end", "End Voyage", "#E6E0FF", 2800,

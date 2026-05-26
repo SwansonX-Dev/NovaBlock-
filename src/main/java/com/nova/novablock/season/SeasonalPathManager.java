@@ -51,6 +51,12 @@ public final class SeasonalPathManager {
             "#C084FC", "#F97316", "#E879F9", "#FDE047", "#60A5FA",
             "#FDBA74", "#FB7185", "#A7F3D0", "#D1D5DB", "#93C5FD"
     };
+    private static final String[] ACCENTS = {
+            "#F0E6FF", "#FFD27F", "#E0F7FF", "#A8F5FF", "#D4F5BA",
+            "#5EEAD4", "#A5F3FC", "#FFF59B", "#FCD34D", "#C4B5FD",
+            "#E9D5FF", "#FCA5A5", "#F5D0FE", "#FEF9C3", "#BFDBFE",
+            "#FED7AA", "#FECDD3", "#D1FAE5", "#F3F4F6", "#DBEAFE"
+    };
 
     private final NovaBlock plugin;
     private final NamespacedKey itemKey;
@@ -91,7 +97,7 @@ public final class SeasonalPathManager {
         int themeIndex = Math.floorMod(index - 1, THEMES.length);
         String seasonName = THEMES[themeIndex];
         return new SeasonalPath(index, month, seasonName + " " + roman(((index - 1) / THEMES.length) + 1),
-                COLORS[themeIndex], ICONS[themeIndex]);
+                COLORS[themeIndex], ACCENTS[themeIndex], ICONS[themeIndex]);
     }
 
     public void ensureActive(Player player) {
@@ -175,8 +181,12 @@ public final class SeasonalPathManager {
         if (Bukkit.getPluginManager().getPlugin("xTags") == null) return;
         for (int i = 1; i <= PATH_COUNT; i++) {
             SeasonalPath path = path(i, activePath().month());
-            ensureTag(path.tagId(), path.name(), "<" + path.color() + ">[" + path.shortName() + "]");
-            ensureTag(path.firstTagId(), "First " + path.name(), "<gold>[First " + path.shortName() + "]");
+            String shimmer = "<gradient:" + path.color() + ":" + path.accent() + ":" + path.color() + ">";
+            String firstShimmer = "<gradient:#FFD700:#FFF8B0:#FFA500:#FFD700>";
+            ensureTag(path.tagId(), path.name(),
+                    shimmer + "[" + path.name() + "]</gradient>");
+            ensureTag(path.firstTagId(), "First " + path.name(),
+                    firstShimmer + "<bold>[✦ " + path.name() + " ✦]</bold></gradient>");
         }
     }
 
@@ -327,7 +337,7 @@ public final class SeasonalPathManager {
         }
     }
 
-    public record SeasonalPath(int index, YearMonth month, String name, String color, Material icon) {
+    public record SeasonalPath(int index, YearMonth month, String name, String color, String accent, Material icon) {
         public String key() { return month + "-" + index; }
         public String petId() { return "novablock_path_" + String.format("%03d", index); }
         public String tagId() { return "nb_path_" + String.format("%03d", index); }

@@ -315,8 +315,11 @@ public class BlockListener implements Listener {
 
     private void playPlaceSound(Block block) {
         var group = block.getBlockData().getSoundGroup();
+        // Match vanilla SoundType: volume = (raw + 1) / 2, pitch = raw * 0.8.
+        float volume = (group.getVolume() + 1.0f) / 2.0f;
+        float pitch = group.getPitch() * 0.8f;
         block.getWorld().playSound(block.getLocation().add(0.5, 0.5, 0.5),
-                group.getPlaceSound(), group.getVolume(), group.getPitch());
+                group.getPlaceSound(), volume, pitch);
     }
 
     /**
@@ -652,6 +655,9 @@ public class BlockListener implements Listener {
         if (inRegenColumn) {
             event.setCancelled(true);
             Msg.actionBar(event.getPlayer(), "<red>Keep the OneBlock column clear.");
+            return;
         }
+
+        playPlaceSound(event.getBlockPlaced());
     }
 }
