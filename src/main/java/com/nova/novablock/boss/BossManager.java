@@ -5,7 +5,11 @@ import com.nova.novablock.boss.bosses.FrostbornSentinel;
 import com.nova.novablock.boss.bosses.MagmaTyrant;
 import com.nova.novablock.boss.bosses.VoidHerald;
 import com.nova.novablock.island.Island;
+import com.nova.novablock.progression.Perk;
 import com.nova.novablock.util.Msg;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
@@ -46,10 +50,30 @@ public class BossManager implements Listener {
         register(new VoidHerald(plugin));
     }
 
+    /**
+     * Sweep for orphan boss entities left over from a crash — any entity carrying
+     * our {@link #BOSS_KEY} PDC but not in the live {@code active} map is removed
+     * so the player doesn't fight an unrewarding zombie boss after a restart.
+     */
+    public void cleanupOrphans() {
+        int removed = 0;
+        for (org.bukkit.World w : Bukkit.getWorlds()) {
+            for (org.bukkit.entity.Entity e : w.getEntities()) {
+                if (!e.getPersistentDataContainer().has(BOSS_KEY, PersistentDataType.STRING)) continue;
+                String fid = e.getPersistentDataContainer().get(FIGHT_KEY, PersistentDataType.STRING);
+                if (fid != null && active.containsKey(java.util.UUID.fromString(fid))) continue;
+                e.remove();
+                removed++;
+            }
+        }
+        if (removed > 0) plugin.getLogger().info("Removed " + removed + " orphan boss entities from prior session.");
+    }
+
     public void register(Boss boss) { registry.put(boss.id(), boss); }
 
     public Boss byId(String id) { return registry.get(id); }
     public int bossCount() { return registry.size(); }
+    public java.util.Set<String> bossIds() { return java.util.Collections.unmodifiableSet(registry.keySet()); }
 
     public BossFight spawn(String id, Island island, Player triggering) {
         Boss boss = registry.get(id);
@@ -109,8 +133,29 @@ public class BossManager implements Listener {
         Player attacker = resolvePlayer(event.getDamager());
         if (attacker != null) {
             fight.addParticipant(attacker);
+            applyCombatPerks(event, fight, attacker);
             fight.boss().onDamaged(fight, attacker, event.getFinalDamage());
             plugin.progression().addXp(attacker, com.nova.novablock.progression.SkillType.COMBAT, 3L);
+        }
+    }
+
+    /** BERSERKER, EXECUTIONER (damage), STAGGER (slowness). */
+    private void applyCombatPerks(EntityDamageByEntityEvent event, BossFight fight, Player attacker) {
+        var prog = plugin.progression().get(attacker);
+        double mult = 1.0;
+        if (Perk.hasPerk(prog, Perk.BERSERKER)) mult *= 1.15;
+        if (Perk.hasPerk(prog, Perk.EXECUTIONER)) {
+            LivingEntity e = fight.entity();
+            if (e != null) {
+                var maxAttr = e.getAttribute(Attribute.MAX_HEALTH);
+                double max = maxAttr == null ? 1.0 : maxAttr.getValue();
+                if (max > 0 && e.getHealth() / max < 0.25) mult *= 1.50;
+            }
+        }
+        if (mult > 1.0) event.setDamage(event.getDamage() * mult);
+        if (Perk.hasPerk(prog, Perk.STAGGER) && event.getEntity() instanceof LivingEntity le) {
+            // Brief slowness so the boss visibly hitches between strikes.
+            le.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 20, 1, true, false, false));
         }
     }
 
@@ -121,15 +166,28 @@ public class BossManager implements Listener {
         BossFight fight = active.remove(UUID.fromString(fid));
         if (fight == null) return;
         fight.clearBar();
+        restoreArena(fight);
         long coins = fight.boss().onDefeat(fight);
         Island island = plugin.islands().get(fight.islandId());
-        if (island != null) plugin.economy().award(island, coins);
+        if (island != null) {
+            // BOSS_LOOT upgrade: +20% coin per level.
+            int lvl = island.data().getUpgradeLevel(com.nova.novablock.island.IslandUpgrade.BOSS_LOOT);
+            if (lvl > 0) coins = Math.round(coins * (1.0 + 0.20 * lvl));
+            plugin.economy().award(island, coins);
+        }
         for (UUID id : fight.participants()) {
             Player p = Bukkit.getPlayer(id);
             if (p != null) {
                 Msg.title(p, "<gold>★ " + fight.boss().displayName() + " defeated!", "<yellow>+" + coins + " coins");
                 p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
                 plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.COMBAT, 200L);
+                // SECOND_WIND (Combat 20): heal 4HP on boss kill.
+                if (Perk.hasPerk(plugin.progression().get(p), Perk.SECOND_WIND)) {
+                    var maxAttr = p.getAttribute(Attribute.MAX_HEALTH);
+                    double max = maxAttr == null ? 20.0 : maxAttr.getValue();
+                    p.setHealth(Math.min(max, p.getHealth() + 4.0));
+                    Msg.actionBar(p, "<red>♥ Second Wind <gray>(+4HP)");
+                }
                 plugin.quests().onBossKilled(p);
             }
         }
@@ -146,10 +204,20 @@ public class BossManager implements Listener {
         if (tickTask != null) tickTask.cancel();
         for (BossFight f : active.values()) {
             f.clearBar();
+            restoreArena(f);
             LivingEntity e = f.entity();
             if (e != null) e.remove();
         }
         active.clear();
+    }
+
+    /** Restore the cobblestone arena footprint back to whatever was there before. */
+    private void restoreArena(BossFight fight) {
+        for (org.bukkit.block.BlockState st : fight.arenaSnapshot()) {
+            // Force-restore so a player who broke the cobble doesn't leave a hole.
+            st.update(true, false);
+        }
+        fight.arenaSnapshot().clear();
     }
 
     /**
@@ -176,6 +244,7 @@ public class BossManager implements Listener {
             org.bukkit.entity.LivingEntity entity = fight.entity();
             if (entity != null) entity.remove();
             fight.clearBar();
+            restoreArena(fight);
 
             com.nova.novablock.island.Island island = plugin.islands().get(fight.islandId());
             long fullReward = fight.boss().onDefeat(fight);

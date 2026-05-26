@@ -47,5 +47,5 @@ public class FrostbornSentinel extends AbstractBoss {
     }
 
     @Override
-    public long onDefeat(BossFight fight) { return 4000L; }
+    public long onDefeat(BossFight fight) { return tunedCoinReward(4000L); }
 }

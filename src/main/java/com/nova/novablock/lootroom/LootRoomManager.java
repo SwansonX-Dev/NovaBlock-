@@ -66,6 +66,28 @@ public class LootRoomManager implements Listener {
         register(new PuzzleRoom());
     }
 
+    /**
+     * Sweep for {@code novablock_loot_*} world folders left over from a crash mid-run.
+     * Called once at plugin enable. Folders are recognised by name prefix and removed
+     * outright since the corresponding world is guaranteed not to be loaded yet.
+     */
+    public void cleanupOrphanWorlds() {
+        java.io.File container = Bukkit.getWorldContainer();
+        java.io.File[] children = container.listFiles((dir, name) -> name.startsWith("novablock_loot_"));
+        if (children == null || children.length == 0) return;
+        int removed = 0;
+        for (java.io.File child : children) {
+            if (!child.isDirectory()) continue;
+            try {
+                deleteDirectory(child.toPath());
+                removed++;
+            } catch (IOException ex) {
+                plugin.getLogger().warning("Could not delete orphan loot world " + child.getName() + ": " + ex.getMessage());
+            }
+        }
+        if (removed > 0) plugin.getLogger().info("Removed " + removed + " orphan loot-room worlds from prior session.");
+    }
+
     public void register(LootRoom room) { registry.put(room.id(), room); }
     public LootRoom byId(String id) { return registry.get(id); }
     public int roomCount() { return registry.size(); }
@@ -274,8 +296,16 @@ public class LootRoomManager implements Listener {
         if (p == null) return;
         Island island = plugin.islands().get(run.islandId());
         int reward = run.room().rewardCoins(island);
+        // JACKPOT (Luck 10): +25% coin from chest-style rewards. Loot-room payouts qualify.
+        if (com.nova.novablock.progression.Perk.hasPerk(plugin.progression().get(p),
+                com.nova.novablock.progression.Perk.JACKPOT)) {
+            reward = (int) Math.round(reward * 1.25);
+        }
         if (plugin.seasons().active() == com.nova.novablock.season.SeasonManager.ServerEvent.DOUBLE_COINS) reward *= 2;
         plugin.economy().award(island, reward);
+        // Loot-room completion is a magical event — reward MAGIC XP so the tree actually levels.
+        plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.MAGIC, 50L);
+        plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.LUCK, 20L);
         p.teleport(run.returnLocation());
 
         // Actual loot — each room defines a thematic drop list. Anything that

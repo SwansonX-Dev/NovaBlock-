@@ -19,11 +19,13 @@ import com.nova.novablock.island.InviteManager;
 import com.nova.novablock.island.IslandManager;
 import com.nova.novablock.island.IslandWorldManager;
 import com.nova.novablock.island.OneBlockRepairService;
+import com.nova.novablock.island.PreviewHologramManager;
 import com.nova.novablock.listener.BlockListener;
 import com.nova.novablock.listener.PlayerListener;
 import com.nova.novablock.lootroom.LootRoomManager;
 import com.nova.novablock.paxel.PaxelManager;
 import com.nova.novablock.phase.PhaseManager;
+import com.nova.novablock.progression.LoginStreakManager;
 import com.nova.novablock.progression.PrestigeManager;
 import com.nova.novablock.progression.ProgressionManager;
 import com.nova.novablock.prophecy.ProphecyManager;
@@ -49,6 +51,7 @@ public final class NovaBlock extends JavaPlugin {
     private LootRoomManager lootRoomManager;
     private ProgressionManager progressionManager;
     private PrestigeManager prestigeManager;
+    private LoginStreakManager loginStreakManager;
     private QuestManager questManager;
     private PaxelManager paxelManager;
     private HotbarMenuManager hotbarManager;
@@ -62,6 +65,7 @@ public final class NovaBlock extends JavaPlugin {
     private IslandStorageManager islandStorageManager;
     private MainMenuConfig menuConfig;
     private OneBlockRepairService oneBlockRepairService;
+    private PreviewHologramManager previewHologramManager;
 
     @Override
     public void onEnable() {
@@ -82,6 +86,7 @@ public final class NovaBlock extends JavaPlugin {
         this.phaseManager = new PhaseManager(this);
         this.phaseManager.loadPhases();
         this.prestigeManager = new PrestigeManager(this);
+        this.loginStreakManager = new LoginStreakManager(this);
 
         this.prophecyManager = new ProphecyManager(this);
         this.bossManager = new BossManager(this);
@@ -106,6 +111,7 @@ public final class NovaBlock extends JavaPlugin {
         this.islandStorageManager = new IslandStorageManager(this);
         this.menuConfig = new MainMenuConfig(this);
         this.oneBlockRepairService = new OneBlockRepairService(this);
+        this.previewHologramManager = new PreviewHologramManager(this);
 
         getServer().getPluginManager().registerEvents(new BlockListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
@@ -118,12 +124,17 @@ public final class NovaBlock extends JavaPlugin {
         getCommand("obadmin").setExecutor(adminCmd);
         getCommand("obadmin").setTabCompleter(adminCmd);
         getCommand("sb").setExecutor(new ScoreboardCommand(this));
-        getCommand("help").setExecutor(new HelpCommand(this));
+        getCommand("novahelp").setExecutor(new HelpCommand(this));
 
         eventManager.startTimers();
         seasonManager.startSeasonTicker();
         scoreboardManager.startTicker();
         oneBlockRepairService.start();
+        previewHologramManager.start();
+
+        // Crash-recovery: clean up orphan bosses and leftover loot-room worlds.
+        bossManager.cleanupOrphans();
+        lootRoomManager.cleanupOrphanWorlds();
 
         // Plug NovaBlock into the /help index so players can discover commands without leaving chat.
         HelpRegistrar.register(this);
@@ -154,6 +165,8 @@ public final class NovaBlock extends JavaPlugin {
         if (oneBlockRepairService != null) oneBlockRepairService.shutdown();
         if (lootRoomManager != null) lootRoomManager.shutdown();
         if (bossManager != null) bossManager.shutdown();
+        if (paxelManager != null) paxelManager.shutdown();
+        if (previewHologramManager != null) previewHologramManager.shutdown();
 
         // Then persist.
         if (islandManager != null) islandManager.saveAll();
@@ -175,6 +188,7 @@ public final class NovaBlock extends JavaPlugin {
     public LootRoomManager lootRooms() { return lootRoomManager; }
     public ProgressionManager progression() { return progressionManager; }
     public PrestigeManager prestige() { return prestigeManager; }
+    public LoginStreakManager loginStreaks() { return loginStreakManager; }
     public QuestManager quests() { return questManager; }
     public PaxelManager paxels() { return paxelManager; }
     public HotbarMenuManager hotbar() { return hotbarManager; }

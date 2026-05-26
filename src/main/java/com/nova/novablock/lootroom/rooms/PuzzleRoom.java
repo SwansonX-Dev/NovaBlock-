@@ -81,7 +81,9 @@ public class PuzzleRoom implements LootRoom {
     private void target(Location anchor, int dx, int dy, int dz) {
         Location at = anchor.clone().add(dx, dy, dz);
         at.getBlock().setType(Material.AMETHYST_BLOCK);
-        at.clone().add(0, 1, 0).getBlock().setType(Material.LIGHT);
+        // Use AMETHYST_CLUSTER as a visible "pip" instead of LIGHT (which needs a
+        // level data value to render and is invisible when placed bare).
+        at.clone().add(0, 1, 0).getBlock().setType(Material.AMETHYST_CLUSTER);
     }
 
     @Override

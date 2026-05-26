@@ -21,8 +21,8 @@ public class PrestigeGui extends ChestGui {
         Island island = plugin.islands().ofPlayer(p);
         int current = island == null ? 0 : island.data().getPrestigeLevel();
         int next = current + 1;
-        double nextCoinMult = 1.0 + 0.10 * Math.min(next, 10);
-        double nextXpMult = 1.0 + 0.05 * Math.min(next, 10);
+        double nextCoinMult = plugin.prestige().coinMultiplierAtLevel(next);
+        double nextXpMult = plugin.prestige().xpMultiplierAtLevel(next);
 
         set(2, ItemBuilder.of(Material.BOOK)
                 .name("<gold>Prestige " + next + " Rewards")
@@ -55,6 +55,11 @@ public class PrestigeGui extends ChestGui {
                 .lore("<gray>Close this menu.")
                 .build(),
                 e -> p.closeInventory());
+
+        set(8, ItemBuilder.of(Material.ARROW)
+                .name("<gray>← Back to menu")
+                .build(),
+                e -> new MainMenuGui(plugin).open(p));
 
         fill(Material.BLACK_STAINED_GLASS_PANE, " ");
     }

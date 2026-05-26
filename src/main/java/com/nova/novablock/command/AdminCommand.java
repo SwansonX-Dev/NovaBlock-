@@ -22,8 +22,6 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBS = List.of(
             "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
             "flags", "storage", "menu", "freshstart", "fix");
-    private static final List<String> BOSSES = List.of(
-            "magma_tyrant", "frostborn_sentinel", "void_herald");
     private static final List<String> EVENTS = List.of(
             "diamond_hour", "double_coins", "blood_moon", "lush_bloom", "rift_storm", "stop");
 
@@ -62,7 +60,10 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 if (target == null) { Msg.send(sender, "<red>Player not online."); return true; }
                 Island island = plugin.islands().ofPlayer(target);
                 if (island == null) { Msg.send(sender, "<red>Target has no island."); return true; }
-                int idx = Math.max(0, Math.min(plugin.phases().phaseCount() - 1, Integer.parseInt(args[2])));
+                int idx;
+                try { idx = Integer.parseInt(args[2]); }
+                catch (NumberFormatException ex) { Msg.send(sender, "<red>Phase index must be an integer."); return true; }
+                idx = Math.max(0, Math.min(plugin.phases().phaseCount() - 1, idx));
                 island.data().setPhaseIndex(idx);
                 island.data().setPhaseProgress(0);
                 island.upcomingBlocks().clear();
@@ -82,7 +83,9 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 Player target = Bukkit.getPlayerExact(args[1]);
                 Island island = target == null ? null : plugin.islands().ofPlayer(target);
                 if (island == null) { Msg.send(sender, "<red>Target has no island."); return true; }
-                long amt = Long.parseLong(args[2]);
+                long amt;
+                try { amt = Long.parseLong(args[2]); }
+                catch (NumberFormatException ex) { Msg.send(sender, "<red>Amount must be an integer."); return true; }
                 plugin.economy().award(island, amt);
                 Msg.send(sender, "<green>Gave " + amt + " coins.");
             }
@@ -91,7 +94,12 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 if (args[1].equalsIgnoreCase("stop")) { plugin.seasons().endEvent(); return true; }
                 try {
                     var e = SeasonManager.ServerEvent.valueOf(args[1].toUpperCase());
-                    plugin.seasons().startEvent(e, args.length >= 3 ? Integer.parseInt(args[2]) : 10);
+                    int minutes = 10;
+                    if (args.length >= 3) {
+                        try { minutes = Integer.parseInt(args[2]); }
+                        catch (NumberFormatException nfe) { Msg.send(sender, "<red>Duration must be an integer."); return true; }
+                    }
+                    plugin.seasons().startEvent(e, minutes);
                 } catch (IllegalArgumentException ex) {
                     Msg.send(sender, "<red>Unknown event.");
                 }
@@ -297,7 +305,10 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                             .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase()))
                             .collect(Collectors.toList());
                 }
-                case "spawnboss" -> BOSSES.stream().filter(b -> b.startsWith(args[1].toLowerCase())).collect(Collectors.toList());
+                case "spawnboss" -> plugin.bosses().bossIds().stream()
+                        .filter(b -> b.startsWith(args[1].toLowerCase()))
+                        .sorted()
+                        .collect(Collectors.toList());
                 case "event" -> EVENTS.stream().filter(e -> e.startsWith(args[1].toLowerCase())).collect(Collectors.toList());
                 default -> Collections.emptyList();
             };

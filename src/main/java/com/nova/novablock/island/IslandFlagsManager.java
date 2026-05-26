@@ -52,6 +52,8 @@ public class IslandFlagsManager implements Listener {
     private final Set<UUID> flyGranted = new HashSet<>();
     /** Players we've pinned to daytime; lets us reset when they leave. */
     private final Set<UUID> dayPinned = new HashSet<>();
+    /** Players we've pushed phase ambience to; reset when they leave. */
+    private final Set<UUID> ambiencePushed = new HashSet<>();
 
     public IslandFlagsManager(NovaBlock plugin) {
         this.plugin = plugin;
@@ -74,6 +76,11 @@ public class IslandFlagsManager implements Listener {
             if (p != null) p.resetPlayerTime();
         }
         dayPinned.clear();
+        for (UUID id : ambiencePushed) {
+            Player p = Bukkit.getPlayer(id);
+            if (p != null) { p.resetPlayerTime(); p.resetPlayerWeather(); }
+        }
+        ambiencePushed.clear();
     }
 
     // ---- tick task: fly + always-day ----
@@ -106,7 +113,44 @@ public class IslandFlagsManager implements Listener {
             } else if (dayPinned.remove(p.getUniqueId())) {
                 p.resetPlayerTime();
             }
+
+            // PHASE_AMBIENCE — time-of-day & weather per phase. Skipped when
+            // ALWAYS_DAY already pinned the player to noon.
+            boolean shouldPushAmbience = onOwnIsland && !shouldPinDay
+                    && island.data().isFlag(IslandFlag.PHASE_AMBIENCE);
+            if (shouldPushAmbience) {
+                var phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
+                if (phase != null) {
+                    long[] ambient = ambientFor(phase.getId());
+                    p.setPlayerTime(ambient[0], false);
+                    if (ambient[1] == 1L) p.setPlayerWeather(org.bukkit.WeatherType.DOWNFALL);
+                    else p.resetPlayerWeather();
+                    ambiencePushed.add(p.getUniqueId());
+                }
+            } else if (ambiencePushed.remove(p.getUniqueId()) && !shouldPinDay) {
+                p.resetPlayerTime();
+                p.resetPlayerWeather();
+            }
         }
+    }
+
+    /** Returns [client-time, weather (0=clear, 1=rain)] for a phase id. */
+    private long[] ambientFor(String phaseId) {
+        return switch (phaseId) {
+            case "plains"     -> new long[]{6000L, 0L};   // bright noon
+            case "underground"-> new long[]{18000L, 0L};  // midnight (dim)
+            case "snow"       -> new long[]{2000L, 1L};   // early morning, snowing
+            case "desert"     -> new long[]{7500L, 0L};   // bright midday
+            case "ocean"      -> new long[]{6000L, 1L};   // overcast
+            case "nether"     -> new long[]{16000L, 0L};  // dusk red
+            case "ancient"    -> new long[]{17000L, 0L};  // dusk
+            case "garden"     -> new long[]{4000L, 1L};   // morning rain
+            case "stronghold" -> new long[]{17500L, 0L};  // late dusk
+            case "end"        -> new long[]{18000L, 0L};
+            case "celestial"  -> new long[]{14000L, 0L};  // sunset
+            case "void"       -> new long[]{18000L, 0L};
+            default -> new long[]{6000L, 0L};
+        };
     }
 
     // ---- helpers ----
@@ -225,6 +269,12 @@ public class IslandFlagsManager implements Listener {
     public void onDeath(PlayerDeathEvent event) {
         Island island = islandAt(event.getEntity().getLocation());
         if (island == null || !island.isMember(event.getEntity())) return;
+        // Nightmare overrides — no keep-inv even if the flag/world says yes.
+        if (island.data().isFlag(IslandFlag.NIGHTMARE_MODE)) {
+            event.setKeepInventory(false);
+            event.setKeepLevel(false);
+            return;
+        }
         if (!island.data().isFlag(IslandFlag.KEEP_INVENTORY)) return;
         event.setKeepInventory(true);
         event.getDrops().clear();

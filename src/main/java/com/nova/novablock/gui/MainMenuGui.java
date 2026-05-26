@@ -60,12 +60,12 @@ public class MainMenuGui extends ChestGui {
         set(20, ItemBuilder.of(Material.EMERALD)
                         .name("<green>Shop")
                         .lore("<gray>Browse the dynamic market.", "<dark_gray>/shop").build(),
-                e -> { p.closeInventory(); p.performCommand("shop"); });
+                e -> runExternal(p, "shop"));
 
         set(21, ItemBuilder.of(Material.GOLD_INGOT)
                         .name("<gold>Sell Items")
                         .lore("<gray>Sell what's in your hand or inventory.", "<dark_gray>/sell").build(),
-                e -> { p.closeInventory(); p.performCommand("sell"); });
+                e -> runExternal(p, "sell"));
 
         set(22, ItemBuilder.of(Material.CHEST)
                         .name("<yellow>Sell Chests")
@@ -83,6 +83,12 @@ public class MainMenuGui extends ChestGui {
                 e -> { p.closeInventory(); p.performCommand("stocks"); });
 
         // Row 3: island settings + storage
+        set(29, ItemBuilder.of(Material.ANVIL)
+                        .name("<gold>Island Upgrades")
+                        .lore("<gray>Spend coins on permanent perks for your island.",
+                                "<dark_gray>/ob upgrades").build(),
+                e -> new UpgradesGui(plugin).open(p));
+
         set(30, ItemBuilder.of(Material.COMPARATOR)
                         .name("<#9C27B0>Island Flags")
                         .lore("<gray>Toggle PVP, fly, mob spawning, and more.", "<dark_gray>/ob flags").build(),
@@ -101,6 +107,10 @@ public class MainMenuGui extends ChestGui {
                         .lore("<gray>Open xPets to summon and manage pets.", "<dark_gray>/pets").build(),
                 e -> {
                     p.closeInventory();
+                    if (org.bukkit.Bukkit.getPluginManager().getPlugin("xPets") == null) {
+                        com.nova.novablock.util.Msg.send(p, "<red>xPets isn't installed on this server.");
+                        return;
+                    }
                     p.performCommand("pets");
                 });
 
@@ -129,5 +139,15 @@ public class MainMenuGui extends ChestGui {
         }
 
         fill(Material.GRAY_STAINED_GLASS_PANE, " ");
+    }
+
+    /** Closes the menu and runs an external command if one is registered, otherwise tells the player. */
+    private void runExternal(Player p, String command) {
+        p.closeInventory();
+        if (org.bukkit.Bukkit.getCommandMap().getCommand(command) == null) {
+            com.nova.novablock.util.Msg.send(p, "<red>The /" + command + " command isn't installed on this server.");
+            return;
+        }
+        p.performCommand(command);
     }
 }

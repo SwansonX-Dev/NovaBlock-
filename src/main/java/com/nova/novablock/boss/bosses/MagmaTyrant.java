@@ -34,7 +34,9 @@ public class MagmaTyrant extends AbstractBoss {
         LivingEntity e = fight.entity();
         if (e == null) return;
         // Phase 2: at 50% HP gains rapid fireball volleys
-        double pct = e.getHealth() / e.getAttribute(Attribute.MAX_HEALTH).getValue();
+        var maxHpAttr = e.getAttribute(Attribute.MAX_HEALTH);
+        double maxHp = maxHpAttr == null ? baseHealth() : maxHpAttr.getValue();
+        double pct = e.getHealth() / maxHp;
         if (pct < 0.5 && phase < 2) {
             phase = 2;
             e.getWorld().strikeLightningEffect(e.getLocation());
@@ -49,14 +51,15 @@ public class MagmaTyrant extends AbstractBoss {
         if (target == null) return;
         Fireball fb = (Fireball) e.getWorld().spawnEntity(e.getLocation().add(0, 1, 0), EntityType.SMALL_FIREBALL);
         fb.setShooter(e);
-        fb.setYield(2.5f);
+        // Yield scales with tuned damage so bosses.yml tuning carries into the special.
+        fb.setYield((float) Math.max(1.0, tunedDamage() / 4.0));
         fb.setVelocity(target.getEyeLocation().toVector().subtract(e.getLocation().toVector()).normalize().multiply(1.2));
         e.getWorld().spawnParticle(Particle.LAVA, e.getLocation().add(0, 1, 0), 8);
         e.getWorld().playSound(e.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 1f, 0.8f);
     }
 
     @Override
-    public long onDefeat(BossFight fight) { return 3500L; }
+    public long onDefeat(BossFight fight) { return tunedCoinReward(3500L); }
 
     private Player nearestParticipant(BossFight fight, Location loc) {
         Player best = null;

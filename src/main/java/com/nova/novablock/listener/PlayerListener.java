@@ -24,14 +24,17 @@ public class PlayerListener implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         var p = event.getPlayer();
         plugin.progression().get(p); // warm cache
+        plugin.loginStreaks().recordLogin(p);
         Island island = plugin.islands().ofPlayer(p);
         boolean created = false;
         if (island == null) {
             island = plugin.islands().create(p);
             created = true;
-            Msg.send(p, "<gray>Welcome to <gradient:#7B61FF:#4FC3F7>NovaBlock</gradient><gray>!");
+            Msg.send(p, com.nova.novablock.util.Messages.of("welcome-first",
+                    "<gray>Welcome to <gradient:#7B61FF:#4FC3F7>NovaBlock</gradient><gray>!"));
         } else {
-            Msg.send(p, "<gray>Welcome back. Sending you to your island.");
+            Msg.send(p, com.nova.novablock.util.Messages.of("welcome-back",
+                    "<gray>Welcome back. Sending you to your island."));
         }
         Island target = island;
         boolean firstJoinIsland = created;
@@ -41,8 +44,10 @@ public class PlayerListener implements Listener {
             if (firstJoinIsland) {
                 Msg.title(p, "<gradient:#7B61FF:#4FC3F7>NovaBlock", "<gray>Your island is ready");
                 p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+                // First-ever join — show the help guide. Returning players can reopen
+                // with /novahelp or /ob help and shouldn't be interrupted.
+                new HelpGui(plugin).open(p);
             }
-            new HelpGui(plugin).open(p);
             plugin.scoreboards().update(p);
         }, 20L);
         plugin.scoreboards().update(p);

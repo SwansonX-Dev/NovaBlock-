@@ -3,6 +3,7 @@ package com.nova.novablock.listener;
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.phase.Phase;
+import com.nova.novablock.progression.Perk;
 import com.nova.novablock.progression.SkillType;
 import com.nova.novablock.season.SeasonManager;
 import com.nova.novablock.util.Msg;
@@ -98,20 +99,52 @@ public class BlockListener implements Listener {
         // Double-break debounce: if we already handled a break for this island in the same tick,
         // suppress the duplicate (Bedrock/Geyser sometimes sends the packet twice).
         long tick = Bukkit.getServer().getCurrentTick();
-        Long last = recentBreakTick.get(island.data().getId());
+        UUID islandId = island.data().getId();
+        Long last = recentBreakTick.get(islandId);
         if (last != null && last == tick) {
             event.setCancelled(true);
             return;
         }
-        recentBreakTick.put(island.data().getId(), tick);
+        // Evict stale entries (older than ~5s) so the map doesn't grow unbounded over server uptime.
+        if (recentBreakTick.size() > 64) {
+            long cutoff = tick - 100L;
+            recentBreakTick.values().removeIf(t -> t < cutoff);
+        }
+        recentBreakTick.put(islandId, tick);
 
         Material broken = block.getType();
+
+        // FATE_THIEF (Luck 20): 1% chance any block converts into a diamond drop.
+        boolean fateThief = Perk.hasPerk(plugin.progression().get(player), Perk.FATE_THIEF)
+                && ThreadLocalRandom.current().nextInt(100) == 0;
+        // LUCKY_BREAK (Mining 5): 5% chance to double drops.
+        boolean luckyBreak = Perk.hasPerk(plugin.progression().get(player), Perk.LUCKY_BREAK)
+                && ThreadLocalRandom.current().nextInt(20) == 0;
+        // DEEP_VEIN (Mining 10): +1 of the same item when the block is an ore.
+        boolean deepVein = Perk.hasPerk(plugin.progression().get(player), Perk.DEEP_VEIN)
+                && isOreLike(broken);
 
         // Take over the break ourselves: cancel vanilla, drop manually, then replace immediately
         // in the same tick so there's never a moment when the block is AIR. This fixes
         // "Bedrock has to break it twice" (player saw the gap and swung again).
         event.setCancelled(true);
-        dropNaturally(block, player, player.getInventory().getItemInMainHand());
+        if (fateThief) {
+            // Convert the natural drop to a diamond and skip the regular drop path.
+            block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5),
+                    new ItemStack(Material.DIAMOND));
+            Msg.actionBar(player, "<aqua>★ Fate Thief! <gray>The block crystallised.");
+            plugin.progression().addXp(player, SkillType.LUCK, 8L);
+        } else {
+            dropNaturally(block, player, player.getInventory().getItemInMainHand());
+            if (luckyBreak) {
+                dropNaturally(block, player, player.getInventory().getItemInMainHand());
+                Msg.actionBar(player, "<green>✦ Lucky Break! <gray>(double drops)");
+            }
+            if (deepVein) {
+                block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5),
+                        new ItemStack(broken));
+            }
+        }
         playBreakSound(block);
 
         // Phase-specific drops & bonuses
@@ -123,6 +156,15 @@ public class BlockListener implements Listener {
         // Pull planned next material from the prophecy queue so previews are honest
         Material next = island.pollNext();
         if (next == null) next = phase.rollBlock(ThreadLocalRandom.current());
+        // FOUR_LEAF (Luck 5): +5% chance to reroll a non-rare next-block into a rare one.
+        if (!plugin.prophecies().isRare(next)
+                && Perk.hasPerk(plugin.progression().get(player), Perk.FOUR_LEAF)
+                && ThreadLocalRandom.current().nextInt(20) == 0) {
+            for (int attempt = 0; attempt < 6; attempt++) {
+                Material candidate = phase.rollBlock(ThreadLocalRandom.current());
+                if (plugin.prophecies().isRare(candidate)) { next = candidate; break; }
+            }
+        }
         next = safeOneBlockMaterial(next, phase);
         // Lush Bloom event: occasionally substitute in a lush block regardless of phase
         if (plugin.seasons().active() == SeasonManager.ServerEvent.LUSH_BLOOM
@@ -137,8 +179,8 @@ public class BlockListener implements Listener {
         // sweet_berry_bush, dead_bush, flowering_azalea, bamboo_block, sculk_shrieker, etc.)
         // from being destroyed for "missing support" the instant they're placed onto bedrock.
         center.getBlock().setType(next, false);
-        fillPhaseChest(center.getBlock(), phase);
         if (next == Material.CHEST) {
+            fillPhaseChest(center.getBlock(), phase);
             Bukkit.getScheduler().runTask(plugin, () -> fillPhaseChest(center.getBlock(), phase));
         }
         playPlaceSound(center.getBlock());
@@ -162,11 +204,12 @@ public class BlockListener implements Listener {
         double xpMult = plugin.prestige().xpMultiplier(island);
         if (island.getComboCount() >= 5) {
             int combo = island.getComboCount();
-            long xp = Math.round(combo * 2L * xpMult);
+            long xp = Math.max(1L, Math.round(combo * 2L * xpMult));
             Msg.actionBar(player, "<aqua>Combo x" + combo + "! <gray>+" + xp + " XP");
             plugin.progression().addXp(player, SkillType.MINING, xp);
         }
-        plugin.progression().addXp(player, SkillType.MINING, 1L);
+        int xpBoost = island.data().getUpgradeLevel(com.nova.novablock.island.IslandUpgrade.XP_BOOST);
+        plugin.progression().addXp(player, SkillType.MINING, (1.0 + xpBoost) * xpMult);
         plugin.prophecies().onAdvance(island, broken);
         island.refillUpcoming(phase, com.nova.novablock.prophecy.ProphecyManager.QUEUE_SIZE);
 
@@ -319,7 +362,7 @@ public class BlockListener implements Listener {
     private void fillPhaseChest(Block block, Phase phase) {
         if (block.getType() != Material.CHEST || !(block.getState() instanceof Container container)) return;
         if (isLootMarked(container)) return;
-        var inventory = container.getInventory();
+        var inventory = container.getSnapshotInventory();
         inventory.clear();
         List<ItemStack> loot = phaseLoot(phase);
         var rng = ThreadLocalRandom.current();
@@ -333,19 +376,15 @@ public class BlockListener implements Listener {
             } while (inventory.getItem(slot) != null && guard < 40);
             inventory.setItem(slot, item);
         }
-        markLootFilled(container);
+        if (container instanceof org.bukkit.block.TileState tile) {
+            tile.getPersistentDataContainer().set(oneBlockLootKey, PersistentDataType.BYTE, (byte) 1);
+        }
+        container.update(true, false);
     }
 
     private boolean isLootMarked(Container container) {
         return container instanceof org.bukkit.block.TileState tile
                 && tile.getPersistentDataContainer().has(oneBlockLootKey, PersistentDataType.BYTE);
-    }
-
-    private void markLootFilled(Container container) {
-        if (container instanceof org.bukkit.block.TileState tile) {
-            tile.getPersistentDataContainer().set(oneBlockLootKey, PersistentDataType.BYTE, (byte) 1);
-            tile.update(true, false);
-        }
     }
 
     private List<ItemStack> phaseLoot(Phase phase) {
@@ -475,12 +514,16 @@ public class BlockListener implements Listener {
         }
         // Paxel tier upgrade — phase-up is the natural milestone
         plugin.paxels().refreshTier(player);
+        plugin.quests().onPhaseAdvanced(player);
     }
 
     private void rollEncounters(Player player, Island island, Phase phase, Location center) {
         long broken = island.data().getBlocksBroken();
         var rng = ThreadLocalRandom.current();
         SeasonManager.ServerEvent ev = plugin.seasons().active();
+        var cfg = plugin.getConfig();
+        int lootCd = Math.max(1, cfg.getInt("cooldowns.lootRoomMinBlocks", 150));
+        int bossCd = Math.max(1, cfg.getInt("cooldowns.bossMinBlocks", 300));
 
         // Mob spawn ~1/18 chance (~every ~45s of steady mining)
         if (!phase.getMobs().isEmpty() && rng.nextInt(18) == 0) {
@@ -490,18 +533,27 @@ public class BlockListener implements Listener {
                 e.setMetadata("nova_natural", new org.bukkit.metadata.FixedMetadataValue(plugin, true));
             }
         }
-        // Loot room every ~150 blocks (cooldown protected). Rift Storm = 5x rolls.
-        if (broken - island.data().getLastLootRoomAt() >= 150) {
+        // Loot room every ~lootCd blocks (config-tunable). Rift Storm = 5x rolls.
+        if (broken - island.data().getLastLootRoomAt() >= lootCd) {
             int denom = 30;
             if (ev == SeasonManager.ServerEvent.RIFT_STORM) denom = 6;
+            // RIFTWALKER (Magic 10): loot rooms appear 20% more often.
+            if (Perk.hasPerk(plugin.progression().get(player), Perk.RIFTWALKER)) {
+                denom = Math.max(1, (int) Math.round(denom / 1.20));
+            }
+            // LOOT_ROOM_RATE upgrade: +10% rate per level.
+            int rateLevel = island.data().getUpgradeLevel(com.nova.novablock.island.IslandUpgrade.LOOT_ROOM_RATE);
+            if (rateLevel > 0) {
+                denom = Math.max(1, (int) Math.round(denom / (1.0 + 0.10 * rateLevel)));
+            }
             if (rng.nextInt(denom) == 0 && !phase.getLootRoomIds().isEmpty()) {
                 String roomId = phase.getLootRoomIds().get(rng.nextInt(phase.getLootRoomIds().size()));
                 plugin.lootRooms().offerEntry(player, island, roomId);
                 island.data().setLastLootRoomAt(broken);
             }
         }
-        // Mid-phase boss every ~300 blocks. Blood Moon = 4x rolls.
-        if (broken - island.data().getLastBossAt() >= 300) {
+        // Mid-phase boss every ~bossCd blocks (config-tunable). Blood Moon = 4x rolls.
+        if (broken - island.data().getLastBossAt() >= bossCd) {
             int denom = 120;
             if (ev == SeasonManager.ServerEvent.BLOOD_MOON) denom = 30;
             if (rng.nextInt(denom) == 0 && phase.getBossId() != null) {
@@ -546,13 +598,38 @@ public class BlockListener implements Listener {
             default -> {}
         }
         if (coins > 0) {
+            // JACKPOT (Luck 10): +25% coin from rare/chest blocks.
+            if (Perk.hasPerk(plugin.progression().get(player), Perk.JACKPOT)) {
+                coins = Math.round(coins * 1.25);
+            }
+            // QUARRY (Mining 20): +10% coin reward per coin-yielding block.
+            if (Perk.hasPerk(plugin.progression().get(player), Perk.QUARRY)) {
+                coins = Math.round(coins * 1.10);
+            }
             if (plugin.seasons().active() == SeasonManager.ServerEvent.DOUBLE_COINS) coins *= 2;
             coins = Math.round(coins * plugin.prestige().coinMultiplier(island));
             plugin.economy().award(island, coins);
+            // Rare-block breaks reward LUCK XP — that's how the LUCK tree levels.
+            plugin.progression().addXp(player, SkillType.LUCK, 5L);
             if (broken == Material.ENDER_CHEST) {
                 Msg.actionBar(player, "<gold>+" + coins + " coins");
             }
         }
+    }
+
+    private static boolean isOreLike(Material m) {
+        return switch (m) {
+            case COAL_ORE, DEEPSLATE_COAL_ORE,
+                 IRON_ORE, DEEPSLATE_IRON_ORE,
+                 GOLD_ORE, DEEPSLATE_GOLD_ORE, NETHER_GOLD_ORE,
+                 DIAMOND_ORE, DEEPSLATE_DIAMOND_ORE,
+                 EMERALD_ORE, DEEPSLATE_EMERALD_ORE,
+                 LAPIS_ORE, DEEPSLATE_LAPIS_ORE,
+                 REDSTONE_ORE, DEEPSLATE_REDSTONE_ORE,
+                 COPPER_ORE, DEEPSLATE_COPPER_ORE,
+                 NETHER_QUARTZ_ORE, ANCIENT_DEBRIS -> true;
+            default -> false;
+        };
     }
 
     /** Stop players placing on top of the center block (would prevent regen). */

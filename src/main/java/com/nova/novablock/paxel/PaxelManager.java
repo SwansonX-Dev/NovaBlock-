@@ -113,11 +113,16 @@ public class PaxelManager implements Listener {
     );
 
     private final NovaBlock plugin;
+    private org.bukkit.scheduler.BukkitTask hudTask;
 
     public PaxelManager(NovaBlock plugin) {
         this.plugin = plugin;
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         startHudTicker();
+    }
+
+    public void shutdown() {
+        if (hudTask != null) { hudTask.cancel(); hudTask = null; }
     }
 
     // ---------------- tiering ----------------
@@ -224,11 +229,24 @@ public class PaxelManager implements Listener {
         return new ItemStack(to, drop.getAmount());
     }
 
-    /** Give the player a paxel if they don't already have one. */
+    /** Give the player a paxel if they don't already have one in inventory, ender chest, or island storage. */
     public void give(Player p) {
         PlayerInventory inv = p.getInventory();
         for (ItemStack it : inv.getContents()) {
             if (isOwner(it, p)) return;
+        }
+        for (ItemStack it : p.getEnderChest().getContents()) {
+            if (isOwner(it, p)) return;
+        }
+        // Island storage check — avoid handing out a second paxel if they stashed theirs.
+        var island = plugin.islands().ofPlayer(p);
+        if (island != null) {
+            var holder = plugin.islandStorage().peekInventory(island);
+            if (holder != null) {
+                for (ItemStack it : holder.getContents()) {
+                    if (isOwner(it, p)) return;
+                }
+            }
         }
         ItemStack paxel = build(p, tierFor(p));
         inv.addItem(paxel);
@@ -236,11 +254,12 @@ public class PaxelManager implements Listener {
     }
 
     /**
-     * Check the player's inventory for a paxel and rebuild it if:
+     * Upgrade the player's existing paxel in-place if:
      *  - the tier is behind the phase (phase-up upgrade), OR
-     *  - the version is older than {@link #PAXEL_VERSION} (legacy paxel from
-     *    before a behaviour change; rebuilding picks up the new tool component,
-     *    auto-smelt mapping, etc.).
+     *  - the version is older than {@link #PAXEL_VERSION}.
+     *
+     * <p>Does NOT auto-issue a new paxel — that would dup if the player stashed
+     * their paxel in island storage. Use {@link #give(Player)} to issue.
      */
     public void refreshTier(Player p) {
         PlayerInventory inv = p.getInventory();
@@ -261,8 +280,6 @@ public class PaxelManager implements Listener {
             }
             return;
         }
-        // No paxel in inventory: re-issue one.
-        give(p);
     }
 
     /** Force-replace any existing paxel with a fresh one at the player's current tier. Used by /obadmin givepaxel. */
@@ -288,7 +305,7 @@ public class PaxelManager implements Listener {
      * still pop briefly over the persistent line.
      */
     private void startHudTicker() {
-        plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+        hudTask = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
             for (Player p : Bukkit.getOnlinePlayers()) {
                 ItemStack main = p.getInventory().getItemInMainHand();
                 if (!isOwner(main, p)) continue;

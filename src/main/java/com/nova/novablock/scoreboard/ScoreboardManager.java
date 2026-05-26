@@ -96,7 +96,7 @@ public class ScoreboardManager {
         if (island != null) {
             int pLvl = island.data().getPrestigeLevel();
             if (pLvl > 0) {
-                lines.add(plugin.prestige().title(pLvl));
+                lines.add(plugin.prestige().title(pLvl) + " <gray>(<white>" + pLvl + "<gray>)");
             }
             Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
             String color = phase == null ? "white" : phase.getThemeColor();

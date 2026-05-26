@@ -22,7 +22,7 @@ public class HelpCommand implements CommandExecutor {
             new HelpGui(plugin).open(player);
             return true;
         }
-        sender.sendMessage("NovaBlock help is available in-game with /help or /ob help.");
+        sender.sendMessage("NovaBlock help is available in-game with /novahelp or /ob help.");
         return true;
     }
 }

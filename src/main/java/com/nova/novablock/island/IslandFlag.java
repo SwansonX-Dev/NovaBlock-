@@ -101,7 +101,23 @@ public enum IslandFlag {
             "novablock.flag.no_hunger_drain",
             Material.COOKED_BEEF,
             "No Hunger Drain",
-            "Members don't lose hunger while on the island.");
+            "Members don't lose hunger while on the island."),
+
+    PHASE_AMBIENCE(
+            true,
+            "novablock.flag.phase_ambience",
+            Material.SUNFLOWER,
+            "Phase Ambience",
+            "Push client time + weather based on the current phase.",
+            "Default on — Snow looks snowy, Void looks midnight."),
+
+    NIGHTMARE_MODE(
+            false,
+            "novablock.flag.nightmare_mode",
+            Material.WITHER_SKELETON_SKULL,
+            "Nightmare Mode",
+            "Doubles boss stats and halves XP. Disables keep-inventory.",
+            "<red>Cannot be undone within the same prestige cycle.");
 
     public final boolean defaultValue;
     public final String permission;

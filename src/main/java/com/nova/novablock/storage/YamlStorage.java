@@ -98,6 +98,13 @@ public class YamlStorage implements DataStorage {
                         if (flag != null) data.setFlag(flag, flagsSec.getBoolean(key));
                     }
                 }
+                ConfigurationSection upgradesSec = y.getConfigurationSection("upgrades");
+                if (upgradesSec != null) {
+                    for (String key : upgradesSec.getKeys(false)) {
+                        com.nova.novablock.island.IslandUpgrade up = com.nova.novablock.island.IslandUpgrade.byKey(key);
+                        if (up != null) data.setUpgradeLevel(up, upgradesSec.getInt(key));
+                    }
+                }
                 data.setStorageBase64(y.getString("storage", ""));
                 result.add(data);
             } catch (Exception ex) {
@@ -130,6 +137,11 @@ public class YamlStorage implements DataStorage {
         for (var e : data.getFlags().entrySet()) {
             y.set("flags." + e.getKey().storageKey(), e.getValue());
         }
+        for (var e : data.getUpgrades().entrySet()) {
+            if (e.getValue() != null && e.getValue() > 0) {
+                y.set("upgrades." + e.getKey().storageKey(), e.getValue());
+            }
+        }
         if (data.getStorageBase64() != null && !data.getStorageBase64().isEmpty()) {
             y.set("storage", data.getStorageBase64());
         }
@@ -161,6 +173,9 @@ public class YamlStorage implements DataStorage {
         }
         p.setQuestProgress(y.getInt("quest.progress", 0));
         p.setQuestDayStamp(y.getLong("quest.day", 0));
+        p.setLastRerollDay(y.getLong("prophecy.lastRerollDay", 0));
+        p.setLastLoginDay(y.getLong("login.lastDay", 0));
+        p.setLoginStreak(y.getInt("login.streak", 0));
         p.setMenuItemEnabled(y.getBoolean("ui.menuItem", true));
         p.setScoreboardEnabled(y.getBoolean("ui.scoreboard", true));
         return p;
@@ -178,6 +193,9 @@ public class YamlStorage implements DataStorage {
         }
         y.set("quest.progress", p.getQuestProgress());
         y.set("quest.day", p.getQuestDayStamp());
+        y.set("prophecy.lastRerollDay", p.getLastRerollDay());
+        y.set("login.lastDay", p.getLastLoginDay());
+        y.set("login.streak", p.getLoginStreak());
         y.set("ui.menuItem", p.isMenuItemEnabled());
         y.set("ui.scoreboard", p.isScoreboardEnabled());
         try { atomicSave(y, f); }

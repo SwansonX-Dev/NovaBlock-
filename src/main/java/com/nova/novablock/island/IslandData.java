@@ -22,6 +22,7 @@ public class IslandData {
     private final int slotZ;
     private final Set<UUID> members = new HashSet<>();
     private final Map<IslandFlag, Boolean> flags = new EnumMap<>(IslandFlag.class);
+    private final Map<IslandUpgrade, Integer> upgrades = new EnumMap<>(IslandUpgrade.class);
 
     private long blocksBroken;
     private int phaseIndex;
@@ -58,6 +59,17 @@ public class IslandData {
     }
 
     public void setFlag(IslandFlag f, boolean v) { flags.put(f, v); }
+
+    public Map<IslandUpgrade, Integer> getUpgrades() { return upgrades; }
+
+    public int getUpgradeLevel(IslandUpgrade u) {
+        Integer v = upgrades.get(u);
+        return v == null ? 0 : v;
+    }
+
+    public void setUpgradeLevel(IslandUpgrade u, int level) {
+        upgrades.put(u, Math.max(0, Math.min(u.maxLevel, level)));
+    }
 
     public String getStorageBase64() { return storageBase64; }
     public void setStorageBase64(String s) { this.storageBase64 = s == null ? "" : s; }

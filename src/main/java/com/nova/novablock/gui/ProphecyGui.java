@@ -2,17 +2,24 @@ package com.nova.novablock.gui;
 
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.island.Island;
+import com.nova.novablock.prophecy.ProphecyManager;
 import com.nova.novablock.util.ItemBuilder;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
+import java.util.Set;
+
 public class ProphecyGui extends ChestGui {
+
+    /** Top two rows reserved for queue items (0-16). Bottom row holds the action bar. */
+    private static final int[] SLOTS_10 = {9, 10, 11, 12, 13, 14, 15, 16, 17, 18};
+    private static final int[] SLOTS_12 = {9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
 
     private final NovaBlock plugin;
 
     public ProphecyGui(NovaBlock plugin) {
-        super("<aqua><bold>Prophecy", 3);
+        super("<aqua><bold>Prophecy", 4);
         this.plugin = plugin;
     }
 
@@ -21,32 +28,73 @@ public class ProphecyGui extends ChestGui {
         Island island = plugin.islands().ofPlayer(p);
         if (island == null) return;
         plugin.prophecies().ensureQueue(island);
-        int picked = plugin.prophecies().pickSlot(p);
-        int[] slots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21};
-        for (int i = 0; i < 10; i++) {
+        Set<Integer> picks = plugin.prophecies().picks(p);
+        int visible = plugin.prophecies().visibleCount(p);
+        int[] slots = visible == 12 ? SLOTS_12 : SLOTS_10;
+
+        for (int i = 0; i < slots.length; i++) {
             Material mat = plugin.prophecies().upcoming(island, i);
             boolean rare = plugin.prophecies().isRare(mat);
+            boolean locked = picks.contains(i);
             int idx = i;
             String name = (rare ? "<gold>★ " : "<gray>") + (i + 1) + ". " + prettyName(mat);
-            // Some phase blocks (SWEET_BERRY_BUSH, TALL_GRASS, etc.) are block-only
-            // Materials with no ItemStack form; substitute a visually-equivalent
-            // item for the icon while keeping the real Material for naming/locking.
             ItemBuilder ib = ItemBuilder.of(displayItem(mat)).name(name);
-            if (rare) ib.lore("<yellow>Tap to lock as your prophecy.", "<gray>Bonus coins when reached.");
+            if (locked) ib.lore("<green>(locked) <gray>— tap to unlock").glow();
+            else if (rare) ib.lore("<yellow>Tap to lock as your prophecy.", "<gray>Bonus coins when reached.");
             else ib.lore("<dark_gray>Not a rare block.");
-            if (picked == i) ib.lore("<green>(locked in)").glow();
-            set(slots[i], ib.build(), e -> {
-                if (plugin.prophecies().lockIn(p, island, idx)) {
-                    Msg.send(p, "<aqua>Prophecy locked: <yellow>" + prettyName(mat));
-                    open(p);
-                } else {
-                    Msg.actionBar(p, "<red>Only rare blocks can be locked.");
-                }
-            });
+            set(slots[i], ib.build(), e -> handleClick(p, island, idx));
         }
-        set(22, ItemBuilder.of(Material.BARRIER).name("<red>Clear").build(),
+
+        // Action bar — row 4 (slots 27-35) so it never overlaps queue slots.
+        int maxPicks = plugin.prophecies().maxPicks(p);
+        set(29, ItemBuilder.of(Material.PAPER)
+                        .name("<gray>Picks: <white>" + picks.size() + "/" + maxPicks)
+                        .lore("<dark_gray>PROPHET (Mining 30) unlocks a second pick slot.").build(), null);
+
+        set(31, ItemBuilder.of(Material.BARRIER)
+                        .name("<red>Clear all picks")
+                        .lore("<gray>Removes every locked prophecy.").build(),
                 e -> { plugin.prophecies().clear(p); open(p); });
+
+        if (plugin.prophecies().canReroll(p)) {
+            set(33, ItemBuilder.of(Material.CLOCK)
+                            .name("<#9C66FF>Timeshift Reroll")
+                            .lore("<gray>Replace the entire queue with a fresh roll.",
+                                    "<dark_gray>Once per day (Magic 30 perk).").glow().build(),
+                    e -> {
+                        if (plugin.prophecies().reroll(p, island)) {
+                            Msg.send(p, com.nova.novablock.util.Messages.of(
+                                    "prophecy-reroll-done", "<#9C66FF>The future shifts. New blocks await."));
+                            open(p);
+                        } else {
+                            Msg.actionBar(p, com.nova.novablock.util.Messages.of(
+                                    "prophecy-reroll-spent", "<gray>You've already rerolled today."));
+                        }
+                    });
+        }
+
         fill(Material.BLACK_STAINED_GLASS_PANE, " ");
+    }
+
+    private void handleClick(Player p, Island island, int slot) {
+        ProphecyManager.LockResult result = plugin.prophecies().toggleLock(p, island, slot);
+        switch (result) {
+            case LOCKED -> {
+                Msg.send(p, com.nova.novablock.util.Messages.format(
+                        "prophecy-locked",
+                        "<aqua>Prophecy locked: <yellow>{material}",
+                        "material", prettyName(plugin.prophecies().upcoming(island, slot))));
+                open(p);
+            }
+            case UNLOCKED -> {
+                Msg.actionBar(p, com.nova.novablock.util.Messages.of("prophecy-released", "<gray>Prophecy released."));
+                open(p);
+            }
+            case NOT_RARE -> Msg.actionBar(p, com.nova.novablock.util.Messages.of(
+                    "prophecy-not-rare", "<red>Only rare blocks can be locked."));
+            case NOT_MEMBER -> Msg.actionBar(p, "<red>Not your island.");
+            case OUT_OF_RANGE -> {}
+        }
     }
 
     private String prettyName(Material m) {

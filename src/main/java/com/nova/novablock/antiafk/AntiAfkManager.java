@@ -50,16 +50,21 @@ public class AntiAfkManager implements Listener {
 
     public void reload() {
         var cfg = plugin.configs().main();
+        boolean wasEnabled = enabled;
         enabled = cfg.getBoolean("anti-afk.enabled", false);
         challengeIntervalMs = Math.max(60_000L,
                 cfg.getLong("anti-afk.challenge-interval-seconds", DEFAULT_CHALLENGE_INTERVAL_MS / 1000L) * 1000L);
         challengeTimeoutMs = Math.max(10_000L,
                 cfg.getLong("anti-afk.challenge-timeout-seconds", DEFAULT_CHALLENGE_TIMEOUT_MS / 1000L) * 1000L);
-        states.clear();
-        if (enabled) {
-            long next = System.currentTimeMillis() + challengeIntervalMs;
+        if (!enabled) {
+            states.clear();
+            return;
+        }
+        // Keep existing pending challenges so /obadmin reload doesn't silently
+        // give a free pass to anyone who was about to be caught.
+        if (!wasEnabled) {
             for (Player player : Bukkit.getOnlinePlayers()) {
-                states.put(player.getUniqueId(), new State(next));
+                states.putIfAbsent(player.getUniqueId(), new State(Long.MAX_VALUE));
             }
         }
     }
@@ -72,12 +77,12 @@ public class AntiAfkManager implements Listener {
     /** Called by BlockListener after a successful OneBlock break. */
     public void recordMineActivity(Player p) {
         if (!enabled) return;
-        State s = states.computeIfAbsent(p.getUniqueId(), id -> new State(System.currentTimeMillis() + challengeIntervalMs));
-        // If they're already being challenged we don't reset the clock; only a
-        // correct chat reply clears the challenge.
-        if (s.activeChallenge == 0) {
-            // Nudge the next-check forward only if they have NOT yet earned a check.
-            // (We don't push it past now+interval so a steady miner still gets checked.)
+        State s = states.computeIfAbsent(p.getUniqueId(), id -> new State(Long.MAX_VALUE));
+        if (s.activeChallenge != 0) return;
+        // Arm the challenge clock on first mining activity since clearance — that way
+        // a player who just chats in the lobby is never challenged, only active miners.
+        if (s.nextCheckAt == Long.MAX_VALUE) {
+            s.nextCheckAt = System.currentTimeMillis() + challengeIntervalMs;
         }
     }
 
@@ -120,10 +125,10 @@ public class AntiAfkManager implements Listener {
         // Accept either the bare letter or it being the first non-whitespace character.
         char first = Character.toUpperCase(body.charAt(0));
         if (first == s.activeChallenge) {
-            long now = System.currentTimeMillis();
             s.activeChallenge = 0;
             s.challengeIssuedAt = 0;
-            s.nextCheckAt = now + challengeIntervalMs;
+            // Disarm until they start mining again; next mine-activity sets the new deadline.
+            s.nextCheckAt = Long.MAX_VALUE;
             Bukkit.getScheduler().runTask(plugin, () ->
                     Msg.send(event.getPlayer(), "<green>✓ Verified — see you in "
                             + (challengeIntervalMs / 60_000L) + " minutes."));
@@ -133,8 +138,7 @@ public class AntiAfkManager implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         if (!enabled) return;
-        states.put(event.getPlayer().getUniqueId(),
-                new State(System.currentTimeMillis() + challengeIntervalMs));
+        states.put(event.getPlayer().getUniqueId(), new State(Long.MAX_VALUE));
     }
 
     @EventHandler

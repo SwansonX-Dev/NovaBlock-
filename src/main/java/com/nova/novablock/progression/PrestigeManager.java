@@ -54,6 +54,8 @@ public class PrestigeManager {
         island.data().setPrestigeLevel(newLevel);
         island.data().setPhaseIndex(0);
         island.data().setPhaseProgress(0);
+        // Prestige clears Nightmare so players can opt back in if they want.
+        island.data().setFlag(com.nova.novablock.island.IslandFlag.NIGHTMARE_MODE, false);
         island.upcomingBlocks().clear();
         Phase first = plugin.phases().get(0);
         if (first != null) {
@@ -93,6 +95,14 @@ public class PrestigeManager {
 
     public double xpMultiplier(Island island) {
         return 1.0 + xpMultPerLevel * cappedLevel(island);
+    }
+
+    public double coinMultiplierAtLevel(int level) {
+        return 1.0 + coinMultPerLevel * Math.min(Math.max(0, level), maxLevel);
+    }
+
+    public double xpMultiplierAtLevel(int level) {
+        return 1.0 + xpMultPerLevel * Math.min(Math.max(0, level), maxLevel);
     }
 
     private int cappedLevel(Island island) {

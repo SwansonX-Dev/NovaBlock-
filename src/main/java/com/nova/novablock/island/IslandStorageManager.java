@@ -5,6 +5,7 @@ import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
@@ -34,6 +35,8 @@ import java.util.UUID;
 public class IslandStorageManager implements Listener {
 
     public static final int SIZE = 54;
+    /** The bottom-right slot of the storage is dedicated to auto-sell-on-close. */
+    public static final int AUTOSELL_SLOT = SIZE - 1;
 
     private final NovaBlock plugin;
     /** Live inventory per island; created on first open, mutated by viewers, written to disk on close. */
@@ -51,9 +54,19 @@ public class IslandStorageManager implements Listener {
         return true;
     }
 
+    /**
+     * Read-only access to the island's storage inventory for scanning (e.g. paxel
+     * dup-check on join). Loads from disk into the live cache if not already open.
+     */
+    public Inventory peekInventory(Island island) {
+        return live.computeIfAbsent(island.data().getId(), id -> loadInventory(island));
+    }
+
     private Inventory loadInventory(Island island) {
-        Inventory inv = Bukkit.createInventory(new Holder(island.data().getId()), SIZE,
+        Holder holder = new Holder(island.data().getId());
+        Inventory inv = Bukkit.createInventory(holder, SIZE,
                 net.kyori.adventure.text.Component.text("Island Storage"));
+        holder.inventory = inv;
         String data = island.data().getStorageBase64();
         if (data != null && !data.isEmpty()) {
             ItemStack[] items = deserialize(data);
@@ -62,7 +75,32 @@ public class IslandStorageManager implements Listener {
                 for (int i = 0; i < n; i++) inv.setItem(i, items[i]);
             }
         }
+        // If the auto-sell marker isn't there yet (fresh island), drop one in.
+        if (inv.getItem(AUTOSELL_SLOT) == null) inv.setItem(AUTOSELL_SLOT, autoSellMarker());
         return inv;
+    }
+
+    /** Visual placeholder for the auto-sell slot — players drag items onto it and replace it. */
+    private ItemStack autoSellMarker() {
+        ItemStack marker = new ItemStack(org.bukkit.Material.EMERALD);
+        var meta = marker.getItemMeta();
+        meta.displayName(com.nova.novablock.util.Msg.mm("<green>Auto-Sell Slot"));
+        meta.lore(java.util.List.of(
+                com.nova.novablock.util.Msg.mm("<gray>Drop sellable items here."),
+                com.nova.novablock.util.Msg.mm("<gray>On close, they're sold via xEconomy"),
+                com.nova.novablock.util.Msg.mm("<gray>and the coins are credited to the island."),
+                com.nova.novablock.util.Msg.mm("<dark_gray>Unsold items stay in the slot.")));
+        marker.setItemMeta(meta);
+        return marker;
+    }
+
+    private boolean isAutoSellMarker(ItemStack item) {
+        if (item == null || item.getType() != org.bukkit.Material.EMERALD) return false;
+        if (!item.hasItemMeta()) return false;
+        var name = item.getItemMeta().displayName();
+        if (name == null) return false;
+        var plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(name);
+        return "Auto-Sell Slot".equals(plain);
     }
 
     /** Force a save of all open storages — called on plugin disable. */
@@ -74,9 +112,41 @@ public class IslandStorageManager implements Listener {
     }
 
     @EventHandler
+    public void onClick(InventoryClickEvent event) {
+        if (!(event.getInventory().getHolder() instanceof Holder)) return;
+        if (event.getRawSlot() == AUTOSELL_SLOT && isAutoSellMarker(event.getCurrentItem())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
     public void onClose(InventoryCloseEvent event) {
         if (!(event.getInventory().getHolder() instanceof Holder h)) return;
+        runAutoSell(h.islandId, event.getInventory(),
+                event.getPlayer() instanceof org.bukkit.entity.Player p ? p : null);
         persist(h.islandId, event.getInventory());
+    }
+
+    /** If the auto-sell slot contains a real item (not the marker), sell it and restore the marker. */
+    private void runAutoSell(UUID islandId, Inventory inv, org.bukkit.entity.Player viewer) {
+        ItemStack slot = inv.getItem(AUTOSELL_SLOT);
+        if (slot == null || slot.getType().isAir() || isAutoSellMarker(slot)) {
+            if (slot == null || slot.getType().isAir()) inv.setItem(AUTOSELL_SLOT, autoSellMarker());
+            return;
+        }
+        Island island = plugin.islands().get(islandId);
+        if (island == null) return;
+        long coins = plugin.economy().autoSellItem(island, slot);
+        if (coins > 0) {
+            inv.setItem(AUTOSELL_SLOT, autoSellMarker());
+            if (viewer != null) {
+                com.nova.novablock.util.Msg.actionBar(viewer,
+                        "<green>Auto-sold for <yellow>" + coins + " <green>coins.");
+            }
+        } else if (viewer != null) {
+            com.nova.novablock.util.Msg.actionBar(viewer,
+                    "<gray>That item has no market price.");
+        }
     }
 
     private void persist(UUID islandId, Inventory inv) {
@@ -116,8 +186,9 @@ public class IslandStorageManager implements Listener {
     /** Marks an Inventory as ours so InventoryCloseEvent can recover the island id. */
     private static final class Holder implements InventoryHolder {
         final UUID islandId;
+        Inventory inventory;
         Holder(UUID islandId) { this.islandId = islandId; }
-        @Override public Inventory getInventory() { return null; }
+        @Override public Inventory getInventory() { return inventory; }
     }
 
     /** Static helper used by the command path to validate + deliver a nice error. */

@@ -96,4 +96,37 @@ public class EconomyManager {
     private long balanceCoins(UUID id) {
         return eco.balanceCents(id) / CENTS_PER_COIN;
     }
+
+    /**
+     * Best-effort auto-sell of a single ItemStack via xEconomy's MarketService.
+     * Returns the coins earned (already deposited to the island), or 0 if the
+     * material has no market entry or the call failed.
+     *
+     * <p>Uses reflection because the paper-side {@code MarketService} isn't
+     * exposed via the {@code xeconomy-api} module. Soft-degrades if xEconomy
+     * ever renames or moves the method.
+     */
+    public long autoSellItem(Island island, org.bukkit.inventory.ItemStack stack) {
+        if (island == null || stack == null || stack.getType().isAir() || stack.getAmount() <= 0) return 0;
+        try {
+            var pluginObj = Bukkit.getPluginManager().getPlugin("xEconomy");
+            if (pluginObj == null) return 0;
+            var marketMethod = pluginObj.getClass().getMethod("market");
+            Object market = marketMethod.invoke(pluginObj);
+            if (market == null) return 0;
+            var sellMethod = market.getClass()
+                    .getMethod("sell", org.bukkit.Material.class, int.class);
+            Object result = sellMethod.invoke(market, stack.getType(), stack.getAmount());
+            long cents = result instanceof Long l ? l : 0L;
+            if (cents <= 0) return 0;
+            long coins = cents / CENTS_PER_COIN;
+            int autoSellLevel = island.data().getUpgradeLevel(
+                    com.nova.novablock.island.IslandUpgrade.STORAGE_AUTOSELL);
+            if (autoSellLevel > 0) coins = Math.round(coins * (1.0 + 0.25 * autoSellLevel));
+            if (coins > 0) award(island, coins);
+            return coins;
+        } catch (ReflectiveOperationException ex) {
+            return 0;
+        }
+    }
 }

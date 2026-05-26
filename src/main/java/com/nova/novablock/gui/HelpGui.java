@@ -56,6 +56,10 @@ public class HelpGui extends ChestGui {
                         .build(),
                 e -> {
                     p.closeInventory();
+                    if (org.bukkit.Bukkit.getPluginManager().getPlugin("xPets") == null) {
+                        com.nova.novablock.util.Msg.send(p, "<red>xPets isn't installed on this server.");
+                        return;
+                    }
                     p.performCommand("pets");
                 });
 
@@ -65,10 +69,7 @@ public class HelpGui extends ChestGui {
                                 "<gray>Sell chests can auto-sell island items.",
                                 "<dark_gray>/shop  /sell  /sellchest")
                         .build(),
-                e -> {
-                    p.closeInventory();
-                    p.performCommand("shop");
-                });
+                e -> runExternal(p, "shop"));
 
         set(15, ItemBuilder.of(Material.GOLD_BLOCK)
                         .name("<gold>Bank")
@@ -76,10 +77,7 @@ public class HelpGui extends ChestGui {
                                 "<gray>Use it to grow money while you play.",
                                 "<dark_gray>/bank")
                         .build(),
-                e -> {
-                    p.closeInventory();
-                    p.performCommand("bank");
-                });
+                e -> runExternal(p, "bank"));
 
         set(16, ItemBuilder.of(Material.COMPASS)
                         .name("<aqua>Stocks")
@@ -87,10 +85,7 @@ public class HelpGui extends ChestGui {
                                 "<gray>Watch prices, portfolios, and market news.",
                                 "<dark_gray>/stocks")
                         .build(),
-                e -> {
-                    p.closeInventory();
-                    p.performCommand("stocks");
-                });
+                e -> runExternal(p, "stocks"));
 
         set(20, ItemBuilder.of(Material.SPYGLASS)
                         .name("<#7B61FF>Prophecy")
@@ -135,7 +130,17 @@ public class HelpGui extends ChestGui {
                         .build(),
                 e -> new IslandFlagsGui(plugin).open(p));
 
-        set(31, ItemBuilder.of(Material.NETHER_STAR)
+        set(30, ItemBuilder.of(Material.BEACON)
+                        .name("<gold>Prestige")
+                        .lore("<gray>Reset phase to 1 for permanent coin and XP boosts.",
+                                "<gray>Requires completing Phase 12.",
+                                "<dark_gray>/ob prestige").build(),
+                e -> {
+                    p.closeInventory();
+                    p.performCommand("ob prestige");
+                });
+
+        set(32, ItemBuilder.of(Material.NETHER_STAR)
                         .name("<gradient:#7B61FF:#4FC3F7><bold>Main Menu")
                         .lore("<gray>Open the NovaBlock hub menu.",
                                 "<dark_gray>/ob menu")
@@ -144,5 +149,14 @@ public class HelpGui extends ChestGui {
                 e -> new MainMenuGui(plugin).open(p));
 
         fill(Material.GRAY_STAINED_GLASS_PANE, " ");
+    }
+
+    private void runExternal(Player p, String command) {
+        p.closeInventory();
+        if (org.bukkit.Bukkit.getCommandMap().getCommand(command) == null) {
+            com.nova.novablock.util.Msg.send(p, "<red>The /" + command + " command isn't installed on this server.");
+            return;
+        }
+        p.performCommand(command);
     }
 }

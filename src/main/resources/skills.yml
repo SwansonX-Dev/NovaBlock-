@@ -1,2 +1,33 @@
+# NovaBlock skill-tree tuning.
+# Use /obadmin reload to reapply after editing.
 
-# Reserved for future skill-tree tuning. Default perks are coded in com.nova.novablock.progression.Perk.
+# Linear XP curve: each level requires base + perLevel * level XP.
+# Defaults (200 + 100*level) give:
+#   level 5  ~  1,200 blocks
+#   level 10 ~  4,200 blocks
+#   level 20 ~ 15,000 blocks
+#   level 30 ~ 33,000 blocks (top perks)
+xp-curve:
+  base: 200
+  per-level: 100
+
+# Perk effects are still wired in code (see com.nova.novablock.progression.Perk).
+# This section is reserved for per-perk numeric tuning in future versions; the
+# values below are reference only and not yet read by the code.
+perks:
+  mining:
+    lucky-break-chance: 0.05
+    deep-vein-extra: 1
+    quarry-coin-multiplier: 1.10
+  combat:
+    berserker-damage-multiplier: 1.15
+    second-wind-heal: 4
+    executioner-multiplier: 1.50
+  magic:
+    riftwalker-rate-multiplier: 1.20
+    arcane-lure-xp-multiplier: 1.10
+  luck:
+    four-leaf-reroll-chance: 0.05
+    jackpot-coin-multiplier: 1.25
+    fate-thief-chance: 0.01
+    gambler-quest-multiplier: 1.50

@@ -43,7 +43,12 @@ public class VoidHerald extends AbstractBoss {
         e.teleport(dest);
         e.getWorld().spawnParticle(Particle.PORTAL, dest, 40, 0.5, 1, 0.5, 0.1);
         e.getWorld().playSound(dest, Sound.ENTITY_ENDERMAN_TELEPORT, 1f, 0.7f);
-        target.damage(5.0 + plugin.islands().get(fight.islandId()).data().getPhaseIndex(), e);
+        var island = plugin.islands().get(fight.islandId());
+        int phaseIdx = island == null ? 0 : island.data().getPhaseIndex();
+        // Half of the boss's tuned damage, scaled the same as base stats — keeps the
+        // special meaningful when admins tune `damage` in bosses.yml.
+        double strike = tunedDamage() * 0.5 * (1.0 + phaseIdx * tunedScalingPerPhase());
+        target.damage(strike, e);
         Msg.actionBar(target, "<dark_purple>Void Strike!");
     }
 
@@ -54,5 +59,5 @@ public class VoidHerald extends AbstractBoss {
     }
 
     @Override
-    public long onDefeat(BossFight fight) { return 6000L; }
+    public long onDefeat(BossFight fight) { return tunedCoinReward(6000L); }
 }

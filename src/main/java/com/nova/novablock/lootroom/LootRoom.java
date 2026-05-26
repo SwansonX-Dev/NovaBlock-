@@ -25,8 +25,13 @@ public interface LootRoom {
     /** Called when the player enters the room — initialize state. */
     default void onStart(LootRoomRun run, Player player) {}
 
-    /** Coin reward when the player completes. */
-    default int rewardCoins(Island island) { return 800 + island.data().getPhaseIndex() * 200; }
+    /** Coin reward when the player completes. Tuned by lootrooms.yml `<id>.base-coins` + `<id>.per-phase-coins`. */
+    default int rewardCoins(Island island) {
+        var cfg = com.nova.novablock.NovaBlock.get().configs().lootRooms();
+        int base = cfg.getInt(id() + ".base-coins", 800);
+        int perPhase = cfg.getInt(id() + ".per-phase-coins", 200);
+        return base + island.data().getPhaseIndex() * perPhase;
+    }
 
     /**
      * Item drops awarded on completion. Each room overrides with thematic loot.

@@ -64,15 +64,37 @@ public class PlaceholderHook extends PlaceholderExpansion {
             }
             case "blocks" -> { return island == null ? "0" : String.valueOf(island.data().getBlocksBroken()); }
             case "coins" -> { return island == null ? "0" : String.valueOf(plugin.economy().balance(island)); }
+            case "prestige_level" -> { return island == null ? "0" : String.valueOf(island.data().getPrestigeLevel()); }
+            case "prestige_title" -> {
+                int lvl = island == null ? 0 : island.data().getPrestigeLevel();
+                return lvl <= 0 ? "" : plugin.prestige().title(lvl);
+            }
+            case "event_color" -> {
+                var ev = plugin.seasons().active();
+                return ev == null ? "<gray>" : ev.color;
+            }
+            case "login_streak" -> {
+                return String.valueOf(plugin.progression().get(player.getUniqueId()).getLoginStreak());
+            }
         }
 
-        if (key.startsWith("skill_") && key.endsWith("_level")) {
-            String name = key.substring("skill_".length(), key.length() - "_level".length());
-            try {
-                SkillType type = SkillType.valueOf(name.toUpperCase());
-                PlayerProgression prog = plugin.progression().get(player.getUniqueId());
-                return String.valueOf(prog.getLevel(type));
-            } catch (IllegalArgumentException ignored) { return ""; }
+        if (key.startsWith("skill_")) {
+            String rest = key.substring("skill_".length());
+            int sep = rest.lastIndexOf('_');
+            if (sep > 0) {
+                String name = rest.substring(0, sep);
+                String field = rest.substring(sep + 1);
+                try {
+                    SkillType type = SkillType.valueOf(name.toUpperCase());
+                    PlayerProgression prog = plugin.progression().get(player.getUniqueId());
+                    return switch (field) {
+                        case "level" -> String.valueOf(prog.getLevel(type));
+                        case "xp" -> String.valueOf(prog.getXp(type));
+                        case "required" -> String.valueOf(PlayerProgression.xpForLevel(prog.getLevel(type)));
+                        default -> "";
+                    };
+                } catch (IllegalArgumentException ignored) { return ""; }
+            }
         }
 
         if (key.startsWith("quest_")) {

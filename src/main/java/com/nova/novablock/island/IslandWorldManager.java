@@ -17,7 +17,12 @@ public class IslandWorldManager {
 
     public static final String DEFAULT_WORLD_NAME = "oneblock";
     public static final String LEGACY_WORLD_NAME = "novablock_world";
-    public static final int SLOT_SIZE = 256;
+    /**
+     * Distance between OneBlock slots. Loaded from config.yml `slotSize` on first
+     * init; baked in for the life of the world (changing it later would shift
+     * existing islands off their saved coordinates).
+     */
+    public static int SLOT_SIZE = 256;
 
     private final NovaBlock plugin;
     private World world;
@@ -28,7 +33,10 @@ public class IslandWorldManager {
     public void init() {
         this.worldName = plugin.getConfig().getString("islandWorld", DEFAULT_WORLD_NAME);
         if (worldName == null || worldName.isBlank()) worldName = DEFAULT_WORLD_NAME;
+        SLOT_SIZE = Math.max(32, plugin.getConfig().getInt("slotSize", 256));
         this.world = ensureWorld(worldName);
+        // Reapply gamerules every startup so config edits take effect even on existing worlds.
+        if (world != null) configure(world);
     }
 
     public World ensureWorld(String name) {
@@ -49,11 +57,14 @@ public class IslandWorldManager {
     }
 
     private void configure(World world) {
+        var cfg = plugin.getConfig();
+        boolean disableSpawning = cfg.getBoolean("disableNaturalSpawning", true);
+        boolean keepInv = cfg.getBoolean("keepInventoryOnDeath", true);
         world.setSpawnFlags(false, false);
         world.setDifficulty(Difficulty.NORMAL);
-        world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
+        world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, !disableSpawning);
         world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, true);
-        world.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, true);
+        world.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, keepInv);
         world.setGameRule(org.bukkit.GameRule.DO_FIRE_TICK, false);
         world.setGameRule(org.bukkit.GameRule.MOB_GRIEFING, false);
     }

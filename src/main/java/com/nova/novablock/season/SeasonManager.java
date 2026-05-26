@@ -66,7 +66,9 @@ public class SeasonManager {
 
     public void startEvent(ServerEvent e, int minutes) {
         this.active = e;
-        this.activeUntil = System.currentTimeMillis() + minutes * 60_000L;
+        // Clamp minutes so multiplying never overflows int * long arithmetic.
+        long safeMinutes = Math.max(1L, Math.min((long) minutes, 24L * 60L));
+        this.activeUntil = System.currentTimeMillis() + safeMinutes * 60_000L;
         for (Player p : Bukkit.getOnlinePlayers()) {
             Msg.title(p, e.color + "▶ " + e.displayName, "<gray>" + e.description);
             Msg.send(p, e.color + "<bold>SERVER EVENT</bold> <gray>– " + e.displayName + " <dark_gray>(" + minutes + "m)");

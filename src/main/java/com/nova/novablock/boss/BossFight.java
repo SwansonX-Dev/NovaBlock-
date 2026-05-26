@@ -23,6 +23,8 @@ public class BossFight {
     private int phase = 1;
     /** Spawn point for tethering — bosses get teleported back if they wander too far. */
     private org.bukkit.Location arenaCenter;
+    /** Block snapshots placed for the arena platform; restored on fight end. */
+    private final java.util.List<org.bukkit.block.BlockState> arenaSnapshot = new java.util.ArrayList<>();
 
     public BossFight(Boss boss, Island island, LivingEntity entity, BossBar bar) {
         this.boss = boss;
@@ -42,6 +44,8 @@ public class BossFight {
 
     public org.bukkit.Location arenaCenter() { return arenaCenter; }
     public void setArenaCenter(org.bukkit.Location l) { this.arenaCenter = l; }
+
+    public java.util.List<org.bukkit.block.BlockState> arenaSnapshot() { return arenaSnapshot; }
 
     /** Returns the player's new death count after incrementing. */
     public int recordDeath(UUID playerId) {

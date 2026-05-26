@@ -10,7 +10,6 @@ import org.bukkit.entity.Player;
 public final class Msg {
 
     private static final MiniMessage MM = MiniMessage.miniMessage();
-    public static final String PREFIX = "<gradient:#7B61FF:#4FC3F7><bold>NovaBlock</bold></gradient> <dark_gray>»</dark_gray> <gray>";
 
     private Msg() {}
 
@@ -19,7 +18,7 @@ public final class Msg {
     }
 
     public static Component prefixed(String raw, TagResolver... resolvers) {
-        return mm(PREFIX + raw, resolvers);
+        return mm(Messages.prefix() + raw, resolvers);
     }
 
     public static void send(CommandSender to, String raw, TagResolver... resolvers) {

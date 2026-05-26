@@ -31,10 +31,12 @@ public class QuestManager {
                 "Break 8 diamond ore.", Quest.QuestType.BREAK_BLOCK, Material.DIAMOND_ORE, 8, 1500, 500));
         dailyPool.add(new Quest("d_grind", "Grinder",
                 "Break 500 blocks of any kind.", Quest.QuestType.BREAK_ANY, Material.AIR, 500, 750, 250));
-        dailyPool.add(new Quest("d_rift", "Riftwalker",
+        dailyPool.add(new Quest("d_rift", "Rift Runner",
                 "Clear 1 loot room.", Quest.QuestType.COMPLETE_LOOT_ROOM, Material.END_PORTAL_FRAME, 1, 1200, 400));
         dailyPool.add(new Quest("d_boss", "Boss Slayer",
                 "Defeat 1 boss.", Quest.QuestType.KILL_BOSS, Material.NETHERITE_SWORD, 1, 2000, 800));
+        dailyPool.add(new Quest("d_phase", "Phase Pusher",
+                "Advance 1 phase.", Quest.QuestType.ADVANCE_PHASE, Material.NETHER_STAR, 1, 1800, 600));
         rollDaily();
     }
 
@@ -74,6 +76,11 @@ public class QuestManager {
         if (q.type() == Quest.QuestType.COMPLETE_LOOT_ROOM) advance(p, 1);
     }
 
+    public void onPhaseAdvanced(Player p) {
+        Quest q = today();
+        if (q.type() == Quest.QuestType.ADVANCE_PHASE) advance(p, 1);
+    }
+
     private void advance(Player p, int amount) {
         Quest q = today();
         PlayerProgression prog = plugin.progression().get(p);
@@ -81,11 +88,20 @@ public class QuestManager {
         int after = Math.min(q.requiredAmount(), before + amount);
         prog.setQuestProgress(after);
         if (before < q.requiredAmount() && after >= q.requiredAmount()) {
-            // Reward
+            // Reward — GAMBLER (Luck 30) bumps the daily reward by 50%.
+            long coins = q.coinReward();
+            long xp = q.xpReward();
+            boolean gambler = com.nova.novablock.progression.Perk.hasPerk(prog,
+                    com.nova.novablock.progression.Perk.GAMBLER);
+            if (gambler) {
+                coins = Math.round(coins * 1.50);
+                xp = Math.round(xp * 1.50);
+            }
             var island = plugin.islands().ofPlayer(p);
-            if (island != null) plugin.economy().award(island, q.coinReward());
-            plugin.progression().addXp(p, SkillType.MINING, q.xpReward());
-            Msg.title(p, "<gold>★ Daily Quest Complete", "<yellow>+" + q.coinReward() + " coins, +" + q.xpReward() + " XP");
+            if (island != null) plugin.economy().award(island, coins);
+            plugin.progression().addXp(p, SkillType.MINING, xp);
+            Msg.title(p, "<gold>★ Daily Quest Complete",
+                    "<yellow>+" + coins + " coins, +" + xp + " XP" + (gambler ? " <#FFD24D>(Gambler)" : ""));
             p.playSound(p.getLocation(), org.bukkit.Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
         }
     }

@@ -13,6 +13,7 @@ public class ProgressionManager {
 
     private final NovaBlock plugin;
     private final Map<UUID, PlayerProgression> cache = new HashMap<>();
+    private final Map<UUID, Map<SkillType, Double>> fractionalBuffer = new HashMap<>();
 
     public ProgressionManager(NovaBlock plugin) { this.plugin = plugin; }
 
@@ -34,6 +35,7 @@ public class ProgressionManager {
     public void unload(UUID id) {
         save(id);
         cache.remove(id);
+        fractionalBuffer.remove(id);
     }
 
     public void delete(UUID id) {
@@ -41,7 +43,45 @@ public class ProgressionManager {
         plugin.storage().deleteProgression(id);
     }
 
+    /** Accumulates fractional XP per-player so multipliers like 1.05 still tick over time. */
+    public void addXp(Player player, SkillType skill, double amount) {
+        if (amount <= 0) return;
+        amount = applyXpMultipliers(player, amount);
+        Map<SkillType, Double> bySkill = fractionalBuffer.computeIfAbsent(player.getUniqueId(), k -> new HashMap<>());
+        double total = bySkill.getOrDefault(skill, 0.0) + amount;
+        long whole = (long) total;
+        bySkill.put(skill, total - whole);
+        if (whole > 0) doAddXp(player, skill, whole);
+    }
+
     public void addXp(Player player, SkillType skill, long amount) {
+        if (amount <= 0) return;
+        // ARCANE_LURE / future multipliers route through the fractional path so the
+        // bonus applies uniformly. Plain whole-amount calls skip the buffer.
+        if (hasXpMultiplier(player)) {
+            addXp(player, skill, (double) amount);
+            return;
+        }
+        doAddXp(player, skill, amount);
+    }
+
+    private boolean hasXpMultiplier(Player player) {
+        if (Perk.hasPerk(get(player), Perk.ARCANE_LURE)) return true;
+        var island = plugin.islands().ofPlayer(player);
+        return island != null && island.data().isFlag(com.nova.novablock.island.IslandFlag.NIGHTMARE_MODE);
+    }
+
+    /** Single source of truth for XP multipliers; both overloads call into this. */
+    private double applyXpMultipliers(Player player, double amount) {
+        if (Perk.hasPerk(get(player), Perk.ARCANE_LURE)) amount *= 1.10;
+        var island = plugin.islands().ofPlayer(player);
+        if (island != null && island.data().isFlag(com.nova.novablock.island.IslandFlag.NIGHTMARE_MODE)) {
+            amount *= 0.5;
+        }
+        return amount;
+    }
+
+    private void doAddXp(Player player, SkillType skill, long amount) {
         PlayerProgression p = get(player);
         p.setXp(skill, p.getXp(skill) + amount);
         while (p.getXp(skill) >= PlayerProgression.xpForLevel(p.getLevel(skill))) {

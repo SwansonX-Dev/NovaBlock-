@@ -25,7 +25,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBCOMMANDS = List.of(
             "create", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
-            "pet", "pets", "toggle", "fix", "help");
+            "visit", "upgrades", "upgrade", "pet", "pets", "toggle", "fix", "help");
 
     private final NovaBlock plugin;
 
@@ -77,6 +77,8 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "invite" -> invite(p, args);
             case "accept" -> accept(p);
             case "leave" -> leave(p);
+            case "visit" -> visit(p, args);
+            case "upgrades", "upgrade" -> new com.nova.novablock.gui.UpgradesGui(plugin).open(p);
             case "pet", "pets" -> openPets(p);
             case "fix", "repair" -> fixOneBlock(p);
             case "toggle" -> {
@@ -126,8 +128,46 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void visit(Player p, String[] args) {
+        if (args.length < 2) { Msg.send(p, "<gray>Usage: <yellow>/ob visit <player>"); return; }
+        Player target = org.bukkit.Bukkit.getPlayerExact(args[1]);
+        if (target == null) {
+            // Allow visiting offline players too — look up by name in the island cache.
+            var offline = org.bukkit.Bukkit.getOfflinePlayer(args[1]);
+            if (!offline.hasPlayedBefore()) { Msg.send(p, "<red>Never seen that player."); return; }
+            Island offlineIsland = plugin.islands().ofPlayer(offline.getUniqueId());
+            if (offlineIsland == null) { Msg.send(p, "<red>They don't have an island."); return; }
+            tryVisit(p, offlineIsland, offline.getName());
+            return;
+        }
+        Island targetIsland = plugin.islands().ofPlayer(target);
+        if (targetIsland == null) { Msg.send(p, "<red>" + target.getName() + " has no island."); return; }
+        tryVisit(p, targetIsland, target.getName());
+    }
+
+    private void tryVisit(Player p, Island target, String ownerName) {
+        // Members and admins always allowed; everyone else needs VISITOR_BUILD.
+        boolean isMember = target.isMember(p);
+        boolean isAdmin = p.hasPermission("novablock.admin");
+        boolean allowed = isMember || isAdmin
+                || target.data().isFlag(com.nova.novablock.island.IslandFlag.VISITOR_BUILD);
+        if (!allowed) {
+            Msg.send(p, com.nova.novablock.util.Messages.format("visit-closed",
+                    "<red>{target}'s island is closed to visitors.", "target", ownerName));
+            return;
+        }
+        p.closeInventory();
+        target.teleportHome(p);
+        Msg.send(p, com.nova.novablock.util.Messages.format("visit-success",
+                "<aqua>Visiting <yellow>{target}<aqua>'s island.", "target", ownerName));
+    }
+
     private void openPets(Player p) {
         p.closeInventory();
+        if (org.bukkit.Bukkit.getPluginManager().getPlugin("xPets") == null) {
+            Msg.send(p, "<red>The pets system (xPets) isn't installed on this server.");
+            return;
+        }
         p.performCommand("pets");
     }
 
@@ -190,7 +230,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
     }
 
     private void denied(Player p) {
-        Msg.send(p, "<red>You don't have permission.");
+        Msg.send(p, com.nova.novablock.util.Messages.of("no-permission", "<red>You don't have permission."));
     }
 
     @Override
@@ -199,7 +239,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             String prefix = args[0].toLowerCase();
             return SUBCOMMANDS.stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
         }
-        if (args.length == 2 && args[0].equalsIgnoreCase("invite")) {
+        if (args.length == 2 && (args[0].equalsIgnoreCase("invite") || args[0].equalsIgnoreCase("visit"))) {
             String prefix = args[1].toLowerCase();
             return org.bukkit.Bukkit.getOnlinePlayers().stream()
                     .map(Player::getName)

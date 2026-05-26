@@ -6,25 +6,25 @@ authors: [Nova]
 description: A reimagined OneBlock experience with phases, bosses, loot rooms, skill trees, prophecies and more.
 load: POSTWORLD
 depend: [xEconomy]
-softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI]
+softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, xPets]
 
 commands:
   oneblock:
     description: Main NovaBlock command
-    usage: /<command> [create|home|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|pet|toggle|help]
+    usage: /<command> [create|home|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|pets|prestige|invite|accept|leave|visit|toggle|help]
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command
-    usage: /<command> [reload|setphase|spawnboss|givecoins|wipe|fix|givepaxel|flags|storage|menu|freshstart]
+    usage: /<command> [reload|setphase|spawnboss|givecoins|event|wipe|fix|givepaxel|flags|storage|menu|freshstart]
     permission: novablock.admin
   sb:
     description: Toggle the NovaBlock sidebar scoreboard
     usage: /<command>
     aliases: [scoreboard, sidebar]
-  help:
-    description: Open the server help GUI
+  novahelp:
+    description: Open the NovaBlock help GUI
     usage: /<command>
-    aliases: [serverhelp, guide]
+    aliases: [obhelp, guide]
 
 permissions:
   novablock.play:
@@ -95,6 +95,12 @@ permissions:
     default: op
   novablock.flag.no_hunger_drain:
     description: Allows toggling the no-hunger-drain flag
+    default: op
+  novablock.flag.phase_ambience:
+    description: Allows toggling the phase-ambience flag
+    default: op
+  novablock.flag.nightmare_mode:
+    description: Allows toggling Nightmare Mode (locked once enabled)
     default: op
   novablock.admin:
     description: All admin commands

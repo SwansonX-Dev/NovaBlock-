@@ -75,8 +75,9 @@ public class ParkourRoom implements LootRoom {
             // Last block is gold (goal); rest are quartz.
             cur.getBlock().setType(i == COURSE.length - 1 ? Material.GOLD_BLOCK : Material.QUARTZ_BLOCK);
         }
-        // Mark the goal with a light beacon so it's visible from the start.
-        cur.clone().add(0, 1, 0).getBlock().setType(Material.LIGHT);
+        // Mark the goal with a glowstone block so it's visible from the start
+        // (LIGHT requires a level data value to render and is invisible bare).
+        cur.clone().add(0, 1, 0).getBlock().setType(Material.GLOWSTONE);
         return anchor.clone().add(0.5, 1, 0.5);
     }
 

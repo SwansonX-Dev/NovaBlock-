@@ -1,2 +1,38 @@
-# Reserved for future i18n. NovaBlock currently uses inline MiniMessage strings.
+# NovaBlock user-facing strings.
+# All values use MiniMessage formatting. Reloaded via /obadmin reload.
+# Placeholders like {player}, {amount}, {phase} are substituted at send time.
+
+# Prefix prepended to chat messages sent via Msg.send / Msg.prefixed.
 prefix: "<gradient:#7B61FF:#4FC3F7><bold>NovaBlock</bold></gradient> <dark_gray>»</dark_gray> <gray>"
+
+# --- core gameplay ---
+welcome-first: "<gray>Welcome to <gradient:#7B61FF:#4FC3F7>NovaBlock</gradient><gray>!"
+welcome-back: "<gray>Welcome back. Sending you to your island."
+need-island: "<red>You don't have an island yet. Try <yellow>/ob create</yellow>."
+already-have-island: "<red>You already have an island. Use /ob home."
+no-permission: "<red>You don't have permission."
+fixed-block: "<green>Your OneBlock was restored."
+fixed-block-healthy: "<gray>Your OneBlock already looks healthy."
+
+# --- co-op ---
+invite-sent: "<green>Invited <yellow>{target}<green>. They have 60 seconds to <yellow>/ob accept</yellow>."
+invite-recv: "<gold>{inviter} <gray>invited you to their island. Tap <yellow>/ob accept</yellow> within 60s."
+invite-expired: "<gray>No pending invite (or it expired)."
+
+# --- visiting ---
+visit-success: "<aqua>Visiting <yellow>{target}<aqua>'s island."
+visit-closed: "<red>{target}'s island is closed to visitors."
+visit-unknown: "<red>Never seen that player."
+
+# --- prophecy ---
+prophecy-locked: "<aqua>Prophecy locked: <yellow>{material}"
+prophecy-released: "<gray>Prophecy released."
+prophecy-not-rare: "<red>Only rare blocks can be locked."
+prophecy-reroll-done: "<#9C66FF>The future shifts. New blocks await."
+prophecy-reroll-spent: "<gray>You've already rerolled today."
+prophecy-fulfilled: "<gold>★ Prophecy fulfilled! +{amount} coins ({material})"
+
+# --- prestige ---
+prestige-need-final: "<red>You must complete the final phase before you can prestige."
+prestige-success-title: "<gold>✦ Prestige {roman}"
+prestige-success-sub: "<gray>+{coinPct}% coins, +{xpPct}% XP"

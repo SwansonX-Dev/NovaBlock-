@@ -1,3 +1,15 @@
+# NovaBlock loot-room tuning.
+# Use /obadmin reload to reapply after editing.
+# Coin reward at runtime is base-coins + island.phaseIndex * per-phase-coins.
 
-# Reserved for future custom loot-room definitions.
-# Default rooms (parkour, arena, puzzle) are coded in.
+parkour:
+  base-coins: 800
+  per-phase-coins: 200
+
+arena:
+  base-coins: 1000
+  per-phase-coins: 300
+
+puzzle:   # "Crystal Cache" amethyst-break room
+  base-coins: 900
+  per-phase-coins: 250

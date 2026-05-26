@@ -1,3 +1,22 @@
+# NovaBlock boss tuning.
+# Use /obadmin reload to reapply after editing.
+# Per-boss values fall back to coded defaults when omitted. Stats scale per
+# phase as (1 + phase * scaling-per-phase).
 
-# Reserved for future custom-boss definitions.
-# Default bosses (magma_tyrant, frostborn_sentinel, void_herald) are coded in.
+magma_tyrant:
+  health: 200
+  damage: 8
+  scaling-per-phase: 0.25
+  coins: 3500   # coin reward on defeat
+
+frostborn_sentinel:
+  health: 180
+  damage: 6
+  scaling-per-phase: 0.25
+  coins: 4000
+
+void_herald:
+  health: 320
+  damage: 10
+  scaling-per-phase: 0.25
+  coins: 6000

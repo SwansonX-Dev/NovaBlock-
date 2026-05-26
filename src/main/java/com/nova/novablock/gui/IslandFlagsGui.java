@@ -81,6 +81,12 @@ public class IslandFlagsGui extends ChestGui {
                     Msg.actionBar(viewer, "<red>You don't have permission for that flag.");
                     return;
                 }
+                // Nightmare Mode is one-way (per the flag description). Only admins can disable it.
+                if (flag == com.nova.novablock.island.IslandFlag.NIGHTMARE_MODE
+                        && island.data().isFlag(flag) && !adminOverride) {
+                    Msg.actionBar(viewer, "<red>Nightmare Mode cannot be disabled. Prestige to reset.");
+                    return;
+                }
                 boolean next = !island.data().isFlag(flag);
                 island.data().setFlag(flag, next);
                 plugin.storage().saveIsland(island.data());
