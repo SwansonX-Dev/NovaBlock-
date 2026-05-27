@@ -60,6 +60,15 @@ public class ScoreboardManager {
             clear(p);
             return;
         }
+        // Yield to OG OneBlock's own scoreboard whenever the player is in its world.
+        var ogPlugin = Bukkit.getPluginManager().getPlugin("OGOneBlock");
+        if (ogPlugin != null && ogPlugin.isEnabled()) {
+            String ogWorld = ogPlugin.getConfig().getString("world.name", "OGOBworld");
+            if (p.getWorld().getName().equals(ogWorld)) {
+                if (boards.containsKey(p.getUniqueId())) clear(p);
+                return;
+            }
+        }
         Scoreboard board = boards.computeIfAbsent(p.getUniqueId(),
                 u -> Bukkit.getScoreboardManager().getNewScoreboard());
         Objective obj = board.getObjective("nb");
