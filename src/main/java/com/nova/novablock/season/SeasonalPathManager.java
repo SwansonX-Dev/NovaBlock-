@@ -161,8 +161,8 @@ public final class SeasonalPathManager {
     }
 
     public String rewardLabel(int tier) {
-        if (tier == 30) return "monthly pet, tag, and relic";
-        if (tier == 20) return "seasonal chat tag";
+        if (tier == 30) return "monthly pet, path tag, and relic";
+        if (tier == 20) return "rare seasonal loot bundle";
         if (tier == 10) return "custom enchanted tool";
         if (tier % 5 == 0) return "rare seasonal loot";
         return "coins, XP, and supplies";
@@ -183,10 +183,14 @@ public final class SeasonalPathManager {
             SeasonalPath path = path(i, activePath().month());
             String shimmer = "<gradient:" + path.color() + ":" + path.accent() + ":" + path.color() + ">";
             String firstShimmer = "<gradient:#FFD700:#FFF8B0:#FFA500:#FFD700>";
+            // Permission-gated: only players granted the tag (i.e., who completed the path)
+            // can equip it. Permission node mirrors the tag id for easy LP/perm-admin lookup.
             ensureTag(path.tagId(), path.name(),
-                    shimmer + "[" + path.name() + "]</gradient>");
+                    shimmer + "[" + path.name() + "]</gradient>",
+                    "novablock.tag." + path.tagId());
             ensureTag(path.firstTagId(), "First " + path.name(),
-                    firstShimmer + "<bold>[✦ " + path.name() + " ✦]</bold></gradient>");
+                    firstShimmer + "<bold>[✦ " + path.name() + " ✦]</bold></gradient>",
+                    "novablock.tag." + path.firstTagId());
         }
     }
 
@@ -209,8 +213,10 @@ public final class SeasonalPathManager {
         }
         plugin.progression().addXp(player, com.nova.novablock.progression.SkillType.LUCK, 15L * tier);
         giveItem(player, rewardItem(path, tier, false));
-        if (tier == 20 || tier == 30) grantTag(player, prog, path.tagId());
-        if (tier == 30) {
+        // Tag drops only on path completion (tier 30). Permission-gated in xTags so it
+        // visibly marks the player as having finished this path.
+        if (tier == TIER_COUNT) {
+            grantTag(player, prog, path.tagId());
             grantPet(player, prog, path.petId());
             String firstKey = "path-" + path.index();
             if (claimedFirsts.add(firstKey)) {
@@ -290,19 +296,20 @@ public final class SeasonalPathManager {
         Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "tagadmin grant " + player.getName() + " " + tagId);
     }
 
-    private void ensureTag(String id, String display, String format) {
+    private void ensureTag(String id, String display, String format, String permission) {
         try {
             Class<?> serviceType = Class.forName("dev.xsuite.tags.api.TagService");
             Object service = Bukkit.getServicesManager().load(serviceType);
             if (service != null) {
                 serviceType.getMethod("ensureTag", String.class, String.class, String.class, String.class)
-                        .invoke(service, id, display, format, "");
+                        .invoke(service, id, display, format, permission == null ? "" : permission);
                 return;
             }
         } catch (ReflectiveOperationException ignored) {
             // Older xTags: command fallback.
         }
-        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "tagadmin create " + id + " none " + format);
+        String perm = permission == null || permission.isBlank() ? "none" : permission;
+        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "tagadmin create " + id + " " + perm + " " + format);
     }
 
     private void retryPendingRewards(Player player, PlayerProgression prog) {
