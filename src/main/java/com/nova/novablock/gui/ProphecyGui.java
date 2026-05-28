@@ -46,6 +46,10 @@ public class ProphecyGui extends ChestGui {
         }
 
         // Action bar — row 4 (slots 27-35) so it never overlaps queue slots.
+        set(27, ItemBuilder.of(Material.ARROW)
+                        .name("<gray>← Back to menu").build(),
+                e -> new MainMenuGui(plugin).open(p));
+
         int maxPicks = plugin.prophecies().maxPicks(p);
         set(29, ItemBuilder.of(Material.PAPER)
                         .name("<gray>Picks: <white>" + picks.size() + "/" + maxPicks)
