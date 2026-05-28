@@ -6,13 +6,42 @@ import com.nova.novablock.phase.Phase;
 import com.nova.novablock.prophecy.ProphecyManager;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class PrestigeManager {
+
+    /**
+     * Armor-trim templates awarded on prestige. Pulled from the full 1.21 trim list,
+     * minus NETHERITE_UPGRADE (vanilla-farmable from bastion loot) so prestige
+     * remains a meaningful source of cosmetic trims rather than gating crafting.
+     */
+    private static final List<Material> PRESTIGE_TEMPLATES = List.of(
+            Material.SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.DUNE_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.COAST_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.WILD_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.WARD_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.EYE_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.VEX_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.TIDE_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.SNOUT_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.RIB_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.SPIRE_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.SHAPER_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.RAISER_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.HOST_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.FLOW_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Material.BOLT_ARMOR_TRIM_SMITHING_TEMPLATE
+    );
 
     private final NovaBlock plugin;
     private double coinMultPerLevel = 0.10;
@@ -67,6 +96,22 @@ public class PrestigeManager {
         long lump = baseCoinReward * newLevel;
         plugin.economy().award(island, lump);
 
+        Material template = pickPrestigeTemplate(island);
+        boolean collectionComplete = template == null;
+        if (collectionComplete) {
+            // All 18 templates already collected — pick any at random so the reward
+            // doesn't silently disappear once the set is complete.
+            template = PRESTIGE_TEMPLATES.get(
+                    ThreadLocalRandom.current().nextInt(PRESTIGE_TEMPLATES.size()));
+        } else {
+            island.data().getReceivedPrestigeTemplates().add(template.name());
+        }
+        ItemStack templateItem = new ItemStack(template);
+        var overflow = player.getInventory().addItem(templateItem);
+        for (var leftover : overflow.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        }
+
         for (String raw : rewardCommands) {
             String cmd = raw.replace("%player%", player.getName())
                     .replace("%level%", String.valueOf(newLevel));
@@ -83,6 +128,17 @@ public class PrestigeManager {
         Msg.title(player, "<gold>✦ Prestige " + roman(newLevel), "<gray>+"
                 + Math.round(coinMultiplier(island) * 100 - 100) + "% coins, +"
                 + Math.round(xpMultiplier(island) * 100 - 100) + "% XP");
+        int collected = island.data().getReceivedPrestigeTemplates().size();
+        int total = PRESTIGE_TEMPLATES.size();
+        if (collectionComplete) {
+            Msg.send(player, "<light_purple>★ Prestige reward: <white>"
+                    + prettyTemplateName(template)
+                    + " <gray>(collection complete — random template)");
+        } else {
+            Msg.send(player, "<light_purple>★ Prestige reward: <white>"
+                    + prettyTemplateName(template)
+                    + " <dark_gray>(" + collected + "/" + total + " trims)");
+        }
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 0.8f);
         plugin.seasonalPaths().award(player, com.nova.novablock.season.SeasonalPathManager.PathSource.PRESTIGE, 500);
 
@@ -122,6 +178,32 @@ public class PrestigeManager {
         if (level >= 7) return "#FFD700";
         if (level >= 4) return "#7BFFBB";
         return "#9FC5FF";
+    }
+
+    /**
+     * Pick a smithing template the island hasn't received yet. Returns {@code null}
+     * when every template in {@link #PRESTIGE_TEMPLATES} has already been awarded;
+     * the caller falls back to a fully random pick in that case.
+     */
+    private Material pickPrestigeTemplate(Island island) {
+        var received = island.data().getReceivedPrestigeTemplates();
+        java.util.List<Material> remaining = new java.util.ArrayList<>();
+        for (Material m : PRESTIGE_TEMPLATES) {
+            if (!received.contains(m.name())) remaining.add(m);
+        }
+        if (remaining.isEmpty()) return null;
+        return remaining.get(ThreadLocalRandom.current().nextInt(remaining.size()));
+    }
+
+    /** "SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE" → "Sentry Armor Trim Smithing Template". */
+    private static String prettyTemplateName(Material m) {
+        String[] parts = m.name().toLowerCase().split("_");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) sb.append(' ');
+            sb.append(Character.toUpperCase(parts[i].charAt(0))).append(parts[i].substring(1));
+        }
+        return sb.toString();
     }
 
     private static String roman(int n) {

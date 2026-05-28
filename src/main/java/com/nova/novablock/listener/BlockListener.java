@@ -538,10 +538,12 @@ public class BlockListener implements Listener {
                 e.setMetadata("nova_natural", new org.bukkit.metadata.FixedMetadataValue(plugin, true));
             }
         }
-        // Loot room every ~lootCd blocks (config-tunable). Rift Storm = 5x rolls.
+        // Loot room every ~lootCd + denom blocks on average (config-tunable).
+        // Baseline tuned for ~1 rift per ~460 blocks (cd 400 + 1/60 roll) so they
+        // stay an event, not a regular interruption. Rift Storm keeps the 5x ratio.
         if (broken - island.data().getLastLootRoomAt() >= lootCd) {
-            int denom = 30;
-            if (ev == SeasonManager.ServerEvent.RIFT_STORM) denom = 6;
+            int denom = 60;
+            if (ev == SeasonManager.ServerEvent.RIFT_STORM) denom = 12;
             // RIFTWALKER (Magic 10): loot rooms appear 20% more often.
             if (Perk.hasPerk(plugin.progression().get(player), Perk.RIFTWALKER)) {
                 denom = Math.max(1, (int) Math.round(denom / 1.20));
@@ -573,9 +575,18 @@ public class BlockListener implements Listener {
         switch (broken) {
             case ENDER_CHEST -> coins = 50;
             case BEACON -> {
+                // Nether Star used to be a guaranteed drop, but the vanilla beacon recipe
+                // takes 1 star + 3 obsidian + 5 glass, so every beacon broken funded another
+                // crafted beacon — players were stockpiling them in phase 10. Cap the star
+                // drop at 20% so it stays exciting without being a self-replenishing loop.
                 coins = 2500;
-                player.getInventory().addItem(new ItemStack(Material.NETHER_STAR));
-                Msg.title(player, "<gold>★ Beacon!", "<yellow>+2500 coins + Nether Star");
+                boolean gotStar = ThreadLocalRandom.current().nextInt(5) == 0;
+                if (gotStar) {
+                    player.getInventory().addItem(new ItemStack(Material.NETHER_STAR));
+                    Msg.title(player, "<gold>★ Beacon!", "<yellow>+2500 coins + Nether Star");
+                } else {
+                    Msg.title(player, "<gold>★ Beacon!", "<yellow>+2500 coins");
+                }
             }
             case CONDUIT -> {
                 coins = 1500;

@@ -32,14 +32,17 @@ public class UpgradesGui extends ChestGui {
             boolean maxed = nextCost < 0;
 
             ItemBuilder ib = ItemBuilder.of(up.icon)
-                    .name("<gold>" + up.displayName + " <gray>Lv " + level + "/" + up.maxLevel);
-            for (String line : up.description) ib.lore("<gray>" + line);
-            ib.lore(" ");
+                    .name("<gold>" + up.displayName + " <gray>Lv " + level + "/" + up.maxLevel)
+                    .lore("<gray>" + up.description)
+                    .lore(" ")
+                    .lore("<aqua>Now: <white>" + up.currentEffect(level));
             if (maxed) {
                 ib.lore("<green>Maxed.").glow();
             } else {
+                ib.lore("<light_purple>Next: <white>" + up.nextEffect(level));
+                ib.lore(" ");
                 String afford = coins >= nextCost ? "<yellow>" : "<red>";
-                ib.lore("<gray>Next level: " + afford + nextCost + " coins");
+                ib.lore("<gray>Cost: " + afford + nextCost + " coins");
                 ib.lore("<dark_gray>Click to purchase.");
             }
             set(slots[i], ib.build(), e -> tryPurchase(p, island, up));

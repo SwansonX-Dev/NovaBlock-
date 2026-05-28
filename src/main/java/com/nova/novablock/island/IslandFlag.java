@@ -71,6 +71,14 @@ public enum IslandFlag {
             "Non-members can break and place blocks.",
             "The OneBlock center is always members-only."),
 
+    VISITOR_CONTAINER_ACCESS(
+            false,
+            "novablock.flag.visitor_container_access",
+            Material.CHEST,
+            "Visitors Can Open Containers",
+            "Non-members can open chests, barrels, hoppers, etc.",
+            "Default off — protects your loot from passers-by."),
+
     // ---- QOL / donor-rank perks ----
 
     ISLAND_FLY(

@@ -17,7 +17,7 @@ keepInventoryOnDeath: true
 # Cooldowns in blocks broken
 cooldowns:
   bossMinBlocks: 300
-  lootRoomMinBlocks: 150
+  lootRoomMinBlocks: 400
 
 anti-afk:
   enabled: false

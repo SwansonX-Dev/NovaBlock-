@@ -106,6 +106,7 @@ public class YamlStorage implements DataStorage {
                     }
                 }
                 data.setStorageBase64(y.getString("storage", ""));
+                data.getReceivedPrestigeTemplates().addAll(y.getStringList("prestige.receivedTemplates"));
                 result.add(data);
             } catch (Exception ex) {
                 plugin.getLogger().warning("Failed to load island " + f.getName() + ": " + ex.getMessage());
@@ -144,6 +145,10 @@ public class YamlStorage implements DataStorage {
         }
         if (data.getStorageBase64() != null && !data.getStorageBase64().isEmpty()) {
             y.set("storage", data.getStorageBase64());
+        }
+        if (!data.getReceivedPrestigeTemplates().isEmpty()) {
+            y.set("prestige.receivedTemplates",
+                    data.getReceivedPrestigeTemplates().stream().sorted().toList());
         }
         try { atomicSave(y, f); }
         catch (IOException ex) { plugin.getLogger().warning("Failed to save island " + data.getId() + ": " + ex.getMessage()); }

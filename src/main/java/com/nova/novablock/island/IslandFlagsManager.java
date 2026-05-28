@@ -27,6 +27,9 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.HashSet;
@@ -261,6 +264,37 @@ public class IslandFlagsManager implements Listener {
         Island island = islandAt(event.getBlock().getLocation());
         if (island == null) return;
         if (!plugin.islands().canBuild(event.getPlayer(), event.getBlock().getLocation())) event.setCancelled(true);
+    }
+
+    // ---- VISITOR_CONTAINER_ACCESS ----
+
+    @EventHandler(ignoreCancelled = true)
+    public void onVisitorContainerOpen(PlayerInteractEvent event) {
+        if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) return;
+        var block = event.getClickedBlock();
+        if (block == null) return;
+        // Crouching to place a block while holding one shouldn't trigger the container UI,
+        // and we don't want to gate that — Spigot already suppresses the open in that case.
+        if (event.getPlayer().isSneaking() && event.hasItem()) return;
+        if (!(block.getState() instanceof InventoryHolder)) return;
+        if (!plugin.islands().canAccessContainers(event.getPlayer(), block.getLocation())) {
+            event.setCancelled(true);
+            event.getPlayer().sendActionBar(
+                    net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                            .deserialize("<red>That container belongs to this island."));
+        }
+    }
+
+    /** Covers entity-backed containers like chest minecarts and hopper minecarts. */
+    @EventHandler(ignoreCancelled = true)
+    public void onVisitorEntityContainerOpen(PlayerInteractEntityEvent event) {
+        if (!(event.getRightClicked() instanceof InventoryHolder)) return;
+        if (!plugin.islands().canAccessContainers(event.getPlayer(), event.getRightClicked().getLocation())) {
+            event.setCancelled(true);
+            event.getPlayer().sendActionBar(
+                    net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                            .deserialize("<red>That container belongs to this island."));
+        }
     }
 
     // ---- KEEP_INVENTORY ----

@@ -78,6 +78,14 @@ public class IslandManager {
         return island.isMember(player) || island.data().isFlag(IslandFlag.VISITOR_BUILD);
     }
 
+    /** True if the player may open containers (chests, barrels, hoppers, etc.) at this location. */
+    public boolean canAccessContainers(Player player, Location loc) {
+        if (player.hasPermission("novablock.build.bypass") || player.hasPermission("novablock.admin")) return true;
+        Island island = atLocation(loc);
+        if (island == null) return true;
+        return island.isMember(player) || island.data().isFlag(IslandFlag.VISITOR_CONTAINER_ACCESS);
+    }
+
     /** Starter bank gift for new island owners. 100 coins, or the bank's min deposit — whichever is larger. */
     private static final long STARTER_BANK_COINS = 100L;
 

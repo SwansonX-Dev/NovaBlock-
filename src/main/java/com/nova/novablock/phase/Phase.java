@@ -60,7 +60,14 @@ public class Phase {
 
     public EntityType rollMob(Random rng) {
         if (mobs.isEmpty()) return null;
-        return mobs.get(rng.nextInt(mobs.size()));
+        EntityType pick = mobs.get(rng.nextInt(mobs.size()));
+        // Shulkers are uniquely disruptive on a 1-block island — levitation can
+        // push the player off into the void and they're hard to escape. Reroll
+        // most picks so they remain a rare hazard instead of a regular spawn.
+        if (pick == EntityType.SHULKER && rng.nextInt(4) != 0) {
+            pick = mobs.get(rng.nextInt(mobs.size()));
+        }
+        return pick;
     }
 
     public static List<EntityType> mobList(EntityType... types) {

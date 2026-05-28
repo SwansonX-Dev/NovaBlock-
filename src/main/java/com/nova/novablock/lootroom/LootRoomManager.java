@@ -95,12 +95,12 @@ public class LootRoomManager implements Listener {
     public void offerEntry(Player player, Island island, String roomId) {
         LootRoom room = registry.get(roomId);
         if (room == null) return;
-        // Place the rift two blocks NORTH of the centre block, on the same Y as the centre.
+        // Place the rift two blocks NORTH of the centre block, one block above the centre's Y.
         Location center = island.centerBlock();
         World w = center.getWorld();
         if (w == null) return;
         int bx = center.getBlockX() + 2;
-        int by = center.getBlockY();
+        int by = center.getBlockY() + 1;
         int bz = center.getBlockZ();
         w.getBlockAt(bx, by, bz).setType(Material.END_PORTAL_FRAME);
         // FX above the portal
@@ -170,7 +170,10 @@ public class LootRoomManager implements Listener {
         }
         Location anchor = new Location(instance, 0, 100, 0);
         Location entry = room.build(anchor);
-        Location returnLoc = p.getLocation().clone();
+        // Always send players back to the island's bedrock spawn next to the OneBlock.
+        // Capturing p.getLocation() risked stranding them in mid-air where the rift
+        // portal used to sit (the portal block is outside the bedrock skirt).
+        Location returnLoc = island.data().spawnLocation();
         LootRoomRun run = new LootRoomRun(room, p.getUniqueId(), island, anchor,
                 returnLoc, instance.getName(), Bukkit.getCurrentTick());
         active.put(p.getUniqueId(), run);

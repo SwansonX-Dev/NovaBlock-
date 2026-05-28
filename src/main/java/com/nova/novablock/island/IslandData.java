@@ -23,6 +23,8 @@ public class IslandData {
     private final Set<UUID> members = new HashSet<>();
     private final Map<IslandFlag, Boolean> flags = new EnumMap<>(IslandFlag.class);
     private final Map<IslandUpgrade, Integer> upgrades = new EnumMap<>(IslandUpgrade.class);
+    /** Material names of smithing templates this island has already earned from prestige. */
+    private final Set<String> receivedPrestigeTemplates = new HashSet<>();
 
     private long blocksBroken;
     private int phaseIndex;
@@ -73,6 +75,8 @@ public class IslandData {
 
     public String getStorageBase64() { return storageBase64; }
     public void setStorageBase64(String s) { this.storageBase64 = s == null ? "" : s; }
+
+    public Set<String> getReceivedPrestigeTemplates() { return receivedPrestigeTemplates; }
 
     public long getBlocksBroken() { return blocksBroken; }
     public void setBlocksBroken(long v) { this.blocksBroken = v; }
