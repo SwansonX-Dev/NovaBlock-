@@ -6,7 +6,7 @@
 
     <groupId>com.nova</groupId>
     <artifactId>novablock</artifactId>
-    <version>0.4.21</version>
+    <version>0.4.22</version>
     <packaging>jar</packaging>
     <name>NovaBlock</name>
 

@@ -90,7 +90,13 @@ public class PhaseManager {
                         b(Material.RAW_GOLD_BLOCK, 2),
                         b(Material.CHEST, 3)
                 ),
-                Phase.mobList(EntityType.HUSK, EntityType.RABBIT, EntityType.CAMEL),
+                // Camel diluted (was 1/3 → 1/8) so it stops dominating spawns;
+                // armadillo added so deserts have their signature 1.20.5 mob.
+                Phase.mobList(
+                        EntityType.HUSK, EntityType.HUSK, EntityType.HUSK,
+                        EntityType.RABBIT, EntityType.RABBIT,
+                        EntityType.ARMADILLO, EntityType.ARMADILLO,
+                        EntityType.CAMEL),
                 null, List.of("parkour", "puzzle")));
 
         phases.add(p(4, "ocean", "Sunken Reef", "#3FB6FF", 1050,

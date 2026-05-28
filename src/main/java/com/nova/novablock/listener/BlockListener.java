@@ -201,6 +201,18 @@ public class BlockListener implements Listener {
         island.data().incrementBlocksBroken();
         island.data().incrementPhaseProgress();
         island.recordBreak(broken);
+        // Block-break milestones — fire once at exact thresholds. Existing islands past
+        // a threshold won't retroactively claim; the milestone is the act of crossing.
+        if (island.data().getBlocksBroken() == 1000L) {
+            plugin.economy().award(island, 5000L);
+            player.getInventory().addItem(new ItemStack(Material.TOTEM_OF_UNDYING));
+            plugin.progression().addXp(player, SkillType.MINING, 100L);
+            Msg.title(player, "<gold>✦ 1,000 Blocks ✦",
+                    "<yellow>+5000 coins · <green>Totem of Undying · <aqua>+100 XP");
+            player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 0.8f);
+            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>" + player.getName()
+                    + " <gray>has mined their <gold>1,000th block<gray>!"));
+        }
         double xpMult = plugin.prestige().xpMultiplier(island);
         if (island.getComboCount() >= 5) {
             int combo = island.getComboCount();
@@ -600,8 +612,19 @@ public class BlockListener implements Listener {
             }
             case SCULK_CATALYST -> {
                 coins = 800;
-                player.getInventory().addItem(new ItemStack(Material.ECHO_SHARD));
-                Msg.actionBar(player, "<dark_purple>+800 coins + Echo Shard");
+                // Silk touch keeps the catalyst block itself (dropped by the natural
+                // drop path). The echo shard is the consolation prize for non-silk
+                // mining — giving both would make silk-touch a strict upgrade and
+                // players would never use it, which is the opposite of intended.
+                ItemStack tool = player.getInventory().getItemInMainHand();
+                boolean silkTouch = tool != null
+                        && tool.containsEnchantment(org.bukkit.enchantments.Enchantment.SILK_TOUCH);
+                if (silkTouch) {
+                    Msg.actionBar(player, "<dark_purple>+800 coins · <gray>Silk-touched the catalyst");
+                } else {
+                    player.getInventory().addItem(new ItemStack(Material.ECHO_SHARD));
+                    Msg.actionBar(player, "<dark_purple>+800 coins + Echo Shard");
+                }
             }
             case NETHERITE_BLOCK -> {
                 coins = 8000;
