@@ -20,12 +20,6 @@ public enum IslandUpgrade {
             "XP Boost",
             "Bonus Mining XP every time the OneBlock is broken."),
 
-    STORAGE_AUTOSELL(
-            3, new long[]{5_000L, 15_000L, 40_000L},
-            Material.CHEST,
-            "Auto-Sell Bonus",
-            "Extra coins from the storage GUI's auto-sell slot."),
-
     PROPHECY_SLOTS(
             3, new long[]{4_000L, 12_000L, 30_000L},
             Material.AMETHYST_SHARD,
@@ -72,9 +66,6 @@ public enum IslandUpgrade {
             case XP_BOOST -> level == 0
                     ? "Base Mining XP per break"
                     : "+" + level + " Mining XP per break";
-            case STORAGE_AUTOSELL -> level == 0
-                    ? "Standard auto-sell payout"
-                    : "+" + (25 * level) + "% auto-sell coins";
             case PROPHECY_SLOTS -> "+" + level + " prophecy slot" + (level == 1 ? "" : "s");
             case BOSS_LOOT -> level == 0
                     ? "Base boss coin reward"

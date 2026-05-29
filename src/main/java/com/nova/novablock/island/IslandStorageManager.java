@@ -3,9 +3,9 @@ package com.nova.novablock.island;
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
-import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
@@ -35,8 +35,6 @@ import java.util.UUID;
 public class IslandStorageManager implements Listener {
 
     public static final int SIZE = 54;
-    /** The bottom-right slot of the storage is dedicated to auto-sell-on-close. */
-    public static final int AUTOSELL_SLOT = SIZE - 1;
 
     private final NovaBlock plugin;
     /** Live inventory per island; created on first open, mutated by viewers, written to disk on close. */
@@ -72,30 +70,20 @@ public class IslandStorageManager implements Listener {
             ItemStack[] items = deserialize(data);
             if (items != null) {
                 int n = Math.min(items.length, SIZE);
-                for (int i = 0; i < n; i++) inv.setItem(i, items[i]);
+                for (int i = 0; i < n; i++) {
+                    ItemStack item = items[i];
+                    // Drop the legacy auto-sell marker so the slot becomes usable storage.
+                    if (isLegacyAutoSellMarker(item)) continue;
+                    inv.setItem(i, item);
+                }
             }
         }
-        // If the auto-sell marker isn't there yet (fresh island), drop one in.
-        if (inv.getItem(AUTOSELL_SLOT) == null) inv.setItem(AUTOSELL_SLOT, autoSellMarker());
         return inv;
     }
 
-    /** Visual placeholder for the auto-sell slot — players drag items onto it and replace it. */
-    private ItemStack autoSellMarker() {
-        ItemStack marker = new ItemStack(org.bukkit.Material.EMERALD);
-        var meta = marker.getItemMeta();
-        meta.displayName(com.nova.novablock.util.Msg.mm("<green>Auto-Sell Slot"));
-        meta.lore(java.util.List.of(
-                com.nova.novablock.util.Msg.mm("<gray>Drop sellable items here."),
-                com.nova.novablock.util.Msg.mm("<gray>On close, they're sold via xEconomy"),
-                com.nova.novablock.util.Msg.mm("<gray>and the coins are credited to the island."),
-                com.nova.novablock.util.Msg.mm("<dark_gray>Unsold items stay in the slot.")));
-        marker.setItemMeta(meta);
-        return marker;
-    }
-
-    private boolean isAutoSellMarker(ItemStack item) {
-        if (item == null || item.getType() != org.bukkit.Material.EMERALD) return false;
+    /** Detects the old auto-sell marker so we can clean it up on load. */
+    private static boolean isLegacyAutoSellMarker(ItemStack item) {
+        if (item == null || item.getType() != Material.EMERALD) return false;
         if (!item.hasItemMeta()) return false;
         var name = item.getItemMeta().displayName();
         if (name == null) return false;
@@ -112,58 +100,9 @@ public class IslandStorageManager implements Listener {
     }
 
     @EventHandler
-    public void onClick(InventoryClickEvent event) {
-        if (!(event.getInventory().getHolder() instanceof Holder)) return;
-        if (event.getRawSlot() == AUTOSELL_SLOT && isAutoSellMarker(event.getCurrentItem())) {
-            event.setCancelled(true);
-            return;
-        }
-        // Block the paxel from being placed in the auto-sell slot. Without this guard
-        // a player could "sell" their paxel for coins via xEconomy's market (the
-        // underlying material has a price), then have give() issue a fresh paxel on
-        // next join — a free coin loop, amplified by the STORAGE_AUTOSELL upgrade.
-        if (event.getRawSlot() == AUTOSELL_SLOT) {
-            ItemStack incoming = event.getCursor();
-            // Shift-click moves the clicked stack into the top inventory's first empty slot,
-            // which can land on AUTOSELL_SLOT when the rest of the storage is full.
-            if (event.isShiftClick()) incoming = event.getCurrentItem();
-            if (incoming != null && plugin.paxels().isPaxel(incoming)) {
-                event.setCancelled(true);
-                if (event.getWhoClicked() instanceof Player p) {
-                    Msg.actionBar(p, "<red>You can't auto-sell your Paxel.");
-                }
-            }
-        }
-    }
-
-    @EventHandler
     public void onClose(InventoryCloseEvent event) {
         if (!(event.getInventory().getHolder() instanceof Holder h)) return;
-        runAutoSell(h.islandId, event.getInventory(),
-                event.getPlayer() instanceof org.bukkit.entity.Player p ? p : null);
         persist(h.islandId, event.getInventory());
-    }
-
-    /** If the auto-sell slot contains a real item (not the marker), sell it and restore the marker. */
-    private void runAutoSell(UUID islandId, Inventory inv, org.bukkit.entity.Player viewer) {
-        ItemStack slot = inv.getItem(AUTOSELL_SLOT);
-        if (slot == null || slot.getType().isAir() || isAutoSellMarker(slot)) {
-            if (slot == null || slot.getType().isAir()) inv.setItem(AUTOSELL_SLOT, autoSellMarker());
-            return;
-        }
-        Island island = plugin.islands().get(islandId);
-        if (island == null) return;
-        long coins = plugin.economy().autoSellItem(island, slot);
-        if (coins > 0) {
-            inv.setItem(AUTOSELL_SLOT, autoSellMarker());
-            if (viewer != null) {
-                com.nova.novablock.util.Msg.actionBar(viewer,
-                        "<green>Auto-sold for <yellow>" + coins + " <green>coins.");
-            }
-        } else if (viewer != null) {
-            com.nova.novablock.util.Msg.actionBar(viewer,
-                    "<gray>That item has no market price.");
-        }
     }
 
     private void persist(UUID islandId, Inventory inv) {

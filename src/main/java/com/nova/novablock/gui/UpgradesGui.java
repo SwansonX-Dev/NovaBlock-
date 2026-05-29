@@ -23,7 +23,7 @@ public class UpgradesGui extends ChestGui {
         if (island == null) return;
         long coins = plugin.economy().balance(island);
 
-        int[] slots = {10, 12, 14, 16, 22};
+        int[] slots = {11, 13, 15, 22};
         IslandUpgrade[] upgrades = IslandUpgrade.values();
         for (int i = 0; i < upgrades.length && i < slots.length; i++) {
             IslandUpgrade up = upgrades[i];
