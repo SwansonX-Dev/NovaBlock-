@@ -108,6 +108,10 @@ public class EconomyManager {
      */
     public long autoSellItem(Island island, org.bukkit.inventory.ItemStack stack) {
         if (island == null || stack == null || stack.getType().isAir() || stack.getAmount() <= 0) return 0;
+        // Defense in depth: never sell a paxel, even if a future code path puts one
+        // here. The IslandStorageManager click handler is the primary gate; this is
+        // the secondary one so the exploit can't sneak in via a new entry point.
+        if (plugin.paxels() != null && plugin.paxels().isPaxel(stack)) return 0;
         try {
             var pluginObj = Bukkit.getPluginManager().getPlugin("xEconomy");
             if (pluginObj == null) return 0;

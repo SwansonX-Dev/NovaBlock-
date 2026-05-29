@@ -116,6 +116,23 @@ public class IslandStorageManager implements Listener {
         if (!(event.getInventory().getHolder() instanceof Holder)) return;
         if (event.getRawSlot() == AUTOSELL_SLOT && isAutoSellMarker(event.getCurrentItem())) {
             event.setCancelled(true);
+            return;
+        }
+        // Block the paxel from being placed in the auto-sell slot. Without this guard
+        // a player could "sell" their paxel for coins via xEconomy's market (the
+        // underlying material has a price), then have give() issue a fresh paxel on
+        // next join — a free coin loop, amplified by the STORAGE_AUTOSELL upgrade.
+        if (event.getRawSlot() == AUTOSELL_SLOT) {
+            ItemStack incoming = event.getCursor();
+            // Shift-click moves the clicked stack into the top inventory's first empty slot,
+            // which can land on AUTOSELL_SLOT when the rest of the storage is full.
+            if (event.isShiftClick()) incoming = event.getCurrentItem();
+            if (incoming != null && plugin.paxels().isPaxel(incoming)) {
+                event.setCancelled(true);
+                if (event.getWhoClicked() instanceof Player p) {
+                    Msg.actionBar(p, "<red>You can't auto-sell your Paxel.");
+                }
+            }
         }
     }
 
