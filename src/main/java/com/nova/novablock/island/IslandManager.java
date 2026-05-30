@@ -133,6 +133,7 @@ public class IslandManager {
     public void delete(Island island) {
         for (UUID m : island.data().getMembers()) playerToIsland.remove(m);
         byId.remove(island.data().getId());
+        if (plugin.minions() != null) plugin.minions().removeIsland(island.data().getId());
         plugin.storage().deleteIsland(island.data().getId());
     }
 

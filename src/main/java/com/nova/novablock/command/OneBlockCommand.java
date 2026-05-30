@@ -4,6 +4,7 @@ import com.nova.novablock.NovaBlock;
 import com.nova.novablock.gui.HelpGui;
 import com.nova.novablock.gui.LeaderboardGui;
 import com.nova.novablock.gui.MainMenuGui;
+import com.nova.novablock.gui.minion.MinionOverviewGui;
 import com.nova.novablock.gui.ProphecyGui;
 import com.nova.novablock.gui.QuestGui;
 import com.nova.novablock.gui.SeasonalPathGui;
@@ -27,7 +28,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             "create", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
             "visit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
-            "setspawn", "friend", "friends", "sprint", "help");
+            "setspawn", "friend", "friends", "sprint", "minion", "minions", "help");
     private static final List<String> FRIEND_SUBS = List.of("add", "accept", "deny", "remove", "list");
 
     private final NovaBlock plugin;
@@ -84,6 +85,14 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "upgrades", "upgrade" -> new com.nova.novablock.gui.UpgradesGui(plugin).open(p);
             case "path", "pass", "season", "atlas" -> new SeasonalPathGui(plugin).open(p);
             case "pet", "pets" -> openPets(p);
+            case "minion", "minions" -> {
+                if (!p.hasPermission("novablock.minions.use")) { denied(p); return true; }
+                if (args.length >= 2) {
+                    new MinionCommand(plugin).onCommand(sender, command, label, java.util.Arrays.copyOfRange(args, 1, args.length));
+                } else {
+                    new MinionOverviewGui(plugin).open(p);
+                }
+            }
             case "fix", "repair" -> fixOneBlock(p);
             case "setspawn" -> {
                 if (!p.hasPermission("novablock.setspawn")) { denied(p); return true; }
@@ -343,6 +352,9 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                     .map(Player::getName)
                     .filter(n -> n.toLowerCase().startsWith(prefix))
                     .collect(Collectors.toList());
+        }
+        if (args.length >= 2 && (args[0].equalsIgnoreCase("minions") || args[0].equalsIgnoreCase("minion"))) {
+            return new MinionCommand(plugin).onTabComplete(sender, command, alias, java.util.Arrays.copyOfRange(args, 1, args.length));
         }
         return Collections.emptyList();
     }

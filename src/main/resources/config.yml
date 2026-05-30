@@ -57,3 +57,57 @@ sprint:
     reward-commands-place-1: []
     reward-commands-place-2: []
     reward-commands-place-3: []
+
+minions:
+  tick-rate-ticks: 20
+  default-island-limit: 6
+  limit-per-prestige: 1
+  max-prestige-limit-bonus: 6
+  discard-leftovers: false
+  fuel:
+    default-speed-multiplier: 1.35
+  skins:
+    royal: { default-unlocked: false }
+    emerald: { default-unlocked: false }
+    amethyst: { default-unlocked: false }
+    frost: { default-unlocked: false }
+    nether: { default-unlocked: false }
+    void: { default-unlocked: false }
+  shop-prices:
+    plains_farmer: 1000
+    underground_miner: 2500
+    frozen_forager: 4000
+    desert_digger: 6000
+    reef_collector: 8500
+    nether_harvester: 12000
+    ancient_excavator: 17000
+    lush_gardener: 23000
+    stronghold_scholar: 30000
+    end_salvager: 40000
+    celestial_collector: 55000
+    void_scavenger: 75000
+  shop-enabled:
+    plains_farmer: true
+    underground_miner: true
+    frozen_forager: true
+    desert_digger: true
+    reef_collector: true
+    nether_harvester: true
+    ancient_excavator: true
+    lush_gardener: true
+    stronghold_scholar: true
+    end_salvager: true
+    celestial_collector: true
+    void_scavenger: true
+  upgrade-costs:
+    speed: { 1: 1000, 2: 4000, 3: 9000, 4: 16000, 5: 25000 }
+    yield: { 1: 1250, 2: 5000, 3: 11250, 4: 20000, 5: 31250 }
+    fuel-efficiency: { 1: 750, 2: 3000, 3: 6750, 4: 12000, 5: 18750 }
+    compactor: { 1: 2500, 2: 5000, 3: 7500 }
+  outputs:
+    void_scavenger:
+      - { material: SCULK, weight: 70, min: 1, max: 2 }
+      - { material: ECHO_SHARD, weight: 40, min: 1, max: 1, rareChance: 0.10 }
+      - { material: ENDER_PEARL, weight: 45, min: 1, max: 2 }
+      - { material: OBSIDIAN, weight: 35, min: 1, max: 2 }
+      - { material: NETHERITE_SCRAP, weight: 2, min: 1, max: 1, rareChance: 0.01 }

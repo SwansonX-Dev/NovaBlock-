@@ -7,6 +7,7 @@ import com.nova.novablock.island.IslandStorageManager;
 import com.nova.novablock.boss.BossManager;
 import com.nova.novablock.command.AdminCommand;
 import com.nova.novablock.command.HelpCommand;
+import com.nova.novablock.command.MinionCommand;
 import com.nova.novablock.command.OneBlockCommand;
 import com.nova.novablock.command.ScoreboardCommand;
 import com.nova.novablock.config.ConfigManager;
@@ -23,6 +24,7 @@ import com.nova.novablock.island.PreviewHologramManager;
 import com.nova.novablock.listener.BlockListener;
 import com.nova.novablock.listener.PlayerListener;
 import com.nova.novablock.lootroom.LootRoomManager;
+import com.nova.novablock.minion.MinionManager;
 import com.nova.novablock.paxel.PaxelManager;
 import com.nova.novablock.phase.PhaseManager;
 import com.nova.novablock.progression.LoginStreakManager;
@@ -78,6 +80,7 @@ public final class NovaBlock extends JavaPlugin {
     private PlayerSpawnManager playerSpawnManager;
     private FriendManager friendManager;
     private WeeklySprintManager sprintManager;
+    private MinionManager minionManager;
 
     @Override
     public void onEnable() {
@@ -130,6 +133,7 @@ public final class NovaBlock extends JavaPlugin {
         this.playerSpawnManager = new PlayerSpawnManager(this);
         this.friendManager = new FriendManager(this);
         this.sprintManager = new WeeklySprintManager(this);
+        this.minionManager = new MinionManager(this);
 
         getServer().getPluginManager().registerEvents(new BlockListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
@@ -145,6 +149,9 @@ public final class NovaBlock extends JavaPlugin {
         getCommand("sb").setExecutor(new ScoreboardCommand(this));
         getCommand("novahelp").setExecutor(new HelpCommand(this));
         getCommand("spawn").setExecutor(new SpawnCommand(this));
+        MinionCommand minionCmd = new MinionCommand(this);
+        getCommand("obminions").setExecutor(minionCmd);
+        getCommand("obminions").setTabCompleter(minionCmd);
 
         eventManager.startTimers();
         seasonManager.startSeasonTicker();
@@ -153,6 +160,7 @@ public final class NovaBlock extends JavaPlugin {
         scoreboardManager.startTicker();
         oneBlockRepairService.start();
         previewHologramManager.start();
+        minionManager.start();
 
         // Crash-recovery: clean up orphan bosses and leftover loot-room worlds.
         bossManager.cleanupOrphans();
@@ -190,6 +198,7 @@ public final class NovaBlock extends JavaPlugin {
         if (bossManager != null) bossManager.shutdown();
         if (paxelManager != null) paxelManager.shutdown();
         if (previewHologramManager != null) previewHologramManager.shutdown();
+        if (minionManager != null) minionManager.shutdown();
 
         // Then persist.
         if (islandManager != null) islandManager.saveAll();
@@ -233,4 +242,5 @@ public final class NovaBlock extends JavaPlugin {
     public PlayerSpawnManager playerSpawns() { return playerSpawnManager; }
     public FriendManager friends() { return friendManager; }
     public WeeklySprintManager sprint() { return sprintManager; }
+    public MinionManager minions() { return minionManager; }
 }

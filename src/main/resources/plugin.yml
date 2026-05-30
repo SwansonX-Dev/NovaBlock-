@@ -28,6 +28,10 @@ commands:
   spawn:
     description: Teleport to your personal spawn (falls back to the world spawn).
     usage: /<command>
+  obminions:
+    description: Open or manage NovaBlock minions
+    usage: /<command> [overview|shop|help|types|reload|debug|give|list|removeall|outputs]
+    aliases: [minions, minion, obminion]
 
 permissions:
   novablock.play:
@@ -74,6 +78,36 @@ permissions:
     default: true
   novablock.storage:
     description: Allows opening the island's shared virtual storage
+    default: op
+  novablock.minions.use:
+    description: Allows using NovaBlock minions. Dynamic limit nodes use novablock.minions.limit.<number>.
+    default: true
+  novablock.minions.buy:
+    description: Allows buying NovaBlock minions
+    default: true
+  novablock.minions.admin:
+    description: Allows administering NovaBlock minions
+    default: op
+  novablock.admin.minions:
+    description: Allows admin minion commands
+    default: op
+  novablock.minions.skin.royal:
+    description: Unlocks the Royal minion skin
+    default: op
+  novablock.minions.skin.emerald:
+    description: Unlocks the Emerald minion skin
+    default: op
+  novablock.minions.skin.amethyst:
+    description: Unlocks the Amethyst minion skin
+    default: op
+  novablock.minions.skin.frost:
+    description: Unlocks the Frost minion skin
+    default: op
+  novablock.minions.skin.nether:
+    description: Unlocks the Nether minion skin
+    default: op
+  novablock.minions.skin.void:
+    description: Unlocks the Void minion skin
     default: op
   novablock.build.bypass:
     description: Allows building and breaking on any NovaBlock island
@@ -134,3 +168,4 @@ permissions:
       novablock.admin.path: true
       novablock.admin.freshstart: true
       novablock.admin.fix: true
+      novablock.admin.minions: true
