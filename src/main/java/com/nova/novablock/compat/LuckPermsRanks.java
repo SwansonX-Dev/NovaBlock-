@@ -22,6 +22,33 @@ public final class LuckPermsRanks {
         return readRank(player);
     }
 
+    /**
+     * Returns the player's LuckPerms cached-meta prefix (the legacy-format
+     * string like {@code &7[&6Owner&7]&r}). Empty string when LP isn't
+     * installed, the user isn't loaded, or no prefix is set.
+     */
+    public static String prefix(OfflinePlayer player) {
+        if (player == null || Bukkit.getPluginManager().getPlugin("LuckPerms") == null) return "";
+        return readPrefix(player);
+    }
+
+    private static String readPrefix(OfflinePlayer player) {
+        try {
+            Class<?> providerClass = Class.forName("net.luckperms.api.LuckPermsProvider");
+            Object luckPerms = providerClass.getMethod("get").invoke(null);
+            Object userManager = luckPerms.getClass().getMethod("getUserManager").invoke(luckPerms);
+            Object user = userManager.getClass().getMethod("getUser", UUID.class).invoke(userManager, player.getUniqueId());
+            if (user == null) return "";
+
+            Object cachedData = user.getClass().getMethod("getCachedData").invoke(user);
+            Object metaData = cachedData.getClass().getMethod("getMetaData").invoke(cachedData);
+            Object value = metaData.getClass().getMethod("getPrefix").invoke(metaData);
+            return value == null ? "" : String.valueOf(value);
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            return "";
+        }
+    }
+
     private static String readRank(OfflinePlayer player) {
         try {
             Class<?> providerClass = Class.forName("net.luckperms.api.LuckPermsProvider");

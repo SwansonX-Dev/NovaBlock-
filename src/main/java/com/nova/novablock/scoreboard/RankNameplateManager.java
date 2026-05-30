@@ -2,7 +2,10 @@ package com.nova.novablock.scoreboard;
 
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.compat.LuckPermsRanks;
+import com.nova.novablock.island.Island;
 import com.nova.novablock.util.Msg;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
@@ -10,9 +13,17 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
 import java.util.ArrayList;
+import java.util.UUID;
 
 public class RankNameplateManager {
     private static final String TEAM_PREFIX = "nbnp_";
+    /**
+     * Refresh cadence. Five seconds so the Owner/Member/Visitor badge keeps up
+     * with players crossing onto and off islands without a per-move listener.
+     */
+    private static final long REFRESH_TICKS = 20L * 5;
+    private static final LegacyComponentSerializer LEGACY =
+            LegacyComponentSerializer.legacyAmpersand();
 
     private final NovaBlock plugin;
     private BukkitTask ticker;
@@ -25,7 +36,7 @@ public class RankNameplateManager {
     public void startTicker() {
         active = true;
         if (ticker != null) ticker.cancel();
-        ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::refreshAll, 40L, 20L * 15);
+        ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::refreshAll, 40L, REFRESH_TICKS);
     }
 
     public void refreshAll() {
@@ -68,13 +79,48 @@ public class RankNameplateManager {
     private void apply(Scoreboard board, Player subject) {
         Team team = board.getTeam(teamName(subject));
         if (team == null) team = board.registerNewTeam(teamName(subject));
-        String rank = LuckPermsRanks.rank(subject);
-        team.prefix(rank.isBlank() ? Msg.mm("") : Msg.mm("<gray>[<#FFC940>" + rank + "<gray>] "));
-        team.suffix(Msg.mm(""));
+        team.prefix(buildPrefix(subject));
+        team.suffix(Component.empty());
         if (!team.hasEntry(subject.getName())) {
             for (String entry : new ArrayList<>(team.getEntries())) team.removeEntry(entry);
             team.addEntry(subject.getName());
         }
+    }
+
+    /**
+     * Combined nameplate prefix: LuckPerms cached-meta prefix (legacy-format
+     * string parsed via Adventure's legacy serializer) followed by an island
+     * role badge. Either piece is omitted if missing — players with no LP
+     * prefix and not on any island get a vanilla nameplate.
+     */
+    private Component buildPrefix(Player subject) {
+        Component out = Component.empty();
+        String lpPrefix = LuckPermsRanks.prefix(subject);
+        if (lpPrefix != null && !lpPrefix.isBlank()) {
+            String normalized = lpPrefix.replace('§', '&');
+            out = out.append(LEGACY.deserialize(normalized));
+            if (!normalized.endsWith(" ")) out = out.append(Component.text(" "));
+        }
+        String islandBadge = islandRoleBadgeFor(subject);
+        if (!islandBadge.isBlank()) {
+            out = out.append(Msg.mm(islandBadge)).append(Component.text(" "));
+        }
+        return out;
+    }
+
+    /**
+     * Subject's role on the island they're currently standing on. Empty when
+     * they're not on any island — that's the spatial signal ("nobody owns
+     * this place"). Owner gold, member aqua, visitor gray.
+     */
+    private String islandRoleBadgeFor(Player subject) {
+        if (subject.getLocation() == null || subject.getWorld() == null) return "";
+        Island island = plugin.islands().atLocation(subject.getLocation());
+        if (island == null) return "";
+        UUID uuid = subject.getUniqueId();
+        if (uuid.equals(island.data().getOwner())) return "<gold>[Owner]";
+        if (island.data().getMembers().contains(uuid)) return "<aqua>[Member]";
+        return "<gray>[Visitor]";
     }
 
     private void clearStaleTeams(Scoreboard board) {
