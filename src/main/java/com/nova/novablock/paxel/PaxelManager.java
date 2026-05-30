@@ -229,8 +229,18 @@ public class PaxelManager implements Listener {
         return new ItemStack(to, drop.getAmount());
     }
 
+    /** True when the player is currently inside the OG OneBlock world — NovaBlock should
+     *  leave their inventory alone there (OG OneBlock issues its own paxel). */
+    private boolean isInOgWorld(Player p) {
+        var ogPlugin = Bukkit.getPluginManager().getPlugin("OGOneBlock");
+        if (ogPlugin == null || !ogPlugin.isEnabled()) return false;
+        String ogWorld = ogPlugin.getConfig().getString("world.name", "OGOBworld");
+        return p.getWorld().getName().equals(ogWorld);
+    }
+
     /** Give the player a paxel if they don't already have one in inventory, ender chest, or island storage. */
     public void give(Player p) {
+        if (isInOgWorld(p)) return;
         PlayerInventory inv = p.getInventory();
         for (ItemStack it : inv.getContents()) {
             if (isOwner(it, p)) return;
@@ -262,6 +272,7 @@ public class PaxelManager implements Listener {
      * their paxel in island storage. Use {@link #give(Player)} to issue.
      */
     public void refreshTier(Player p) {
+        if (isInOgWorld(p)) return;
         PlayerInventory inv = p.getInventory();
         int target = tierFor(p);
         for (int i = 0; i < inv.getSize(); i++) {
