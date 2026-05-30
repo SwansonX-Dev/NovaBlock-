@@ -33,7 +33,7 @@ public class SpawnCommand implements CommandExecutor {
         }
         Location server = plugin.spawn().location();
         if (server == null) {
-            com.nova.novablock.util.Msg.send(player, "<red>No spawn set. Use <yellow>/setspawn</yellow> to set yours.");
+            com.nova.novablock.util.Msg.send(player, "<red>No spawn set. Use <yellow>/ob setspawn</yellow> to set yours.");
             return true;
         }
         player.teleport(server);

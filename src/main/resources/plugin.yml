@@ -11,11 +11,11 @@ softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, xPets, xTags]
 commands:
   oneblock:
     description: Main NovaBlock command
-    usage: /<command> [create|home|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|toggle|help]
+    usage: /<command> [create|home|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|toggle|setspawn|help]
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command
-    usage: /<command> [reload|setphase|spawnboss|givecoins|event|wipe|fix|givepaxel|flags|storage|menu|freshstart]
+    usage: /<command> [reload|setphase|spawnboss|givecoins|event|wipe|fix|givepaxel|flags|storage|menu|freshstart|setspawn]
     permission: novablock.admin
   sb:
     description: Toggle the NovaBlock sidebar scoreboard
@@ -26,12 +26,8 @@ commands:
     usage: /<command>
     aliases: [obhelp, guide]
   spawn:
-    description: Teleport to the server spawn.
+    description: Teleport to your personal spawn (falls back to the world spawn).
     usage: /<command>
-  setspawn:
-    description: Set the server spawn to your current location.
-    usage: /<command>
-    permission: novablock.setspawn
 
 permissions:
   novablock.play:
@@ -41,7 +37,7 @@ permissions:
     description: Allows using /spawn.
     default: true
   novablock.setspawn:
-    description: Allows using /setspawn to set your personal spawn.
+    description: Allows using /ob setspawn to set your personal spawn.
     default: true
   novablock.admin.setspawn:
     description: Allows /obadmin setspawn to set the server spawn.

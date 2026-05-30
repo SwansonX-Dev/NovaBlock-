@@ -36,7 +36,6 @@ import com.nova.novablock.season.SeasonalPathManager;
 import com.nova.novablock.spawn.SpawnManager;
 import com.nova.novablock.spawn.PlayerSpawnManager;
 import com.nova.novablock.command.SpawnCommand;
-import com.nova.novablock.command.SetSpawnCommand;
 import com.nova.novablock.storage.DataStorage;
 import com.nova.novablock.storage.YamlStorage;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -138,7 +137,6 @@ public final class NovaBlock extends JavaPlugin {
         getCommand("sb").setExecutor(new ScoreboardCommand(this));
         getCommand("novahelp").setExecutor(new HelpCommand(this));
         getCommand("spawn").setExecutor(new SpawnCommand(this));
-        getCommand("setspawn").setExecutor(new SetSpawnCommand(this));
 
         eventManager.startTimers();
         seasonManager.startSeasonTicker();

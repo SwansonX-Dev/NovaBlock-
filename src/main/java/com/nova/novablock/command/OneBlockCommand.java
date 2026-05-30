@@ -26,7 +26,8 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBCOMMANDS = List.of(
             "create", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
-            "visit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix", "help");
+            "visit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
+            "setspawn", "help");
 
     private final NovaBlock plugin;
 
@@ -83,6 +84,11 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "path", "pass", "season", "atlas" -> new SeasonalPathGui(plugin).open(p);
             case "pet", "pets" -> openPets(p);
             case "fix", "repair" -> fixOneBlock(p);
+            case "setspawn" -> {
+                if (!p.hasPermission("novablock.setspawn")) { denied(p); return true; }
+                plugin.playerSpawns().set(p.getUniqueId(), p.getLocation());
+                Msg.send(p, "<green>Spawn set. You'll respawn here and rejoin here. <gray>(<yellow>/spawn</yellow> to teleport back)");
+            }
             case "toggle" -> {
                 if (!p.hasPermission("novablock.toggle")) { denied(p); return true; }
                 plugin.hotbar().toggle(p);
