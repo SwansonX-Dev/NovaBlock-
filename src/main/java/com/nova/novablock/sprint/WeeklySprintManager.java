@@ -51,6 +51,7 @@ public class WeeklySprintManager {
 
     private final ConcurrentMap<UUID, Long> hardcore = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, CasualEntry> casual = new ConcurrentHashMap<>();
+    private final List<WinnerRow> lastWinners = new ArrayList<>();
     private long weekStart;
     private long lastPodiumWeekStart;
 
@@ -135,13 +136,78 @@ public class WeeklySprintManager {
                 .toList();
     }
 
+    public int hardcoreRank(UUID islandUuid) {
+        if (islandUuid == null || hardcoreScore(islandUuid) <= 0) return 0;
+        List<HardcoreRow> rows = topHardcore(Integer.MAX_VALUE);
+        for (int i = 0; i < rows.size(); i++) if (rows.get(i).islandUuid().equals(islandUuid)) return i + 1;
+        return 0;
+    }
+
+    public int casualRank(UUID playerUuid) {
+        if (playerUuid == null || casualQuests(playerUuid) <= 0) return 0;
+        List<CasualRow> rows = topCasual(Integer.MAX_VALUE);
+        for (int i = 0; i < rows.size(); i++) if (rows.get(i).playerUuid().equals(playerUuid)) return i + 1;
+        return 0;
+    }
+
+    public List<Long> hardcoreCoinRewards() {
+        return readCoinRewards(plugin.getConfig(), "sprint.hardcore.coin-rewards", List.of(100_000L, 50_000L, 25_000L));
+    }
+
+    public List<Long> casualCoinRewards() {
+        return readCoinRewards(plugin.getConfig(), "sprint.casual.coin-rewards", List.of(25_000L, 10_000L, 5_000L));
+    }
+
+    public List<WinnerRow> lastWinners() { return List.copyOf(lastWinners); }
+
+    public void addHardcoreScore(UUID islandUuid, long amount) {
+        if (islandUuid == null || amount == 0) return;
+        rolloverIfNeeded();
+        hardcore.compute(islandUuid, (id, existing) -> Math.max(0L, (existing == null ? 0L : existing) + amount));
+        if (hardcore.getOrDefault(islandUuid, 0L) == 0L) hardcore.remove(islandUuid);
+        scheduleSave();
+    }
+
+    public void addCasualScore(UUID playerUuid, int amount) {
+        if (playerUuid == null || amount == 0) return;
+        rolloverIfNeeded();
+        casual.compute(playerUuid, (id, existing) -> {
+            CasualEntry entry = existing == null ? new CasualEntry() : existing;
+            int before = entry.quests;
+            entry.quests = Math.max(0, Math.min(CASUAL_MAX, entry.quests + amount));
+            if (entry.quests == 0) return null;
+            if (before < CASUAL_MAX && entry.quests == CASUAL_MAX && entry.firstSevenAt == 0L) {
+                entry.firstSevenAt = System.currentTimeMillis();
+            }
+            if (entry.quests < CASUAL_MAX) entry.firstSevenAt = 0L;
+            return entry;
+        });
+        scheduleSave();
+    }
+
+    public void resetCurrentWeek() {
+        weekStart = mondayMidnightOf(System.currentTimeMillis());
+        hardcore.clear();
+        casual.clear();
+        lastPodiumWeekStart = 0L;
+        scheduleSave();
+    }
+
+    public void broadcastPodiumNow(boolean reward) {
+        broadcastPodium(reward, true);
+        if (reward) {
+            lastPodiumWeekStart = weekStart;
+            scheduleSave();
+        }
+    }
+
     // ---- Internals ----
 
     private void tick() {
         rolloverIfNeeded();
         long now = System.currentTimeMillis();
         if (now >= weekStart + PODIUM_OFFSET_MILLIS && lastPodiumWeekStart != weekStart) {
-            broadcastPodium();
+            broadcastPodium(true, true);
             lastPodiumWeekStart = weekStart;
             scheduleSave();
         }
@@ -162,14 +228,14 @@ public class WeeklySprintManager {
         scheduleSave();
     }
 
-    private void broadcastPodium() {
+    private void broadcastPodium(boolean reward, boolean rememberWinners) {
         List<HardcoreRow> hcTop = topHardcore(3);
         List<CasualRow> caTop = topCasual(3);
         if (hcTop.isEmpty() && caTop.isEmpty()) return;
 
-        var cfg = plugin.getConfig();
-        List<Long> hcCoins = readCoinRewards(cfg, "sprint.hardcore.coin-rewards", List.of(100_000L, 50_000L, 25_000L));
-        List<Long> caCoins = readCoinRewards(cfg, "sprint.casual.coin-rewards", List.of(25_000L, 10_000L, 5_000L));
+        List<Long> hcCoins = hardcoreCoinRewards();
+        List<Long> caCoins = casualCoinRewards();
+        List<WinnerRow> winners = new ArrayList<>();
 
         Bukkit.broadcast(Msg.mm("<gradient:#7B61FF:#4FC3F7><bold>Weekly Sprint Podium"));
         if (!hcTop.isEmpty()) {
@@ -182,7 +248,8 @@ public class WeeklySprintManager {
                 Bukkit.broadcast(Msg.mm("  " + medal(i) + " <yellow>" + name
                         + " <gray>– <white>" + row.blocks() + " blocks"
                         + (coins > 0 ? " <dark_gray>(<gold>+" + coins + "<dark_gray>)" : "")));
-                dispatchHardcoreReward(row.islandUuid(), name, i + 1, coins);
+                winners.add(new WinnerRow("hardcore", i + 1, name, row.blocks(), coins));
+                if (reward) dispatchHardcoreReward(row.islandUuid(), name, i + 1, coins);
             }
         }
         if (!caTop.isEmpty()) {
@@ -195,8 +262,14 @@ public class WeeklySprintManager {
                 Bukkit.broadcast(Msg.mm("  " + medal(i) + " <yellow>" + name
                         + " <gray>– <white>" + row.quests() + "/7"
                         + (coins > 0 ? " <dark_gray>(<gold>+" + coins + "<dark_gray>)" : "")));
-                dispatchCasualReward(row.playerUuid(), name, i + 1, coins);
+                winners.add(new WinnerRow("casual", i + 1, name, row.quests(), coins));
+                if (reward) dispatchCasualReward(row.playerUuid(), name, i + 1, coins);
             }
+        }
+        if (rememberWinners) {
+            lastWinners.clear();
+            lastWinners.addAll(winners);
+            scheduleSave();
         }
     }
 
@@ -319,6 +392,21 @@ public class WeeklySprintManager {
                 if (entry.quests > 0) casual.put(uuid, entry);
             }
         }
+        lastWinners.clear();
+        ConfigurationSection winners = data.getConfigurationSection("last-winners");
+        if (winners != null) {
+            for (String key : winners.getKeys(false)) {
+                ConfigurationSection sec = winners.getConfigurationSection(key);
+                if (sec == null) continue;
+                lastWinners.add(new WinnerRow(
+                        sec.getString("board", "unknown"),
+                        sec.getInt("place", 0),
+                        sec.getString("name", "Unknown"),
+                        sec.getLong("score", 0L),
+                        sec.getLong("coins", 0L)));
+            }
+            lastWinners.sort(Comparator.comparingInt((WinnerRow row) -> boardOrder(row.board())).thenComparingInt(WinnerRow::place));
+        }
         rolloverIfNeeded();
     }
 
@@ -354,15 +442,31 @@ public class WeeklySprintManager {
             ca.set(e.getKey() + ".quests", e.getValue().quests);
             ca.set(e.getKey() + ".first-seven-at", e.getValue().firstSevenAt);
         }
+        data.set("last-winners", null);
+        ConfigurationSection winners = data.createSection("last-winners");
+        for (int i = 0; i < lastWinners.size(); i++) {
+            WinnerRow row = lastWinners.get(i);
+            String path = String.valueOf(i);
+            winners.set(path + ".board", row.board());
+            winners.set(path + ".place", row.place());
+            winners.set(path + ".name", row.name());
+            winners.set(path + ".score", row.score());
+            winners.set(path + ".coins", row.coins());
+        }
     }
 
     // ---- Records ----
 
     public record HardcoreRow(UUID islandUuid, long blocks) {}
     public record CasualRow(UUID playerUuid, int quests, long firstSevenAt) {}
+    public record WinnerRow(String board, int place, String name, long score, long coins) {}
 
     private static final class CasualEntry {
         int quests;
         long firstSevenAt;
+    }
+
+    private static int boardOrder(String board) {
+        return "casual".equalsIgnoreCase(board) ? 1 : 0;
     }
 }

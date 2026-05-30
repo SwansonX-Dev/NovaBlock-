@@ -21,7 +21,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
             "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
-            "flags", "storage", "menu", "path", "freshstart", "fix", "setspawn");
+            "flags", "storage", "menu", "path", "sprint", "freshstart", "fix", "setspawn");
     private static final List<String> EVENTS = List.of(
             "diamond_hour", "double_coins", "blood_moon", "lush_bloom", "rift_storm", "stop");
 
@@ -34,7 +34,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         // Per-subcommand permission is checked below; allow entry if the user has
         // any admin permission at all (or the wildcard).
         if (args.length == 0) {
-            Msg.send(sender, "<yellow>/obadmin <reload|setphase|spawnboss|givecoins|event|wipe|freshstart>");
+            Msg.send(sender, "<yellow>/obadmin <reload|setphase|spawnboss|givecoins|event|wipe|sprint|freshstart>");
             return true;
         }
         String sub = args[0].toLowerCase();
@@ -144,6 +144,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             }
             case "menu" -> handleMenuEdit(sender, args);
             case "path" -> handlePath(sender, args);
+            case "sprint" -> handleSprint(sender, args);
             case "freshstart" -> handleFreshStart(sender, args);
             case "fix" -> handleFix(sender, args);
             case "setspawn" -> {
@@ -207,6 +208,60 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 Msg.send(sender, "<green>Reloaded seasonal path state and ensured xTags definitions.");
             }
             default -> Msg.send(sender, "<yellow>/obadmin path <status|points|resetplayer|reload>");
+        }
+    }
+
+    private void handleSprint(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            Msg.send(sender, "<yellow>/obadmin sprint <status|reset|podium|addscore>");
+            return;
+        }
+        switch (args[1].toLowerCase()) {
+            case "status" -> {
+                Msg.send(sender, "<gold>Weekly Sprint");
+                Msg.send(sender, "<gray>Hardcore entries: <white>" + plugin.sprint().topHardcore(Integer.MAX_VALUE).size());
+                Msg.send(sender, "<gray>Casual entries: <white>" + plugin.sprint().topCasual(Integer.MAX_VALUE).size());
+                Msg.send(sender, "<gray>Hardcore rewards: <yellow>" + plugin.sprint().hardcoreCoinRewards());
+                Msg.send(sender, "<gray>Casual rewards: <yellow>" + plugin.sprint().casualCoinRewards());
+            }
+            case "reset" -> {
+                plugin.sprint().resetCurrentWeek();
+                Msg.send(sender, "<green>Weekly sprint counters reset. Island progress and economy were not touched.");
+            }
+            case "podium" -> {
+                boolean reward = args.length >= 3 && args[2].equalsIgnoreCase("reward");
+                plugin.sprint().broadcastPodiumNow(reward);
+                Msg.send(sender, reward
+                        ? "<green>Broadcasted podium and dispatched configured rewards."
+                        : "<green>Broadcasted podium preview without rewards. Use /obadmin sprint podium reward to pay.");
+            }
+            case "addscore" -> {
+                if (args.length < 5) {
+                    Msg.send(sender, "<red>/obadmin sprint addscore <hardcore|casual> <player> <amount>");
+                    return;
+                }
+                int amount;
+                try { amount = Integer.parseInt(args[4]); }
+                catch (NumberFormatException ex) { Msg.send(sender, "<red>Amount must be an integer."); return; }
+
+                OfflinePlayer target = Bukkit.getOfflinePlayer(args[3]);
+                if (!target.hasPlayedBefore() && !target.isOnline()) {
+                    Msg.send(sender, "<red>That player has never joined this server.");
+                    return;
+                }
+                if (args[2].equalsIgnoreCase("hardcore")) {
+                    Island island = plugin.islands().ofPlayer(target.getUniqueId());
+                    if (island == null) { Msg.send(sender, "<red>Target has no island."); return; }
+                    plugin.sprint().addHardcoreScore(island.data().getId(), amount);
+                    Msg.send(sender, "<green>Adjusted Hardcore score for " + target.getName() + " by " + amount + ".");
+                } else if (args[2].equalsIgnoreCase("casual")) {
+                    plugin.sprint().addCasualScore(target.getUniqueId(), amount);
+                    Msg.send(sender, "<green>Adjusted Casual score for " + target.getName() + " by " + amount + ".");
+                } else {
+                    Msg.send(sender, "<red>Board must be hardcore or casual.");
+                }
+            }
+            default -> Msg.send(sender, "<yellow>/obadmin sprint <status|reset|podium|addscore>");
         }
     }
 
@@ -362,6 +417,9 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 case "path" -> List.of("status", "points", "resetplayer", "reload").stream()
                         .filter(n -> n.startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
+                case "sprint" -> List.of("status", "reset", "podium", "addscore").stream()
+                        .filter(n -> n.startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
                 case "fix" -> {
                     java.util.List<String> tabs = Bukkit.getOnlinePlayers().stream()
                             .map(Player::getName)
@@ -387,6 +445,22 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             return Bukkit.getOnlinePlayers().stream()
                     .map(Player::getName)
                     .filter(n -> n.toLowerCase().startsWith(args[2].toLowerCase()))
+                    .collect(Collectors.toList());
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("sprint")) {
+            if (args[1].equalsIgnoreCase("addscore")) {
+                return List.of("hardcore", "casual").stream()
+                        .filter(n -> n.startsWith(args[2].toLowerCase()))
+                        .collect(Collectors.toList());
+            }
+            if (args[1].equalsIgnoreCase("podium")) {
+                return "reward".startsWith(args[2].toLowerCase()) ? List.of("reward") : Collections.emptyList();
+            }
+        }
+        if (args.length == 4 && args[0].equalsIgnoreCase("sprint") && args[1].equalsIgnoreCase("addscore")) {
+            return Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(n -> n.toLowerCase().startsWith(args[3].toLowerCase()))
                     .collect(Collectors.toList());
         }
         return Collections.emptyList();

@@ -16,6 +16,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Weekly competition view with two boards: Hardcore (blocks broken this week)
@@ -66,7 +67,8 @@ public class SprintGui extends ChestGui {
         set(4, ItemBuilder.of(Material.CLOCK)
                 .name("<gradient:#7B61FF:#4FC3F7><bold>This Week")
                 .lore("<gray>" + label,
-                        "<gray>Sunday 20:00 podium broadcast.")
+                        "<gray>Sunday 20:00 podium broadcast.",
+                        "<gold>Rewards: <yellow>" + rewardLine(tab))
                 .glow().build(), null);
 
         if (tab == Tab.HARDCORE) renderHardcore(viewer);
@@ -74,6 +76,15 @@ public class SprintGui extends ChestGui {
 
         set(45, ItemBuilder.of(Material.ARROW).name("<gray>Leaderboard").build(),
                 e -> new LeaderboardGui(plugin).open(viewer));
+        set(46, ItemBuilder.of(Material.GOLD_BLOCK)
+                .name("<gold>Last Winners")
+                .lore(lastWinnerLore())
+                .build(),
+                e -> new SprintHistoryGui(plugin).open(viewer));
+        set(49, ItemBuilder.of(tab == Tab.HARDCORE ? Material.COMPASS : Material.NAME_TAG)
+                .name("<aqua>Your Rank")
+                .lore(rankLore(viewer))
+                .build(), null);
         set(53, ItemBuilder.of(Material.NETHER_STAR)
                 .name("<gradient:#7B61FF:#4FC3F7><bold>Main Menu")
                 .lore("<dark_gray>/ob menu").glow().build(),
@@ -154,6 +165,59 @@ public class SprintGui extends ChestGui {
         if (days > 0) return days + "d " + hours + "h";
         if (hours > 0) return hours + "h " + mins + "m";
         return mins + "m";
+    }
+
+    private List<String> rankLore(Player viewer) {
+        List<String> lore = new ArrayList<>();
+        if (tab == Tab.HARDCORE) {
+            Island island = plugin.islands().ofPlayer(viewer);
+            if (island == null) {
+                lore.add("<gray>Create an island to join Hardcore.");
+                return lore;
+            }
+            int rank = plugin.sprint().hardcoreRank(island.data().getId());
+            long score = plugin.sprint().hardcoreScore(island.data().getId());
+            lore.add(rank > 0 ? "<gray>Rank: <yellow>#" + rank : "<gray>Rank: <white>Unranked");
+            lore.add("<gray>Blocks this week: <white>" + score);
+            return lore;
+        }
+        int rank = plugin.sprint().casualRank(viewer.getUniqueId());
+        int quests = plugin.sprint().casualQuests(viewer.getUniqueId());
+        lore.add(rank > 0 ? "<gray>Rank: <yellow>#" + rank : "<gray>Rank: <white>Unranked");
+        lore.add("<gray>Quests this week: <white>" + quests + "<gray>/7");
+        return lore;
+    }
+
+    private String rewardLine(Tab tab) {
+        List<Long> rewards = tab == Tab.HARDCORE ? plugin.sprint().hardcoreCoinRewards() : plugin.sprint().casualCoinRewards();
+        List<String> parts = new ArrayList<>();
+        for (int i = 0; i < Math.min(3, rewards.size()); i++) {
+            long coins = rewards.get(i);
+            if (coins > 0) parts.add("#" + (i + 1) + " " + formatNumber(coins));
+        }
+        return parts.isEmpty() ? "No coin rewards" : String.join(" / ", parts);
+    }
+
+    private List<String> lastWinnerLore() {
+        List<WeeklySprintManager.WinnerRow> winners = plugin.sprint().lastWinners();
+        if (winners.isEmpty()) return List.of("<gray>No completed sprint yet.");
+        List<String> lore = new ArrayList<>();
+        for (WeeklySprintManager.WinnerRow row : winners) {
+            lore.add("<gray>" + prettyBoard(row.board()) + " #" + row.place()
+                    + ": <yellow>" + row.name()
+                    + " <dark_gray>(" + formatNumber(row.score()) + ")");
+            if (lore.size() >= 6) break;
+        }
+        lore.add("<yellow>Click to view.");
+        return lore;
+    }
+
+    static String prettyBoard(String board) {
+        return "casual".equalsIgnoreCase(board) ? "Casual" : "Hardcore";
+    }
+
+    static String formatNumber(long value) {
+        return String.format(Locale.US, "%,d", value);
     }
 
     private static ItemStack head(OfflinePlayer op) {
