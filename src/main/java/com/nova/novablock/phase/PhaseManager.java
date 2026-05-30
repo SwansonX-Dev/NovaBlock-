@@ -129,6 +129,9 @@ public class PhaseManager {
                         b(Material.WARPED_NYLIUM, 6),
                         b(Material.GLOWSTONE, 5),
                         b(Material.MAGMA_BLOCK, 6),
+                        // ~1.5% of rolls → ~20 obsidian across the phase, enough
+                        // to assemble the first Nether portal without paying shop.
+                        b(Material.OBSIDIAN, 2),
                         b(Material.CHEST, 3)
                 ),
                 Phase.mobList(EntityType.PIGLIN, EntityType.BLAZE, EntityType.MAGMA_CUBE, EntityType.HOGLIN),
