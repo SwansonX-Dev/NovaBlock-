@@ -31,11 +31,29 @@ public class Island {
     public IslandData data() { return data; }
 
     public Location centerBlock() { return data.centerBlock(); }
+    public Location netherCenterBlock() { return data.netherCenterBlock(); }
+
+    public boolean isNetherUnlocked() { return data.isNetherUnlocked(); }
 
     public void ensureSpawnPlatform() {
-        Location c = centerBlock();
+        ensurePlatformAt(centerBlock(), Material.GRASS_BLOCK);
+    }
+
+    /**
+     * Build the Nether bedrock pad and a placeholder center. Placeholder is
+     * NETHERRACK — the next {@link com.nova.novablock.listener.BlockListener}
+     * break + the {@link OneBlockRepairService} will both pick a phase-correct
+     * material once Slice 2 lands.
+     */
+    public void ensureNetherPlatform() {
+        Location c = netherCenterBlock();
         if (c.getWorld() == null) return;
-        c.getBlock().setType(Material.GRASS_BLOCK, false);
+        ensurePlatformAt(c, Material.NETHERRACK);
+    }
+
+    private void ensurePlatformAt(Location c, Material centerMaterial) {
+        if (c.getWorld() == null) return;
+        c.getBlock().setType(centerMaterial, false);
         // Permanent bedrock directly under the centre so the OneBlock can never fall into the void
         // even if the player breaks faster than the regen, or if a chunk reload skips a tick.
         c.clone().add(0, -1, 0).getBlock().setType(Material.BEDROCK, false);
@@ -77,6 +95,16 @@ public class Island {
         Location loc = data.spawnLocation();
         if (loc.getWorld() == null) {
             p.sendMessage("Your island world isn't loaded.");
+            return;
+        }
+        loc.getChunk().load();
+        p.teleportAsync(loc);
+    }
+
+    public void teleportNetherHome(Player p) {
+        Location loc = data.netherSpawnLocation();
+        if (loc.getWorld() == null) {
+            p.sendMessage("The Nether world isn't loaded.");
             return;
         }
         loc.getChunk().load();

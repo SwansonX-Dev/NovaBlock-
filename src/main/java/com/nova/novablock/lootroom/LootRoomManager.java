@@ -61,9 +61,12 @@ public class LootRoomManager implements Listener {
     }
 
     public void registerDefaultRooms() {
-        register(new ParkourRoom());
-        register(new ArenaRoom(plugin));
-        register(new PuzzleRoom());
+        register(new ParkourRoom(RoomTheme.OVERWORLD));
+        register(new ArenaRoom(plugin, RoomTheme.OVERWORLD));
+        register(new PuzzleRoom(RoomTheme.OVERWORLD));
+        register(new ParkourRoom(RoomTheme.NETHER));
+        register(new ArenaRoom(plugin, RoomTheme.NETHER));
+        register(new PuzzleRoom(RoomTheme.NETHER));
     }
 
     /**
@@ -163,7 +166,8 @@ public class LootRoomManager implements Listener {
         Island island = plugin.islands().get(offer.islandId);
         if (room == null || island == null) return;
         if (active.containsKey(p.getUniqueId())) finishEarly(p);
-        World instance = createInstanceWorld(p);
+        RoomTheme theme = themeForRoomId(room.id());
+        World instance = createInstanceWorld(p, theme);
         if (instance == null) {
             Msg.send(p, "<red>Could not create a private rift world. Try again.");
             return;
@@ -332,12 +336,19 @@ public class LootRoomManager implements Listener {
         plugin.seasonalPaths().award(p, com.nova.novablock.season.SeasonalPathManager.PathSource.LOOT_ROOM, 90);
     }
 
-    private World createInstanceWorld(Player player) {
+    private RoomTheme themeForRoomId(String roomId) {
+        // Suffix is everything after the final underscore — defensive for legacy
+        // unsuffixed room IDs (treat as overworld).
+        if (roomId.endsWith("_nether")) return RoomTheme.NETHER;
+        return RoomTheme.OVERWORLD;
+    }
+
+    private World createInstanceWorld(Player player, RoomTheme theme) {
         String name = "novablock_loot_" + player.getUniqueId().toString().replace("-", "").substring(0, 12)
                 + "_" + Long.toUnsignedString(System.currentTimeMillis(), 36);
         WorldCreator creator = new WorldCreator(name)
                 .generator(new IslandWorldManager.VoidGenerator())
-                .biomeProvider(new IslandWorldManager.SingleBiomeProvider(Biome.PLAINS))
+                .biomeProvider(new IslandWorldManager.SingleBiomeProvider(theme.biome()))
                 .generateStructures(false);
         World world = creator.createWorld();
         if (world == null) return null;

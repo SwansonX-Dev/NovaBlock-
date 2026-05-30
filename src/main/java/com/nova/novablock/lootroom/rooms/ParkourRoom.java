@@ -3,6 +3,7 @@ package com.nova.novablock.lootroom.rooms;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.lootroom.LootRoom;
 import com.nova.novablock.lootroom.LootRoomRun;
+import com.nova.novablock.lootroom.RoomTheme;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -48,8 +49,20 @@ public class ParkourRoom implements LootRoom {
             {2, 0, 0},   // 18: final approach to gold
     };
 
-    @Override public String id() { return "parkour"; }
-    @Override public String displayName() { return "Parkour Rift"; }
+    private final RoomTheme theme;
+
+    public ParkourRoom(RoomTheme theme) { this.theme = theme; }
+
+    @Override public String id() { return "parkour_" + theme.suffix(); }
+    @Override public String displayName() { return theme.displayPrefix() + "Parkour Rift"; }
+
+    private Material stepMaterial() {
+        return "nether".equals(theme.suffix()) ? Material.BLACKSTONE : Material.QUARTZ_BLOCK;
+    }
+
+    private Material goalMaterial() {
+        return "nether".equals(theme.suffix()) ? Material.GOLD_BLOCK : Material.GOLD_BLOCK;
+    }
 
     @Override
     public List<ItemStack> rewardItems(Island island) {
@@ -66,14 +79,14 @@ public class ParkourRoom implements LootRoom {
 
     @Override
     public Location build(Location anchor) {
-        // Start block at the anchor.
+        Material step = stepMaterial();
+        Material goal = goalMaterial();
         Location cur = anchor.clone();
-        cur.getBlock().setType(Material.QUARTZ_BLOCK);
+        cur.getBlock().setType(step);
         for (int i = 0; i < COURSE.length; i++) {
-            int[] step = COURSE[i];
-            cur.add(step[0], step[1], step[2]);
-            // Last block is gold (goal); rest are quartz.
-            cur.getBlock().setType(i == COURSE.length - 1 ? Material.GOLD_BLOCK : Material.QUARTZ_BLOCK);
+            int[] s = COURSE[i];
+            cur.add(s[0], s[1], s[2]);
+            cur.getBlock().setType(i == COURSE.length - 1 ? goal : step);
         }
         return anchor.clone().add(0.5, 1, 0.5);
     }
@@ -88,9 +101,9 @@ public class ParkourRoom implements LootRoom {
             run.markFinished();
             return;
         }
-        // Finish condition: standing on the gold block
+        // Finish condition: standing on the goal block
         Material under = p.getLocation().clone().subtract(0, 1, 0).getBlock().getType();
-        if (under == Material.GOLD_BLOCK) {
+        if (under == goalMaterial()) {
             run.addScore((int) Math.max(50, 250 - elapsed * 2));
             run.markFinished();
             return;

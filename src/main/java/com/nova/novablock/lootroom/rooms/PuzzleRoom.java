@@ -2,6 +2,7 @@ package com.nova.novablock.lootroom.rooms;
 
 import com.nova.novablock.lootroom.LootRoom;
 import com.nova.novablock.lootroom.LootRoomRun;
+import com.nova.novablock.lootroom.RoomTheme;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -28,8 +29,24 @@ public class PuzzleRoom implements LootRoom {
     private static final int TIME_LIMIT_SECONDS = 75;
     private static final int[] TARGETS_OFFSET = {-3, -2, -1, 0, 1, 2, 3};
 
-    @Override public String id() { return "puzzle"; }
-    @Override public String displayName() { return "Crystal Cache"; }
+    private final RoomTheme theme;
+
+    public PuzzleRoom(RoomTheme theme) { this.theme = theme; }
+
+    @Override public String id() { return "puzzle_" + theme.suffix(); }
+    @Override public String displayName() { return theme.displayPrefix() + "Crystal Cache"; }
+
+    private Material floorMaterial() {
+        return "nether".equals(theme.suffix()) ? Material.POLISHED_BLACKSTONE : Material.SMOOTH_BASALT;
+    }
+
+    private Material wallMaterial() {
+        return "nether".equals(theme.suffix()) ? Material.RED_NETHER_BRICKS : Material.TINTED_GLASS;
+    }
+
+    private Material ceilingMaterial() {
+        return "nether".equals(theme.suffix()) ? Material.SHROOMLIGHT : Material.SEA_LANTERN;
+    }
 
     @Override
     public List<ItemStack> rewardItems(com.nova.novablock.island.Island island) {
@@ -48,7 +65,7 @@ public class PuzzleRoom implements LootRoom {
     public Location build(Location anchor) {
         for (int dx = -4; dx <= 4; dx++) {
             for (int dz = -4; dz <= 4; dz++) {
-                anchor.clone().add(dx, 0, dz).getBlock().setType(Material.SMOOTH_BASALT);
+                anchor.clone().add(dx, 0, dz).getBlock().setType(floorMaterial());
                 for (int dy = 1; dy <= 5; dy++) {
                     anchor.clone().add(dx, dy, dz).getBlock().setType(Material.AIR);
                 }
@@ -59,7 +76,7 @@ public class PuzzleRoom implements LootRoom {
             for (int dz = -5; dz <= 5; dz++) {
                 if (Math.abs(dx) == 5 || Math.abs(dz) == 5) {
                     for (int dy = 1; dy <= 3; dy++) {
-                        anchor.clone().add(dx, dy, dz).getBlock().setType(Material.TINTED_GLASS);
+                        anchor.clone().add(dx, dy, dz).getBlock().setType(wallMaterial());
                     }
                 }
             }
@@ -74,7 +91,7 @@ public class PuzzleRoom implements LootRoom {
         target(anchor, 0, 2, 3);
         target(anchor, 3, 1, 3);
 
-        anchor.clone().add(0, 4, 0).getBlock().setType(Material.SEA_LANTERN);
+        anchor.clone().add(0, 4, 0).getBlock().setType(ceilingMaterial());
         return anchor.clone().add(0.5, 1, 0.5);
     }
 

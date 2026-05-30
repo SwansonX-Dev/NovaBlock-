@@ -78,6 +78,12 @@ public class YamlStorage implements DataStorage {
                 int level = y.getInt("level", 1);
                 long lastBossAt = y.getLong("lastBossAt", 0);
                 long lastLootRoomAt = y.getLong("lastLootRoomAt", 0);
+                long netherBlocksBroken = y.getLong("nether.blocksBroken", 0);
+                int netherPhaseIndex = y.getInt("nether.phaseIndex", 0);
+                int netherPhaseProgress = y.getInt("nether.phaseProgress", 0);
+                long netherLastBossAt = y.getLong("nether.lastBossAt", 0);
+                long netherLastLootRoomAt = y.getLong("nether.lastLootRoomAt", 0);
+                boolean netherUnlocked = y.getBoolean("nether.unlocked", false);
                 List<String> members = y.getStringList("members");
                 List<UUID> memberIds = new ArrayList<>();
                 for (String m : members) memberIds.add(UUID.fromString(m));
@@ -90,6 +96,12 @@ public class YamlStorage implements DataStorage {
                 data.setLevel(level);
                 data.setLastBossAt(lastBossAt);
                 data.setLastLootRoomAt(lastLootRoomAt);
+                data.setNetherBlocksBroken(netherBlocksBroken);
+                data.setNetherPhaseIndex(netherPhaseIndex);
+                data.setNetherPhaseProgress(netherPhaseProgress);
+                data.setNetherLastBossAt(netherLastBossAt);
+                data.setNetherLastLootRoomAt(netherLastLootRoomAt);
+                data.setNetherUnlocked(netherUnlocked);
                 data.getMembers().addAll(memberIds);
                 ConfigurationSection flagsSec = y.getConfigurationSection("flags");
                 if (flagsSec != null) {
@@ -132,6 +144,12 @@ public class YamlStorage implements DataStorage {
         y.set("level", data.getLevel());
         y.set("lastBossAt", data.getLastBossAt());
         y.set("lastLootRoomAt", data.getLastLootRoomAt());
+        y.set("nether.blocksBroken", data.getNetherBlocksBroken());
+        y.set("nether.phaseIndex", data.getNetherPhaseIndex());
+        y.set("nether.phaseProgress", data.getNetherPhaseProgress());
+        y.set("nether.lastBossAt", data.getNetherLastBossAt());
+        y.set("nether.lastLootRoomAt", data.getNetherLastLootRoomAt());
+        y.set("nether.unlocked", data.isNetherUnlocked());
         List<String> mem = new ArrayList<>();
         for (UUID u : data.getMembers()) mem.add(u.toString());
         y.set("members", mem);

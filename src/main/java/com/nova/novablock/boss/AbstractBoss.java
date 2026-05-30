@@ -41,7 +41,14 @@ public abstract class AbstractBoss implements Boss {
 
     @Override
     public BossFight spawn(Island island, Player trigger) {
-        Location loc = island.centerBlock().clone().add(0, 3, 0);
+        return spawn(island, trigger, island.centerBlock());
+    }
+
+    @Override
+    public BossFight spawn(Island island, Player trigger, Location arenaCenter) {
+        Location base = arenaCenter == null ? island.centerBlock() : arenaCenter;
+        Location loc = base.clone().add(0, 3, 0);
+        if (loc.getWorld() == null) return null;
         var entity = loc.getWorld().spawnEntity(loc, entityType());
         if (!(entity instanceof LivingEntity le)) {
             entity.remove();
@@ -82,7 +89,7 @@ public abstract class AbstractBoss implements Boss {
 
         BossFight fight = new BossFight(this, island, le, bar);
         fight.setArenaCenter(loc.clone());
-        buildArenaPlatform(fight, island.centerBlock().clone());
+        buildArenaPlatform(fight, base.clone());
         le.getPersistentDataContainer().set(BossManager.FIGHT_KEY, PersistentDataType.STRING, le.getUniqueId().toString());
         return fight;
     }

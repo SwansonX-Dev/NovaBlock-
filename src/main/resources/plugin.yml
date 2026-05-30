@@ -11,7 +11,7 @@ softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, LuckPerms, xPets, xTags]
 commands:
   oneblock:
     description: Main NovaBlock command
-    usage: /<command> [create|home|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|toggle|setspawn|friend|minions|sprint|help]
+    usage: /<command> [create|home [nether]|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|toggle|setspawn|friend|minions|sprint|help]
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command

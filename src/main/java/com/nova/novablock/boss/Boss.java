@@ -15,6 +15,15 @@ public interface Boss {
     /** Spawn the boss for an island. Returns the spawned BossFight handle. */
     BossFight spawn(Island island, Player triggeringPlayer);
 
+    /**
+     * Spawn variant that targets an explicit arena center — used by the Nether
+     * OneBlock so the fight happens at the Nether center, not the Overworld.
+     * Default falls back to the no-arena-center form for backwards compat.
+     */
+    default BossFight spawn(Island island, Player triggeringPlayer, org.bukkit.Location arenaCenter) {
+        return spawn(island, triggeringPlayer);
+    }
+
     /** Per-tick mechanic update for an active fight. */
     void onTick(BossFight fight);
 

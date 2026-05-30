@@ -17,15 +17,15 @@ import java.util.concurrent.ConcurrentMap;
 /**
  * Pushes one-shot action-bar prompts that the sidebar can't capture.
  * Currently only the "you're almost at the next phase" nudge — fires once per
- * (player, phase index) so we don't spam the player while they mine the final
- * 50 blocks.
+ * (player, dimension, phase index) so we don't spam the player while they mine
+ * the final 50 blocks, and so the Overworld and Nether nudges are independent.
  */
 public class ActionBarNudger implements Listener {
 
     private static final int APPROACH_THRESHOLD = 50;
 
     private final NovaBlock plugin;
-    private final ConcurrentMap<UUID, Integer> nudgedPhaseByPlayer = new ConcurrentHashMap<>();
+    private final ConcurrentMap<NudgeKey, Boolean> nudged = new ConcurrentHashMap<>();
 
     public ActionBarNudger(NovaBlock plugin) {
         this.plugin = plugin;
@@ -36,20 +36,33 @@ public class ActionBarNudger implements Listener {
         Player player = event.getPlayer();
         Island island = plugin.islands().ofPlayer(player);
         if (island == null) return;
-        Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
+        boolean nether = player.getWorld() != null
+                && player.getWorld().getName().equals(plugin.worlds().netherWorldName());
+        Phase phase = nether
+                ? plugin.phases().getNetherOrLast(island.data().getNetherPhaseIndex())
+                : plugin.phases().getOrLast(island.data().getPhaseIndex());
         if (phase == null) return;
-        int remaining = phase.getRequiredBlocks() - island.data().getPhaseProgress();
+        int progress = nether ? island.data().getNetherPhaseProgress() : island.data().getPhaseProgress();
+        int remaining = phase.getRequiredBlocks() - progress;
         if (remaining <= 0 || remaining > APPROACH_THRESHOLD) return;
 
-        int phaseIdx = island.data().getPhaseIndex();
-        Integer last = nudgedPhaseByPlayer.get(player.getUniqueId());
-        if (last != null && last == phaseIdx) return;
-        nudgedPhaseByPlayer.put(player.getUniqueId(), phaseIdx);
+        int phaseIdx = nether ? island.data().getNetherPhaseIndex() : island.data().getPhaseIndex();
+        NudgeKey key = new NudgeKey(player.getUniqueId(), nether, phaseIdx);
+        if (nudged.putIfAbsent(key, Boolean.TRUE) != null) return;
 
-        Phase next = plugin.phases().get(phaseIdx + 1);
-        String label = next == null ? "Prestige" : ("Phase " + (phaseIdx + 2) + ": " + next.getDisplayName());
-        String color = next == null ? "<gradient:#7B61FF:#4FC3F7>" : ("<" + next.getThemeColor() + ">");
+        Phase next = nether ? plugin.phases().getNether(phaseIdx + 1) : plugin.phases().get(phaseIdx + 1);
+        String label;
+        String color;
+        if (next == null) {
+            label = nether ? "Conquer the Nether" : "Prestige";
+            color = "<gradient:#7B61FF:#4FC3F7>";
+        } else {
+            label = (nether ? "Nether Phase " : "Phase ") + (phaseIdx + 2) + ": " + next.getDisplayName();
+            color = "<" + next.getThemeColor() + ">";
+        }
         Msg.actionBar(player,
                 "<gold><bold>" + remaining + "</bold> blocks to " + color + label);
     }
+
+    private record NudgeKey(UUID uuid, boolean nether, int phaseIndex) {}
 }

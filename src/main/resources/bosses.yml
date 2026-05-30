@@ -20,3 +20,10 @@ void_herald:
   damage: 10
   scaling-per-phase: 0.25
   coins: 6000
+
+# Climax boss of the Nether OneBlock (final Nether phase).
+ashen_warlord:
+  health: 400
+  damage: 14
+  scaling-per-phase: 0.25
+  coins: 8000

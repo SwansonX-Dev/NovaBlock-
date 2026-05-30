@@ -24,7 +24,16 @@ public class IslandManager {
     public void loadAll() {
         for (IslandData data : plugin.storage().loadAllIslands()) {
             plugin.worlds().ensureWorld(data.getWorldName());
-            register(new Island(plugin, data));
+            Island island = new Island(plugin, data);
+            // Silent migration: any island already past the Nether Gates phase
+            // (phaseIndex >= 6, i.e. has cleared Phase 6) gets its Nether
+            // platform built on first load. Brand-new islands flow through
+            // BlockListener.advancePhase when they cross the unlock point.
+            if (data.getPhaseIndex() >= 6 && plugin.worlds().isNetherEnabled()) {
+                if (!data.isNetherUnlocked()) data.setNetherUnlocked(true);
+                island.ensureNetherPlatform();
+            }
+            register(island);
         }
         recalculateNextSlot();
     }
@@ -54,13 +63,21 @@ public class IslandManager {
     }
     public Island ofPlayer(Player p) { return ofPlayer(p.getUniqueId()); }
 
-    /** Resolve which island a location belongs to by checking grid slot. */
+    /**
+     * Resolve which island a location belongs to by checking grid slot. The
+     * grid is shared between the Overworld and Nether OneBlock worlds — an
+     * island has the same {@code (slotX, slotZ)} in both.
+     */
     public Island atLocation(Location loc) {
         if (loc.getWorld() == null) return null;
         int slotX = nearestSlot(loc.getBlockX());
         int slotZ = nearestSlot(loc.getBlockZ());
+        String worldName = loc.getWorld().getName();
+        String netherWorldName = plugin.worlds().netherWorldName();
         for (Island i : byId.values()) {
-            if (!loc.getWorld().getName().equals(i.data().getWorldName())) continue;
+            String islandWorld = i.data().getWorldName();
+            boolean worldMatches = worldName.equals(islandWorld) || worldName.equals(netherWorldName);
+            if (!worldMatches) continue;
             if (i.data().getSlotX() == slotX && i.data().getSlotZ() == slotZ) return i;
         }
         return null;

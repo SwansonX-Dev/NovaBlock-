@@ -46,6 +46,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             case "reload" -> {
                 plugin.configs().loadAll();
                 plugin.phases().loadPhases();
+                plugin.phases().loadNetherPhases();
                 plugin.quests().loadDailyQuests();
                 plugin.antiAfk().reload();
                 plugin.prestige().reload();

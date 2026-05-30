@@ -4,6 +4,12 @@
 # Dedicated world used for all newly-created OneBlock islands.
 islandWorld: oneblock
 
+# Nether OneBlock world. Created at startup if netherEnabled is true.
+netherIslandWorld: oneblock_nether
+# Toggle the entire Nether dimension. When false: /ob home nether is rejected,
+# the world is not created, and existing Nether progress is preserved but inert.
+netherEnabled: true
+
 # Distance in blocks between island slots in the OneBlock world.
 # Default keeps islands well-separated to avoid TNT/projectile crossover.
 slotSize: 256
@@ -18,6 +24,9 @@ keepInventoryOnDeath: true
 cooldowns:
   bossMinBlocks: 300
   lootRoomMinBlocks: 400
+  # Same rhythm as the Overworld for now — tune to taste.
+  netherBossMinBlocks: 300
+  netherLootRoomMinBlocks: 400
 
 anti-afk:
   enabled: false

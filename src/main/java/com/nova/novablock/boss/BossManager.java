@@ -48,6 +48,7 @@ public class BossManager implements Listener {
         register(new MagmaTyrant(plugin));
         register(new FrostbornSentinel(plugin));
         register(new VoidHerald(plugin));
+        register(new com.nova.novablock.boss.bosses.AshenWarlord(plugin));
     }
 
     /**
@@ -76,9 +77,14 @@ public class BossManager implements Listener {
     public java.util.Set<String> bossIds() { return java.util.Collections.unmodifiableSet(registry.keySet()); }
 
     public BossFight spawn(String id, Island island, Player triggering) {
+        return spawn(id, island, triggering, false);
+    }
+
+    public BossFight spawn(String id, Island island, Player triggering, boolean inNether) {
         Boss boss = registry.get(id);
         if (boss == null) return null;
-        BossFight fight = boss.spawn(island, triggering);
+        org.bukkit.Location arenaCenter = inNether ? island.netherCenterBlock() : island.centerBlock();
+        BossFight fight = boss.spawn(island, triggering, arenaCenter);
         if (fight == null) return null;
         active.put(fight.entityId(), fight);
         fight.addParticipant(triggering);

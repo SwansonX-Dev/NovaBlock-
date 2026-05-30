@@ -3,6 +3,7 @@ package com.nova.novablock.lootroom.rooms;
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.lootroom.LootRoom;
 import com.nova.novablock.lootroom.LootRoomRun;
+import com.nova.novablock.lootroom.RoomTheme;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -16,12 +17,20 @@ import java.util.concurrent.ThreadLocalRandom;
 public class ArenaRoom implements LootRoom {
 
     private final NovaBlock plugin;
+    private final RoomTheme theme;
     private static final int RADIUS = 10;
 
-    public ArenaRoom(NovaBlock plugin) { this.plugin = plugin; }
+    public ArenaRoom(NovaBlock plugin, RoomTheme theme) {
+        this.plugin = plugin;
+        this.theme = theme;
+    }
 
-    @Override public String id() { return "arena"; }
-    @Override public String displayName() { return "Arena Rift"; }
+    @Override public String id() { return "arena_" + theme.suffix(); }
+    @Override public String displayName() { return theme.displayPrefix() + "Arena Rift"; }
+
+    private Material floorMaterial() {
+        return "nether".equals(theme.suffix()) ? Material.NETHER_BRICKS : Material.POLISHED_BLACKSTONE_BRICKS;
+    }
 
     @Override
     public Location build(Location anchor) {
@@ -29,7 +38,7 @@ public class ArenaRoom implements LootRoom {
         for (int dx = -RADIUS; dx <= RADIUS; dx++) {
             for (int dz = -RADIUS; dz <= RADIUS; dz++) {
                 if (dx * dx + dz * dz <= RADIUS * RADIUS) {
-                    anchor.clone().add(dx, 0, dz).getBlock().setType(Material.POLISHED_BLACKSTONE_BRICKS);
+                    anchor.clone().add(dx, 0, dz).getBlock().setType(floorMaterial());
                     for (int dy = 1; dy <= 6; dy++) {
                         anchor.clone().add(dx, dy, dz).getBlock().setType(Material.AIR);
                     }
@@ -76,11 +85,11 @@ public class ArenaRoom implements LootRoom {
                 return;
             }
             int toSpawn = 3 + wave * 2;
-            EntityType[] pool = {EntityType.ZOMBIE, EntityType.SKELETON, EntityType.SPIDER, EntityType.HUSK};
+            var pool = theme.mobPool();
             var rng = ThreadLocalRandom.current();
             for (int i = 0; i < toSpawn; i++) {
                 Location at = run.anchor().clone().add(rng.nextInt(-RADIUS + 2, RADIUS - 2), 1, rng.nextInt(-RADIUS + 2, RADIUS - 2));
-                var ent = p.getWorld().spawnEntity(at, pool[rng.nextInt(pool.length)]);
+                var ent = p.getWorld().spawnEntity(at, pool.get(rng.nextInt(pool.size())));
                 if (ent instanceof LivingEntity le) {
                     le.setRemoveWhenFarAway(false);
                     if (ent instanceof org.bukkit.entity.Mob mob) mob.setTarget(p);

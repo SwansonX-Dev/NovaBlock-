@@ -12,6 +12,7 @@ public class PhaseManager {
 
     private final NovaBlock plugin;
     private final List<Phase> phases = new ArrayList<>();
+    private final List<Phase> netherPhases = new ArrayList<>();
 
     public PhaseManager(NovaBlock plugin) { this.plugin = plugin; }
 
@@ -35,7 +36,7 @@ public class PhaseManager {
                         b(Material.CHEST, 3)
                 ),
                 Phase.mobList(EntityType.COW, EntityType.PIG, EntityType.CHICKEN, EntityType.SHEEP, EntityType.VILLAGER),
-                null, List.of("parkour")));
+                null, List.of("parkour_overworld")));
 
         phases.add(p(1, "underground", "Underground", "#8B6F47", 450,
                 List.of(
@@ -55,7 +56,7 @@ public class PhaseManager {
                         b(Material.CHEST, 3)
                 ),
                 Phase.mobList(EntityType.ZOMBIE, EntityType.SKELETON, EntityType.SPIDER, EntityType.SILVERFISH),
-                null, List.of("arena")));
+                null, List.of("arena_overworld")));
 
         phases.add(p(2, "snow", "Frozen Tundra", "#A0E7FF", 650,
                 List.of(
@@ -73,7 +74,7 @@ public class PhaseManager {
                         b(Material.CHEST, 3)
                 ),
                 Phase.mobList(EntityType.STRAY, EntityType.POLAR_BEAR, EntityType.WOLF, EntityType.FOX),
-                "frostborn_sentinel", List.of("puzzle", "arena")));
+                "frostborn_sentinel", List.of("puzzle_overworld", "arena_overworld")));
 
         phases.add(p(3, "desert", "Burning Desert", "#FFD27A", 850,
                 List.of(
@@ -97,7 +98,7 @@ public class PhaseManager {
                         EntityType.RABBIT, EntityType.RABBIT,
                         EntityType.ARMADILLO, EntityType.ARMADILLO,
                         EntityType.CAMEL),
-                null, List.of("parkour", "puzzle")));
+                null, List.of("parkour_overworld", "puzzle_overworld")));
 
         phases.add(p(4, "ocean", "Sunken Reef", "#3FB6FF", 1050,
                 List.of(
@@ -114,7 +115,7 @@ public class PhaseManager {
                         b(Material.CHEST, 3)
                 ),
                 Phase.mobList(EntityType.DROWNED, EntityType.GUARDIAN, EntityType.PUFFERFISH, EntityType.SQUID),
-                null, List.of("arena")));
+                null, List.of("arena_overworld")));
 
         phases.add(p(5, "nether", "Nether Gates", "#FF4D4D", 1300,
                 List.of(
@@ -131,7 +132,7 @@ public class PhaseManager {
                         b(Material.CHEST, 3)
                 ),
                 Phase.mobList(EntityType.PIGLIN, EntityType.BLAZE, EntityType.MAGMA_CUBE, EntityType.HOGLIN),
-                "magma_tyrant", List.of("arena", "puzzle")));
+                "magma_tyrant", List.of("arena_overworld", "puzzle_overworld")));
 
         phases.add(p(6, "ancient", "Ancient Mines", "#FFB347", 1600,
                 List.of(
@@ -149,7 +150,7 @@ public class PhaseManager {
                 // Wardens removed from random spawns — too punishing for casual mining.
                 // Boss-style Warden fights can still be triggered explicitly via the boss system.
                 Phase.mobList(EntityType.SILVERFISH, EntityType.ZOMBIE, EntityType.ALLAY, EntityType.ENDERMITE),
-                null, List.of("puzzle")));
+                null, List.of("puzzle_overworld")));
 
         phases.add(p(7, "garden", "Lush Garden", "#7BFFBB", 1900,
                 List.of(
@@ -166,7 +167,7 @@ public class PhaseManager {
                         b(Material.CHEST, 3)
                 ),
                 Phase.mobList(EntityType.AXOLOTL, EntityType.GLOW_SQUID, EntityType.ALLAY, EntityType.PARROT),
-                null, List.of("parkour", "puzzle")));
+                null, List.of("parkour_overworld", "puzzle_overworld")));
 
         phases.add(p(8, "stronghold", "Stronghold Halls", "#9966CC", 2300,
                 List.of(
@@ -181,7 +182,7 @@ public class PhaseManager {
                         b(Material.CHEST, 3)
                 ),
                 Phase.mobList(EntityType.SILVERFISH, EntityType.ENDERMAN, EntityType.EVOKER, EntityType.VINDICATOR, EntityType.VILLAGER),
-                null, List.of("arena", "puzzle")));
+                null, List.of("arena_overworld", "puzzle_overworld")));
 
         phases.add(p(9, "end", "End Voyage", "#E6E0FF", 2800,
                 List.of(
@@ -195,7 +196,7 @@ public class PhaseManager {
                         b(Material.CHEST, 3)
                 ),
                 Phase.mobList(EntityType.ENDERMAN, EntityType.SHULKER, EntityType.PHANTOM),
-                "void_herald", List.of("arena")));
+                "void_herald", List.of("arena_overworld")));
 
         phases.add(p(10, "celestial", "Celestial Vault", "#FFE680", 3400,
                 List.of(
@@ -210,7 +211,7 @@ public class PhaseManager {
                         b(Material.CHEST, 3)
                 ),
                 Phase.mobList(EntityType.ALLAY, EntityType.VEX, EntityType.BREEZE),
-                null, List.of("puzzle", "arena")));
+                null, List.of("puzzle_overworld", "arena_overworld")));
 
         phases.add(p(11, "void", "Void Beyond", "#9C27B0", 4200,
                 List.of(
@@ -229,7 +230,7 @@ public class PhaseManager {
                 // Warden / Wither / Ravager removed from random spawns — would
                 // routinely kill players just for mining. Reserved for explicit boss fights.
                 Phase.mobList(EntityType.VEX, EntityType.PHANTOM, EntityType.EVOKER, EntityType.SHULKER),
-                "void_herald", List.of("arena")));
+                "void_herald", List.of("arena_overworld")));
     }
 
     private static Phase p(int idx, String id, String name, String color, int req,
@@ -254,4 +255,178 @@ public class PhaseManager {
 
     public List<Phase> all() { return Collections.unmodifiableList(phases); }
     public int phaseCount() { return phases.size(); }
+
+    /**
+     * Twelve Nether phases — unlocked when an island clears Overworld Phase 6.
+     * Mirrors the Overworld {@code requiredBlocks} curve so the curve doesn't
+     * surprise returning players. Final phase carries the {@code ashen_warlord}
+     * climax boss. Loot-room IDs use the {@code _nether} suffix added in Slice 3.
+     */
+    public void loadNetherPhases() {
+        netherPhases.clear();
+        netherPhases.add(p(0, "nether_outpost", "Crimson Outpost", "#FF4D4D", 250,
+                List.of(
+                        b(Material.NETHERRACK, 48),
+                        b(Material.NETHER_BRICKS, 18),
+                        b(Material.RED_NETHER_BRICKS, 8),
+                        b(Material.NETHER_QUARTZ_ORE, 10),
+                        b(Material.GLOWSTONE, 5),
+                        b(Material.SOUL_SAND, 4),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.ZOMBIFIED_PIGLIN, EntityType.PIGLIN),
+                null, List.of("parkour_nether")));
+        netherPhases.add(p(1, "nether_crimson_grove", "Crimson Grove", "#A8324A", 400,
+                List.of(
+                        b(Material.CRIMSON_NYLIUM, 36),
+                        b(Material.CRIMSON_STEM, 18),
+                        b(Material.CRIMSON_HYPHAE, 8),
+                        b(Material.NETHER_WART_BLOCK, 14),
+                        b(Material.SHROOMLIGHT, 6),
+                        b(Material.CRIMSON_FUNGUS, 4),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.PIGLIN, EntityType.HOGLIN),
+                null, List.of("arena_nether")));
+        netherPhases.add(p(2, "nether_basalt_delta", "Basalt Delta", "#3C2F4A", 550,
+                List.of(
+                        b(Material.BASALT, 30),
+                        b(Material.SMOOTH_BASALT, 12),
+                        b(Material.BLACKSTONE, 18),
+                        b(Material.MAGMA_BLOCK, 12),
+                        b(Material.GLOWSTONE, 6),
+                        b(Material.GRAVEL, 6),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.MAGMA_CUBE, EntityType.STRIDER, EntityType.GHAST),
+                null, List.of("puzzle_nether")));
+        netherPhases.add(p(3, "nether_warped_grove", "Warped Grove", "#1C9A91", 750,
+                List.of(
+                        b(Material.WARPED_NYLIUM, 36),
+                        b(Material.WARPED_STEM, 18),
+                        b(Material.WARPED_HYPHAE, 8),
+                        b(Material.WARPED_WART_BLOCK, 14),
+                        b(Material.SHROOMLIGHT, 6),
+                        b(Material.TWISTING_VINES, 4),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.ENDERMAN, EntityType.PIGLIN),
+                null, List.of("parkour_nether")));
+        netherPhases.add(p(4, "nether_soul_valley", "Soul Valley", "#7CDFFF", 950,
+                List.of(
+                        b(Material.SOUL_SAND, 30),
+                        b(Material.SOUL_SOIL, 22),
+                        b(Material.BONE_BLOCK, 14),
+                        b(Material.SOUL_TORCH, 4),
+                        b(Material.BLACKSTONE, 10),
+                        b(Material.GLOWSTONE, 4),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.SKELETON, EntityType.GHAST),
+                null, List.of("arena_nether")));
+        netherPhases.add(p(5, "nether_blackstone_keep", "Blackstone Keep", "#2A2230", 1200,
+                List.of(
+                        b(Material.POLISHED_BLACKSTONE, 26),
+                        b(Material.POLISHED_BLACKSTONE_BRICKS, 18),
+                        b(Material.CHISELED_POLISHED_BLACKSTONE, 8),
+                        b(Material.GILDED_BLACKSTONE, 6),
+                        b(Material.BLACKSTONE, 14),
+                        b(Material.NETHER_GOLD_ORE, 8),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.PIGLIN, EntityType.WITHER_SKELETON),
+                null, List.of("puzzle_nether")));
+        netherPhases.add(p(6, "nether_bastion", "Bastion Halls", "#C7A04B", 1500,
+                List.of(
+                        b(Material.POLISHED_BLACKSTONE_BRICKS, 22),
+                        b(Material.NETHER_BRICKS, 14),
+                        b(Material.GILDED_BLACKSTONE, 10),
+                        b(Material.GOLD_BLOCK, 4),
+                        b(Material.CHAIN, 4),
+                        b(Material.LODESTONE, 2),
+                        b(Material.MAGMA_BLOCK, 8),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.PIGLIN_BRUTE, EntityType.PIGLIN, EntityType.HOGLIN),
+                null, List.of("arena_nether")));
+        netherPhases.add(p(7, "nether_magma_caverns", "Magma Caverns", "#FF6E2B", 1850,
+                List.of(
+                        b(Material.MAGMA_BLOCK, 28),
+                        b(Material.NETHER_QUARTZ_ORE, 14),
+                        b(Material.BASALT, 14),
+                        b(Material.GLOWSTONE, 8),
+                        b(Material.OBSIDIAN, 4),
+                        b(Material.SOUL_FIRE, 2),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.MAGMA_CUBE, EntityType.BLAZE),
+                null, List.of("parkour_nether")));
+        netherPhases.add(p(8, "nether_fortress", "Fortress of Ash", "#5A2A2A", 2250,
+                List.of(
+                        b(Material.NETHER_BRICKS, 30),
+                        b(Material.NETHER_BRICK_FENCE, 10),
+                        b(Material.NETHER_WART_BLOCK, 8),
+                        b(Material.GLOWSTONE, 6),
+                        b(Material.SOUL_SAND, 4),
+                        b(Material.NETHER_WART, 6),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.BLAZE, EntityType.WITHER_SKELETON),
+                null, List.of("arena_nether")));
+        netherPhases.add(p(9, "nether_warped_temple", "Warped Temple", "#3CD6B7", 2700,
+                List.of(
+                        b(Material.WARPED_HYPHAE, 24),
+                        b(Material.WARPED_PLANKS, 10),
+                        b(Material.RESPAWN_ANCHOR, 1),
+                        b(Material.GLOWSTONE, 8),
+                        b(Material.GILDED_BLACKSTONE, 4),
+                        b(Material.SHROOMLIGHT, 6),
+                        b(Material.ENDER_CHEST, 2),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.ENDERMAN, EntityType.PIGLIN_BRUTE),
+                null, List.of("puzzle_nether")));
+        netherPhases.add(p(10, "nether_blazing_throne", "Blazing Throne", "#FFB347", 3300,
+                List.of(
+                        b(Material.GILDED_BLACKSTONE, 20),
+                        b(Material.MAGMA_BLOCK, 14),
+                        b(Material.GLOWSTONE, 10),
+                        b(Material.NETHERITE_BLOCK, 1),
+                        b(Material.GOLD_BLOCK, 4),
+                        b(Material.NETHER_GOLD_ORE, 10),
+                        b(Material.SHROOMLIGHT, 4),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.BLAZE, EntityType.GHAST, EntityType.MAGMA_CUBE),
+                null, List.of("arena_nether")));
+        netherPhases.add(p(11, "nether_ashen_throne", "Ashen Throne", "#FF6347", 4200,
+                List.of(
+                        b(Material.ANCIENT_DEBRIS, 1),
+                        b(Material.NETHERITE_BLOCK, 1),
+                        b(Material.GILDED_BLACKSTONE, 12),
+                        b(Material.CRYING_OBSIDIAN, 6),
+                        b(Material.OBSIDIAN, 8),
+                        b(Material.RESPAWN_ANCHOR, 2),
+                        b(Material.SOUL_FIRE, 4),
+                        b(Material.GLOWSTONE, 8),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.WITHER_SKELETON, EntityType.PIGLIN_BRUTE),
+                "ashen_warlord", List.of("arena_nether")));
+    }
+
+    public Phase getNether(int index) {
+        if (index < 0 || index >= netherPhases.size()) return null;
+        return netherPhases.get(index);
+    }
+
+    public Phase getNetherOrLast(int index) {
+        if (netherPhases.isEmpty()) return null;
+        if (index < 0) return netherPhases.get(0);
+        if (index >= netherPhases.size()) return netherPhases.get(netherPhases.size() - 1);
+        return netherPhases.get(index);
+    }
+
+    public List<Phase> allNether() { return Collections.unmodifiableList(netherPhases); }
+    public int netherPhaseCount() { return netherPhases.size(); }
 }

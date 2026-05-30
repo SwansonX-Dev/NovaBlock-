@@ -59,12 +59,28 @@ public final class OneBlockRepairService {
         int repaired = 0;
         for (Island island : plugin.islands().all().values()) {
             if (repair(island, false)) repaired++;
+            if (island.isNetherUnlocked() && repairNether(island, false)) repaired++;
         }
         return repaired;
     }
 
     public boolean repair(@NotNull Island island, boolean force) {
-        Location center = island.centerBlock();
+        return repairAt(island, island.centerBlock(), false, force);
+    }
+
+    /**
+     * Mirror of {@link #repair(Island, boolean)} but for the Nether center.
+     * Picks replacements from the Nether phase table (added in Slice 2);
+     * until then it falls back to NETHERRACK via {@link #netherReplacementFor}.
+     */
+    public boolean repairNether(@NotNull Island island, boolean force) {
+        if (!island.isNetherUnlocked()) return false;
+        Location center = island.netherCenterBlock();
+        if (center.getWorld() == null) return false;
+        return repairAt(island, center, true, force);
+    }
+
+    private boolean repairAt(@NotNull Island island, @NotNull Location center, boolean nether, boolean force) {
         if (center.getWorld() == null) return false;
         center.getChunk().load();
 
@@ -75,9 +91,9 @@ public final class OneBlockRepairService {
 
         Block block = center.getBlock();
         if (!force && !needsRepair(block.getType())) return false;
-        Material replacement = replacementFor(island);
+        Material replacement = nether ? netherReplacementFor(island) : replacementFor(island);
         block.setType(replacement, false);
-        refillPreview(island);
+        if (!nether) refillPreview(island);
         return true;
     }
 
@@ -105,6 +121,26 @@ public final class OneBlockRepairService {
             }
         }
         return Material.GRASS_BLOCK;
+    }
+
+    /**
+     * Slice 1 placeholder: until Nether phases land in Slice 2, the Nether
+     * center repairs to NETHERRACK. Slice 2 swaps this to read from
+     * {@code plugin.phases().getNetherOrLast(...)}.
+     */
+    private @NotNull Material netherReplacementFor(@NotNull Island island) {
+        Phase phase = plugin.phases().getNetherOrLast(island.data().getNetherPhaseIndex());
+        if (phase != null) {
+            for (int i = 0; i < 12; i++) {
+                Material rolled = phase.rollBlock(ThreadLocalRandom.current());
+                if (!needsRepair(rolled)) return rolled;
+            }
+            for (var phaseBlock : phase.getBlocks()) {
+                Material candidate = phaseBlock.material();
+                if (!needsRepair(candidate)) return candidate;
+            }
+        }
+        return Material.NETHERRACK;
     }
 
     private void refillPreview(@NotNull Island island) {

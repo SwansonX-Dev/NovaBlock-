@@ -60,8 +60,22 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 if (!p.hasPermission("novablock.home")) { denied(p); return true; }
                 Island island = plugin.islands().ofPlayer(p);
                 if (island == null) { Msg.send(p, "<red>You don't have an island yet. Try <yellow>/ob create</yellow>."); return true; }
-                plugin.repairs().repair(island, false);
-                island.teleportHome(p);
+                boolean wantsNether = args.length > 1 && args[1].equalsIgnoreCase("nether");
+                if (wantsNether) {
+                    if (!plugin.worlds().isNetherEnabled()) {
+                        Msg.send(p, "<red>The Nether dimension is disabled on this server.");
+                        return true;
+                    }
+                    if (!island.isNetherUnlocked()) {
+                        Msg.send(p, "<red>The Nether is sealed. Reach Phase 7 to break through.");
+                        return true;
+                    }
+                    plugin.repairs().repairNether(island, false);
+                    island.teleportNetherHome(p);
+                } else {
+                    plugin.repairs().repair(island, false);
+                    island.teleportHome(p);
+                }
             }
             case "menu" -> { if (perm(p, "novablock.menu")) new MainMenuGui(plugin).open(p); }
             case "prophecy" -> { if (perm(p, "novablock.prophecy")) new ProphecyGui(plugin).open(p); }
@@ -340,6 +354,12 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             return org.bukkit.Bukkit.getOnlinePlayers().stream()
                     .map(Player::getName)
                     .filter(n -> n.toLowerCase().startsWith(prefix))
+                    .collect(Collectors.toList());
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("home")) {
+            String prefix = args[1].toLowerCase();
+            return java.util.stream.Stream.of("nether")
+                    .filter(s -> s.startsWith(prefix))
                     .collect(Collectors.toList());
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("friend") || args[0].equalsIgnoreCase("friends") || args[0].equalsIgnoreCase("f"))) {

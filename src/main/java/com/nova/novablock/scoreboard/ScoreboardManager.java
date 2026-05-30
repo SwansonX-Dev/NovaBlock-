@@ -104,6 +104,8 @@ public class ScoreboardManager {
         PlayerProgression prog = plugin.progression().get(p);
         List<String> lines = new ArrayList<>();
         if (island != null) {
+            boolean inNether = p.getWorld() != null
+                    && p.getWorld().getName().equals(plugin.worlds().netherWorldName());
             int pLvl = island.data().getPrestigeLevel();
             if (pLvl > 0) {
                 lines.add(plugin.prestige().title(pLvl) + " <gray>(<white>" + pLvl + "<gray>)");
@@ -113,11 +115,14 @@ public class ScoreboardManager {
                     lines.add("<aqua>Bonus: <yellow>+" + coinPct + "%<gray> coins <yellow>+" + xpPct + "%<gray> xp");
                 }
             }
-            Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
+            Phase phase = inNether
+                    ? plugin.phases().getNetherOrLast(island.data().getNetherPhaseIndex())
+                    : plugin.phases().getOrLast(island.data().getPhaseIndex());
             String color = phase == null ? "white" : phase.getThemeColor();
             String name = phase == null ? "?" : phase.getDisplayName();
-            lines.add("<gray>Phase: <" + color + ">" + name);
-            int prog2 = island.data().getPhaseProgress();
+            String label = inNether ? "Nether" : "Phase";
+            lines.add("<gray>" + label + ": <" + color + ">" + name);
+            int prog2 = inNether ? island.data().getNetherPhaseProgress() : island.data().getPhaseProgress();
             int req = phase == null ? 1 : phase.getRequiredBlocks();
             int remaining = Math.max(0, req - prog2);
             if (remaining > 0 && remaining <= 50) {
@@ -125,8 +130,9 @@ public class ScoreboardManager {
             } else {
                 lines.add("<gray>" + prog2 + " / " + req + " blocks");
             }
-            lines.add("<gray>Total: <white>" + island.data().getBlocksBroken());
-            String riftLine = nextRiftLine(island);
+            long totalBlocks = inNether ? island.data().getNetherBlocksBroken() : island.data().getBlocksBroken();
+            lines.add("<gray>Total: <white>" + totalBlocks);
+            String riftLine = nextRiftLine(island, inNether);
             if (riftLine != null) lines.add(riftLine);
             lines.add("<gold>Coins: <yellow>" + plugin.economy().balance(island));
             var path = plugin.seasonalPaths().activePath();
@@ -158,13 +164,18 @@ public class ScoreboardManager {
      * it once the player is within 50 blocks of either gate so they feel something
      * coming, instead of crunching aimlessly.
      */
-    private String nextRiftLine(Island island) {
+    private String nextRiftLine(Island island, boolean inNether) {
         var cfg = plugin.getConfig();
-        int lootCd = Math.max(1, cfg.getInt("cooldowns.lootRoomMinBlocks", 150));
-        int bossCd = Math.max(1, cfg.getInt("cooldowns.bossMinBlocks", 300));
-        long broken = island.data().getBlocksBroken();
-        long lootSince = broken - island.data().getLastLootRoomAt();
-        long bossSince = broken - island.data().getLastBossAt();
+        int lootCd = Math.max(1, cfg.getInt(
+                inNether ? "cooldowns.netherLootRoomMinBlocks" : "cooldowns.lootRoomMinBlocks",
+                inNether ? 400 : 150));
+        int bossCd = Math.max(1, cfg.getInt(
+                inNether ? "cooldowns.netherBossMinBlocks" : "cooldowns.bossMinBlocks", 300));
+        long broken = inNether ? island.data().getNetherBlocksBroken() : island.data().getBlocksBroken();
+        long lastLoot = inNether ? island.data().getNetherLastLootRoomAt() : island.data().getLastLootRoomAt();
+        long lastBoss = inNether ? island.data().getNetherLastBossAt() : island.data().getLastBossAt();
+        long lootSince = broken - lastLoot;
+        long bossSince = broken - lastBoss;
         long lootLeft = lootCd - lootSince;
         long bossLeft = bossCd - bossSince;
         if (lootLeft > 0 && lootLeft <= 50) {

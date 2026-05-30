@@ -75,7 +75,10 @@ public class BlockListener implements Listener {
         Island island = plugin.islands().atLocation(loc);
         if (island == null) return;
 
-        Location center = island.centerBlock();
+        boolean nether = loc.getWorld() != null
+                && loc.getWorld().getName().equals(plugin.worlds().netherWorldName())
+                && island.isNetherUnlocked();
+        Location center = nether ? island.netherCenterBlock() : island.centerBlock();
         // Always keep a bedrock anchor under the center — replace anything that isn't bedrock there.
         if (loc.getBlockX() == center.getBlockX()
                 && loc.getBlockY() == center.getBlockY() - 1
@@ -150,11 +153,14 @@ public class BlockListener implements Listener {
         // Phase-specific drops & bonuses
         handleBlockEvents(player, island, broken);
 
-        Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
+        Phase phase = nether
+                ? plugin.phases().getNetherOrLast(island.data().getNetherPhaseIndex())
+                : plugin.phases().getOrLast(island.data().getPhaseIndex());
         if (phase == null) return;
 
-        // Pull planned next material from the prophecy queue so previews are honest
-        Material next = island.pollNext();
+        // Pull planned next material from the prophecy queue so previews are honest.
+        // Nether breaks bypass the queue (prophecy is Overworld-themed in v1).
+        Material next = nether ? null : island.pollNext();
         if (next == null) next = phase.rollBlock(ThreadLocalRandom.current());
         // FOUR_LEAF (Luck 5): +5% chance to reroll a non-rare next-block into a rare one.
         if (!plugin.prophecies().isRare(next)
@@ -198,13 +204,19 @@ public class BlockListener implements Listener {
             Msg.actionBar(player, "<aqua>★ Diamond Hour bonus!");
         }
 
-        island.data().incrementBlocksBroken();
-        island.data().incrementPhaseProgress();
+        if (nether) {
+            island.data().incrementNetherBlocksBroken();
+            island.data().incrementNetherPhaseProgress();
+        } else {
+            island.data().incrementBlocksBroken();
+            island.data().incrementPhaseProgress();
+        }
         island.recordBreak(broken);
         plugin.sprint().recordBlocksBroken(island.data().getId(), 1L);
         // Block-break milestones — fire once at exact thresholds. Existing islands past
         // a threshold won't retroactively claim; the milestone is the act of crossing.
-        if (island.data().getBlocksBroken() == 1000L) {
+        // Overworld-only milestone in v1.
+        if (!nether && island.data().getBlocksBroken() == 1000L) {
             plugin.economy().award(island, 5000L);
             player.getInventory().addItem(new ItemStack(Material.TOTEM_OF_UNDYING));
             plugin.progression().addXp(player, SkillType.MINING, 100L);
@@ -223,10 +235,12 @@ public class BlockListener implements Listener {
         }
         int xpBoost = island.data().getUpgradeLevel(com.nova.novablock.island.IslandUpgrade.XP_BOOST);
         plugin.progression().addXp(player, SkillType.MINING, (1.0 + xpBoost) * xpMult);
-        plugin.prophecies().onAdvance(island, broken);
-        island.refillUpcoming(phase, com.nova.novablock.prophecy.ProphecyManager.QUEUE_SIZE);
+        if (!nether) {
+            plugin.prophecies().onAdvance(island, broken);
+            island.refillUpcoming(phase, com.nova.novablock.prophecy.ProphecyManager.QUEUE_SIZE);
+        }
 
-        // Quest tick
+        // Quest tick (dimension-agnostic)
         plugin.quests().onBlockBroken(player, broken);
         plugin.seasonalPaths().award(player, com.nova.novablock.season.SeasonalPathManager.PathSource.MINING, 1);
 
@@ -237,12 +251,14 @@ public class BlockListener implements Listener {
         plugin.antiAfk().recordMineActivity(player);
 
         // Phase progression
-        if (island.data().getPhaseProgress() >= phase.getRequiredBlocks()) {
-            advancePhase(player, island, phase);
+        int progressAfter = nether ? island.data().getNetherPhaseProgress() : island.data().getPhaseProgress();
+        if (progressAfter >= phase.getRequiredBlocks()) {
+            if (nether) advanceNetherPhase(player, island, phase);
+            else advancePhase(player, island, phase);
         }
 
         // Roll boss / loot room
-        rollEncounters(player, island, phase, center);
+        rollEncounters(player, island, phase, center, nether);
 
         // FX
         center.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, center.clone().add(0.5, 0.5, 0.5), 4, 0.2, 0.2, 0.2);
@@ -533,15 +549,58 @@ public class BlockListener implements Listener {
         plugin.paxels().refreshTier(player);
         plugin.quests().onPhaseAdvanced(player);
         plugin.seasonalPaths().award(player, com.nova.novablock.season.SeasonalPathManager.PathSource.PHASE, 125);
+
+        // Crossing into Phase 7 unlocks the Nether dimension.
+        if (nextIdx == 6 && plugin.worlds().isNetherEnabled() && !island.data().isNetherUnlocked()) {
+            island.data().setNetherUnlocked(true);
+            island.ensureNetherPlatform();
+            String ownerName = Bukkit.getOfflinePlayer(island.data().getOwner()).getName();
+            if (ownerName == null) ownerName = player.getName();
+            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>" + ownerName
+                    + "<gray>'s island has <red>breached the Nether<gray>! <dark_gray>(/ob home nether)"));
+            Msg.title(player, "<red>The Nether is open",
+                    "<gray>Use <yellow>/ob home nether</yellow> to enter.");
+        }
     }
 
-    private void rollEncounters(Player player, Island island, Phase phase, Location center) {
-        long broken = island.data().getBlocksBroken();
+    private void advanceNetherPhase(Player player, Island island, Phase old) {
+        int nextIdx = old.getIndex() + 1;
+        Phase next = plugin.phases().getNether(nextIdx);
+        if (next == null) {
+            Msg.title(player, "<gold>You've conquered the Nether!", "<gray>Return to the Overworld for prestige.");
+            island.data().setNetherPhaseProgress(old.getRequiredBlocks());
+            return;
+        }
+        island.data().setNetherPhaseIndex(nextIdx);
+        island.data().setNetherPhaseProgress(0);
+        Msg.title(player, "<" + next.getThemeColor() + ">▶ " + next.getDisplayName(),
+                "<gray>Nether Phase " + (nextIdx + 1) + " unlocked");
+        player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+        long reward = 500 + nextIdx * 250L;
+        if (plugin.seasons().active() == SeasonManager.ServerEvent.DOUBLE_COINS) reward *= 2;
+        reward = Math.round(reward * plugin.prestige().coinMultiplier(island));
+        plugin.economy().award(island, reward);
+        if (old.getBossId() != null) {
+            plugin.bosses().spawn(old.getBossId(), island, player, true);
+        }
+        plugin.paxels().refreshTier(player);
+        plugin.quests().onPhaseAdvanced(player);
+        plugin.seasonalPaths().award(player, com.nova.novablock.season.SeasonalPathManager.PathSource.PHASE, 125);
+    }
+
+    private void rollEncounters(Player player, Island island, Phase phase, Location center, boolean nether) {
+        long broken = nether ? island.data().getNetherBlocksBroken() : island.data().getBlocksBroken();
         var rng = ThreadLocalRandom.current();
         SeasonManager.ServerEvent ev = plugin.seasons().active();
         var cfg = plugin.getConfig();
-        int lootCd = Math.max(1, cfg.getInt("cooldowns.lootRoomMinBlocks", 150));
-        int bossCd = Math.max(1, cfg.getInt("cooldowns.bossMinBlocks", 300));
+        int lootCd = Math.max(1, cfg.getInt(
+                nether ? "cooldowns.netherLootRoomMinBlocks" : "cooldowns.lootRoomMinBlocks",
+                nether ? 400 : 150));
+        int bossCd = Math.max(1, cfg.getInt(
+                nether ? "cooldowns.netherBossMinBlocks" : "cooldowns.bossMinBlocks",
+                300));
+        long lastLootRoom = nether ? island.data().getNetherLastLootRoomAt() : island.data().getLastLootRoomAt();
+        long lastBoss = nether ? island.data().getNetherLastBossAt() : island.data().getLastBossAt();
 
         // Mob spawn ~1/18 chance (~every ~45s of steady mining)
         if (!phase.getMobs().isEmpty() && rng.nextInt(18) == 0) {
@@ -554,7 +613,7 @@ public class BlockListener implements Listener {
         // Loot room every ~lootCd + denom blocks on average (config-tunable).
         // Baseline tuned for ~1 rift per ~460 blocks (cd 400 + 1/60 roll) so they
         // stay an event, not a regular interruption. Rift Storm keeps the 5x ratio.
-        if (broken - island.data().getLastLootRoomAt() >= lootCd) {
+        if (broken - lastLootRoom >= lootCd) {
             int denom = 60;
             if (ev == SeasonManager.ServerEvent.RIFT_STORM) denom = 12;
             // RIFTWALKER (Magic 10): loot rooms appear 20% more often.
@@ -569,16 +628,18 @@ public class BlockListener implements Listener {
             if (rng.nextInt(denom) == 0 && !phase.getLootRoomIds().isEmpty()) {
                 String roomId = phase.getLootRoomIds().get(rng.nextInt(phase.getLootRoomIds().size()));
                 plugin.lootRooms().offerEntry(player, island, roomId);
-                island.data().setLastLootRoomAt(broken);
+                if (nether) island.data().setNetherLastLootRoomAt(broken);
+                else island.data().setLastLootRoomAt(broken);
             }
         }
         // Mid-phase boss every ~bossCd blocks (config-tunable). Blood Moon = 4x rolls.
-        if (broken - island.data().getLastBossAt() >= bossCd) {
+        if (broken - lastBoss >= bossCd) {
             int denom = 120;
             if (ev == SeasonManager.ServerEvent.BLOOD_MOON) denom = 30;
             if (rng.nextInt(denom) == 0 && phase.getBossId() != null) {
-                plugin.bosses().spawn(phase.getBossId(), island, player);
-                island.data().setLastBossAt(broken);
+                plugin.bosses().spawn(phase.getBossId(), island, player, nether);
+                if (nether) island.data().setNetherLastBossAt(broken);
+                else island.data().setLastBossAt(broken);
             }
         }
     }
