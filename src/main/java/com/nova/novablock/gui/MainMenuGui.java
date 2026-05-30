@@ -44,8 +44,17 @@ public class MainMenuGui extends ChestGui {
 
         set(15, ItemBuilder.of(Material.PAPER)
                         .name("<white>Leaderboard")
-                        .lore("<gray>Top islands by blocks broken.").build(),
+                        .lore("<gray>Top islands by blocks broken.",
+                                "<dark_gray>Open Sprint for the weekly boards.").build(),
                 e -> new LeaderboardGui(plugin).open(p));
+
+        set(26, ItemBuilder.of(Material.GOLDEN_HOE)
+                        .name("<gradient:#FF6B6B:#FFC940><bold>Weekly Sprint")
+                        .lore("<gray>Hardcore (blocks this week) +",
+                                "<gray>Casual (daily quests this week).",
+                                "<gray>Sunday 20:00 podium broadcast.",
+                                "<dark_gray>/ob sprint").glow().build(),
+                e -> new SprintGui(plugin).open(p));
 
         int onlineFriendCount = plugin.friends().onlineFriends(p.getUniqueId()).size();
         int incoming = plugin.friends().incoming(p.getUniqueId()).size();

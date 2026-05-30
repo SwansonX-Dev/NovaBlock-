@@ -201,6 +201,7 @@ public class BlockListener implements Listener {
         island.data().incrementBlocksBroken();
         island.data().incrementPhaseProgress();
         island.recordBreak(broken);
+        plugin.sprint().recordBlocksBroken(island.data().getId(), 1L);
         // Block-break milestones — fire once at exact thresholds. Existing islands past
         // a threshold won't retroactively claim; the milestone is the act of crossing.
         if (island.data().getBlocksBroken() == 1000L) {

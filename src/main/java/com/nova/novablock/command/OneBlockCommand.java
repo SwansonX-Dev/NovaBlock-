@@ -27,7 +27,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             "create", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
             "visit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
-            "setspawn", "friend", "friends", "help");
+            "setspawn", "friend", "friends", "sprint", "help");
     private static final List<String> FRIEND_SUBS = List.of("add", "accept", "deny", "remove", "list");
 
     private final NovaBlock plugin;
@@ -91,6 +91,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 Msg.send(p, "<green>Spawn set. You'll respawn here and rejoin here. <gray>(<yellow>/spawn</yellow> to teleport back)");
             }
             case "friend", "friends", "f" -> handleFriend(p, args);
+            case "sprint" -> new com.nova.novablock.gui.SprintGui(plugin).open(p);
             case "toggle" -> {
                 if (!p.hasPermission("novablock.toggle")) { denied(p); return true; }
                 plugin.hotbar().toggle(p);

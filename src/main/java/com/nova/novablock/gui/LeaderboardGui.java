@@ -67,6 +67,11 @@ public class LeaderboardGui extends ChestGui {
                     .lore(lore.toArray(new String[0]))
                     .build(), null);
         }
+        set(49, ItemBuilder.of(Material.GOLDEN_HOE)
+                .name("<gradient:#FF6B6B:#FFC940><bold>Weekly Sprint")
+                .lore("<gray>Hardcore + Casual weekly boards.",
+                        "<dark_gray>/ob sprint").glow().build(),
+                e -> new SprintGui(plugin).open(viewer));
         set(53, ItemBuilder.of(Material.ARROW).name("<gray>Back").build(),
                 e -> new MainMenuGui(plugin).open(viewer));
     }

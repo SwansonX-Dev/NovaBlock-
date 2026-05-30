@@ -104,6 +104,7 @@ public class QuestManager {
                     "<yellow>+" + coins + " coins, +" + xp + " XP" + (gambler ? " <#FFD24D>(Gambler)" : ""));
             p.playSound(p.getLocation(), org.bukkit.Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
             plugin.seasonalPaths().award(p, com.nova.novablock.season.SeasonalPathManager.PathSource.QUEST, 75);
+            plugin.sprint().recordQuestCompleted(p.getUniqueId());
         }
     }
 }
