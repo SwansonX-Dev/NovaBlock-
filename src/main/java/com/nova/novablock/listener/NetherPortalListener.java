@@ -4,20 +4,32 @@ import com.nova.novablock.NovaBlock;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerPortalEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 
 /**
- * Vanilla Nether portals in the OneBlock world bridge to the same island's
- * Nether half, and vice versa. The portal is resolved against
- * {@link com.nova.novablock.island.IslandManager#atLocation(Location)} so a
- * portal placed on a visited island sends the visitor to that island's other
- * half — matching the standard "portals link points at the same x/z" mental
- * model rather than always sending the player to their own.
+ * Two responsibilities:
+ *
+ * <ol>
+ *   <li>Bridge vanilla Nether portals inside the OneBlock world to the same
+ *       island's Nether half (and vice versa).</li>
+ *   <li>Disable the vanilla Nether and vanilla End entirely — the OneBlock
+ *       Nether is the only Nether on this server, and there is no End. Any
+ *       Nether portal that would land outside our worlds, any End portal
+ *       teleport, and any Eye-of-Ender activation of an End Portal Frame is
+ *       cancelled with a player-facing message.</li>
+ * </ol>
+ *
+ * <p>End Portal Frames placed inside loot rooms remain functional as rift
+ * markers because that path doesn't go through {@link PlayerInteractEvent}
+ * with an Ender Eye in hand.
  */
 public class NetherPortalListener implements Listener {
 
@@ -29,16 +41,34 @@ public class NetherPortalListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPortal(PlayerPortalEvent event) {
-        if (event.getCause() != PlayerTeleportEvent.TeleportCause.NETHER_PORTAL) return;
         Player player = event.getPlayer();
         if (player.getWorld() == null) return;
+        PlayerTeleportEvent.TeleportCause cause = event.getCause();
 
-        String worldName = player.getWorld().getName();
+        // The End is disabled entirely. Any END_PORTAL teleport (player walks
+        // into a built end portal, throws an enderpearl into it, etc.) is
+        // rejected with a clear message.
+        if (cause == PlayerTeleportEvent.TeleportCause.END_PORTAL) {
+            event.setCancelled(true);
+            Msg.send(player, "<red>The End is disabled on this server.");
+            return;
+        }
+        if (cause != PlayerTeleportEvent.TeleportCause.NETHER_PORTAL) return;
+
+        String fromWorld = player.getWorld().getName();
         String overworld = plugin.worlds().worldName();
         String netherWorld = plugin.worlds().netherWorldName();
-        boolean inOverworld = worldName.equals(overworld);
-        boolean inNether = worldName.equals(netherWorld);
-        if (!inOverworld && !inNether) return; // not in a OneBlock world — let vanilla handle.
+        boolean inOverworld = fromWorld.equals(overworld);
+        boolean inNether = fromWorld.equals(netherWorld);
+
+        if (!inOverworld && !inNether) {
+            // Player is somewhere else trying to portal — most likely a leaked
+            // vanilla world. Vanilla nether is disabled; cancel so they don't
+            // travel into one.
+            event.setCancelled(true);
+            Msg.send(player, "<red>The vanilla Nether is disabled. Use <yellow>/ob home nether</yellow> from your island.");
+            return;
+        }
 
         Island island = plugin.islands().atLocation(player.getLocation());
         if (island == null) return;
@@ -55,6 +85,8 @@ public class NetherPortalListener implements Listener {
                 Msg.send(player, "<red>The Nether world isn't loaded right now.");
                 return;
             }
+            // Belt-and-suspenders: if Paper somehow set the destination to a
+            // vanilla nether world, override it back to ours.
             event.setTo(dest);
             event.setCanCreatePortal(false);
         } else {
@@ -67,5 +99,23 @@ public class NetherPortalListener implements Listener {
             event.setTo(dest);
             event.setCanCreatePortal(false);
         }
+    }
+
+    /**
+     * Activating an End Portal Frame with an Eye of Ender starts the multi-eye
+     * sequence that completes a real End portal. Cancel the right-click in
+     * either hand to lock the End out cleanly. The frame block itself stays
+     * usable (we use it as the loot-room rift marker), only the eye insertion
+     * is blocked.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onEnderEyeInsert(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        if (event.getClickedBlock() == null) return;
+        if (event.getClickedBlock().getType() != Material.END_PORTAL_FRAME) return;
+        if (event.getItem() == null || event.getItem().getType() != Material.ENDER_EYE) return;
+        event.setCancelled(true);
+        Player player = event.getPlayer();
+        Msg.send(player, "<red>The End is disabled — End Portals can't be assembled.");
     }
 }
