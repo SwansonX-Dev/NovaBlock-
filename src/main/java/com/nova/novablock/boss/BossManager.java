@@ -49,6 +49,7 @@ public class BossManager implements Listener {
         register(new FrostbornSentinel(plugin));
         register(new VoidHerald(plugin));
         register(new com.nova.novablock.boss.bosses.AshenWarlord(plugin));
+        register(new com.nova.novablock.boss.bosses.PiglinChieftain(plugin));
     }
 
     /**

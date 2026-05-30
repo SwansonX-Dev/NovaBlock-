@@ -21,6 +21,13 @@ void_herald:
   scaling-per-phase: 0.25
   coins: 6000
 
+# Mid-Nether boss (Bastion Halls, phase 6).
+piglin_chieftain:
+  health: 250
+  damage: 10
+  scaling-per-phase: 0.25
+  coins: 5000
+
 # Climax boss of the Nether OneBlock (final Nether phase).
 ashen_warlord:
   health: 400

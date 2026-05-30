@@ -348,7 +348,7 @@ public class PhaseManager {
                         b(Material.CHEST, 3)
                 ),
                 Phase.mobList(EntityType.PIGLIN_BRUTE, EntityType.PIGLIN, EntityType.HOGLIN),
-                null, List.of("arena_nether")));
+                "piglin_chieftain", List.of("arena_nether")));
         netherPhases.add(p(7, "nether_magma_caverns", "Magma Caverns", "#FF6E2B", 1850,
                 List.of(
                         b(Material.MAGMA_BLOCK, 28),

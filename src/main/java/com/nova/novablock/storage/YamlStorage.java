@@ -84,6 +84,7 @@ public class YamlStorage implements DataStorage {
                 long netherLastBossAt = y.getLong("nether.lastBossAt", 0);
                 long netherLastLootRoomAt = y.getLong("nether.lastLootRoomAt", 0);
                 boolean netherUnlocked = y.getBoolean("nether.unlocked", false);
+                boolean firstNetherVisit = y.getBoolean("nether.firstVisit", true);
                 List<String> members = y.getStringList("members");
                 List<UUID> memberIds = new ArrayList<>();
                 for (String m : members) memberIds.add(UUID.fromString(m));
@@ -102,6 +103,7 @@ public class YamlStorage implements DataStorage {
                 data.setNetherLastBossAt(netherLastBossAt);
                 data.setNetherLastLootRoomAt(netherLastLootRoomAt);
                 data.setNetherUnlocked(netherUnlocked);
+                data.setFirstNetherVisit(firstNetherVisit);
                 data.getMembers().addAll(memberIds);
                 ConfigurationSection flagsSec = y.getConfigurationSection("flags");
                 if (flagsSec != null) {
@@ -150,6 +152,7 @@ public class YamlStorage implements DataStorage {
         y.set("nether.lastBossAt", data.getNetherLastBossAt());
         y.set("nether.lastLootRoomAt", data.getNetherLastLootRoomAt());
         y.set("nether.unlocked", data.isNetherUnlocked());
+        y.set("nether.firstVisit", data.isFirstNetherVisit());
         List<String> mem = new ArrayList<>();
         for (UUID u : data.getMembers()) mem.add(u.toString());
         y.set("members", mem);

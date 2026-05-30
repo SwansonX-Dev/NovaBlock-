@@ -9,7 +9,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.Sound;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerPortalEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -99,6 +101,32 @@ public class NetherPortalListener implements Listener {
             event.setTo(dest);
             event.setCanCreatePortal(false);
         }
+    }
+
+    /**
+     * Fires once per island the first time its owner enters their own Nether.
+     * Welcomes them to Crimson Outpost so the dimension doesn't open silently
+     * after the Overworld-side unlock broadcast. Persisted via
+     * {@link com.nova.novablock.island.IslandData#setFirstNetherVisit(boolean)}
+     * so a restart doesn't re-trigger.
+     */
+    @EventHandler
+    public void onWorldChange(PlayerChangedWorldEvent event) {
+        Player player = event.getPlayer();
+        if (player.getWorld() == null) return;
+        if (!player.getWorld().getName().equals(plugin.worlds().netherWorldName())) return;
+        Island island = plugin.islands().atLocation(player.getLocation());
+        if (island == null) return;
+        if (!player.getUniqueId().equals(island.data().getOwner())) return;
+        if (!island.data().isFirstNetherVisit()) return;
+
+        island.data().setFirstNetherVisit(false);
+        plugin.storage().saveIsland(island.data());
+        Msg.title(player,
+                "<#FF4D4D><bold>Crimson Outpost",
+                "<gray>Break the center to begin your Nether descent.");
+        Msg.send(player, "<#FF6347>The Nether opens. Twelve phases lie between you and the Ashen Warlord.");
+        player.playSound(player.getLocation(), Sound.AMBIENT_NETHER_WASTES_MOOD, 0.8f, 0.7f);
     }
 
     /**

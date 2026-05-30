@@ -45,6 +45,8 @@ public class IslandData {
     private long netherLastLootRoomAt;
     /** Set the first time the Overworld crosses into Phase 7 (phaseIndex >= 6). */
     private boolean netherUnlocked;
+    /** True until the owner has visited their own Nether for the first time. */
+    private boolean firstNetherVisit = true;
 
     public IslandData(UUID id, UUID owner, String worldName, int slotX, int slotZ) {
         this.id = id;
@@ -132,6 +134,9 @@ public class IslandData {
 
     public boolean isNetherUnlocked() { return netherUnlocked; }
     public void setNetherUnlocked(boolean v) { this.netherUnlocked = v; }
+
+    public boolean isFirstNetherVisit() { return firstNetherVisit; }
+    public void setFirstNetherVisit(boolean v) { this.firstNetherVisit = v; }
 
     /** Centre block (the one that regenerates). */
     public Location centerBlock() {
