@@ -38,3 +38,22 @@ prestige:
   reward-commands:
     - "pets give %player% novablock_prestige_%level%"
     - "swansonstocks give %player% 10"
+
+# Weekly sprint. Two parallel boards reset Monday 00:00 server-local; the
+# Sunday 20:00 podium broadcasts top 3 and dispatches the rewards below.
+# Island progress is never touched — only the per-week counters reset.
+sprint:
+  hardcore:
+    # Coins awarded to the top-3 islands (split among online members by xEconomy).
+    coin-rewards: [100000, 50000, 25000]
+    # Optional console commands fired per place. Placeholders: %owner% %place%.
+    reward-commands-place-1: []
+    reward-commands-place-2: []
+    reward-commands-place-3: []
+  casual:
+    # Coins awarded to the top-3 players' islands.
+    coin-rewards: [25000, 10000, 5000]
+    # Optional console commands fired per place. Placeholders: %player% %place%.
+    reward-commands-place-1: []
+    reward-commands-place-2: []
+    reward-commands-place-3: []

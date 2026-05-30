@@ -167,6 +167,10 @@ public class WeeklySprintManager {
         List<CasualRow> caTop = topCasual(3);
         if (hcTop.isEmpty() && caTop.isEmpty()) return;
 
+        var cfg = plugin.getConfig();
+        List<Long> hcCoins = readCoinRewards(cfg, "sprint.hardcore.coin-rewards", List.of(100_000L, 50_000L, 25_000L));
+        List<Long> caCoins = readCoinRewards(cfg, "sprint.casual.coin-rewards", List.of(25_000L, 10_000L, 5_000L));
+
         Bukkit.broadcast(Msg.mm("<gradient:#7B61FF:#4FC3F7><bold>Weekly Sprint Podium"));
         if (!hcTop.isEmpty()) {
             Bukkit.broadcast(Msg.mm("<red>Hardcore <gray>(blocks broken)"));
@@ -174,7 +178,11 @@ public class WeeklySprintManager {
                 HardcoreRow row = hcTop.get(i);
                 var owner = ownerOfIsland(row.islandUuid());
                 String name = owner == null ? "Unknown" : (owner.getName() == null ? "Unknown" : owner.getName());
-                Bukkit.broadcast(Msg.mm("  " + medal(i) + " <yellow>" + name + " <gray>– <white>" + row.blocks() + " blocks"));
+                long coins = at(hcCoins, i);
+                Bukkit.broadcast(Msg.mm("  " + medal(i) + " <yellow>" + name
+                        + " <gray>– <white>" + row.blocks() + " blocks"
+                        + (coins > 0 ? " <dark_gray>(<gold>+" + coins + "<dark_gray>)" : "")));
+                dispatchHardcoreReward(row.islandUuid(), name, i + 1, coins);
             }
         }
         if (!caTop.isEmpty()) {
@@ -183,9 +191,76 @@ public class WeeklySprintManager {
                 CasualRow row = caTop.get(i);
                 OfflinePlayer op = Bukkit.getOfflinePlayer(row.playerUuid());
                 String name = op.getName() == null ? "Unknown" : op.getName();
-                Bukkit.broadcast(Msg.mm("  " + medal(i) + " <yellow>" + name + " <gray>– <white>" + row.quests() + "/7"));
+                long coins = at(caCoins, i);
+                Bukkit.broadcast(Msg.mm("  " + medal(i) + " <yellow>" + name
+                        + " <gray>– <white>" + row.quests() + "/7"
+                        + (coins > 0 ? " <dark_gray>(<gold>+" + coins + "<dark_gray>)" : "")));
+                dispatchCasualReward(row.playerUuid(), name, i + 1, coins);
             }
         }
+    }
+
+    /**
+     * Coins land on the island (xEconomy splits among online members per its
+     * existing rules), and {@code sprint.hardcore.reward-commands-place-N} are
+     * dispatched from console with {@code %owner%} and {@code %place%}
+     * placeholders so server owners can stack extra perks (pets, ranks, etc.).
+     */
+    private void dispatchHardcoreReward(UUID islandUuid, String ownerName, int place, long coins) {
+        var island = plugin.islands().all().get(islandUuid);
+        if (island != null && coins > 0) plugin.economy().award(island, coins);
+
+        if (island != null) {
+            var ownerPlayer = Bukkit.getPlayer(island.data().getOwner());
+            if (ownerPlayer != null) {
+                Msg.title(ownerPlayer,
+                        "<gradient:#FF6B6B:#FFC940><bold>Hardcore #" + place + "!",
+                        coins > 0 ? "<yellow>+" + coins + " coins to your island" : "<yellow>Podium claimed");
+            }
+        }
+
+        for (String raw : plugin.getConfig().getStringList("sprint.hardcore.reward-commands-place-" + place)) {
+            runCommand(raw.replace("%owner%", ownerName).replace("%place%", String.valueOf(place)));
+        }
+    }
+
+    /**
+     * Casual rewards go to the individual player (their island for coins,
+     * placeholders {@code %player%} / {@code %place%} for commands).
+     */
+    private void dispatchCasualReward(UUID playerUuid, String playerName, int place, long coins) {
+        var island = plugin.islands().ofPlayer(playerUuid);
+        if (island != null && coins > 0) plugin.economy().award(island, coins);
+
+        var online = Bukkit.getPlayer(playerUuid);
+        if (online != null) {
+            Msg.title(online,
+                    "<gradient:#7B61FF:#4FC3F7><bold>Casual #" + place + "!",
+                    coins > 0 ? "<yellow>+" + coins + " coins" : "<yellow>Podium claimed");
+        }
+
+        for (String raw : plugin.getConfig().getStringList("sprint.casual.reward-commands-place-" + place)) {
+            runCommand(raw.replace("%player%", playerName).replace("%place%", String.valueOf(place)));
+        }
+    }
+
+    private void runCommand(String command) {
+        try { Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command); }
+        catch (Throwable t) { plugin.getLogger().warning("Sprint reward command failed: " + command); }
+    }
+
+    private static List<Long> readCoinRewards(org.bukkit.configuration.file.FileConfiguration cfg,
+                                              String path, List<Long> fallback) {
+        if (!cfg.isList(path)) return fallback;
+        List<Long> out = new ArrayList<>(3);
+        for (Object raw : cfg.getList(path)) {
+            if (raw instanceof Number n) out.add(n.longValue());
+        }
+        return out.isEmpty() ? fallback : out;
+    }
+
+    private static long at(List<Long> list, int index) {
+        return index < list.size() ? Math.max(0L, list.get(index)) : 0L;
     }
 
     private OfflinePlayer ownerOfIsland(UUID islandUuid) {
