@@ -134,6 +134,9 @@ public final class NovaBlock extends JavaPlugin {
         this.oneBlockRepairService = new OneBlockRepairService(this);
         this.previewHologramManager = new PreviewHologramManager(this);
         this.spawnManager = new SpawnManager(this);
+        // SpawnManager is the preferred evacuation target for any players
+        // still stuck in vanilla nether/end, so unload only after it exists.
+        this.worldManager.cleanupVanillaDimensions();
         this.playerSpawnManager = new PlayerSpawnManager(this);
         this.friendManager = new FriendManager(this);
         this.sprintManager = new WeeklySprintManager(this);

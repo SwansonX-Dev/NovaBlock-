@@ -107,6 +107,57 @@ public class IslandWorldManager {
     public String netherWorldName() { return netherWorldName; }
     public boolean isNetherEnabled() { return netherEnabled; }
 
+    /**
+     * Unload the default vanilla Nether and End worlds if they're loaded.
+     * Any players currently inside are evacuated to the configured /spawn
+     * (or the primary world spawn as a fallback) so the unload doesn't fail
+     * silently. Names default to the Bukkit defaults (`world_nether`,
+     * `world_the_end`) but are configurable via {@code vanillaNetherWorld}
+     * and {@code vanillaEndWorld}. Gated by {@code unloadVanillaDimensions}.
+     */
+    public void cleanupVanillaDimensions() {
+        if (!plugin.getConfig().getBoolean("unloadVanillaDimensions", true)) return;
+        String vanillaNether = plugin.getConfig().getString("vanillaNetherWorld", "world_nether");
+        String vanillaEnd = plugin.getConfig().getString("vanillaEndWorld", "world_the_end");
+        unloadIfPresent(vanillaNether);
+        unloadIfPresent(vanillaEnd);
+    }
+
+    private void unloadIfPresent(String name) {
+        if (name == null || name.isBlank()) return;
+        World target = Bukkit.getWorld(name);
+        if (target == null) return;
+        // Don't try to unload one of our own worlds even if a server owner
+        // accidentally points the config at it.
+        if (name.equals(worldName) || name.equals(netherWorldName)) return;
+        evacuate(target);
+        if (Bukkit.unloadWorld(target, false)) {
+            plugin.getLogger().info("Unloaded vanilla dimension: " + name);
+        } else {
+            plugin.getLogger().warning("Could not unload vanilla dimension: " + name
+                    + " (players may still be inside or the world is busy).");
+        }
+    }
+
+    private void evacuate(World doomed) {
+        if (doomed.getPlayers().isEmpty()) return;
+        org.bukkit.Location safe = plugin.spawn().location();
+        if (safe == null || safe.getWorld() == null || safe.getWorld().equals(doomed)) {
+            // Fall back to the first non-doomed loaded world.
+            for (World w : Bukkit.getWorlds()) {
+                if (!w.equals(doomed)) { safe = w.getSpawnLocation(); break; }
+            }
+        }
+        if (safe == null || safe.getWorld() == null || safe.getWorld().equals(doomed)) {
+            plugin.getLogger().warning("No safe destination to evacuate players from "
+                    + doomed.getName() + "; skipping unload.");
+            return;
+        }
+        for (var player : doomed.getPlayers()) {
+            player.teleport(safe);
+        }
+    }
+
     public static final class VoidGenerator extends ChunkGenerator {
         @Override public void generateNoise(WorldInfo w, Random r, int cx, int cz, ChunkData d) {}
         @Override public void generateSurface(WorldInfo w, Random r, int cx, int cz, ChunkData d) {}

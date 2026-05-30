@@ -10,6 +10,13 @@ netherIslandWorld: oneblock_nether
 # the world is not created, and existing Nether progress is preserved but inert.
 netherEnabled: true
 
+# At startup, unload the vanilla Nether and End worlds (if present) so the
+# server is OneBlock-only. Players in those worlds are evacuated to /spawn
+# before the unload. Set false to keep them around for admin use.
+unloadVanillaDimensions: true
+vanillaNetherWorld: world_nether
+vanillaEndWorld: world_the_end
+
 # Distance in blocks between island slots in the OneBlock world.
 # Default keeps islands well-separated to avoid TNT/projectile crossover.
 slotSize: 256
