@@ -34,6 +34,7 @@ import com.nova.novablock.scoreboard.ScoreboardManager;
 import com.nova.novablock.season.SeasonManager;
 import com.nova.novablock.season.SeasonalPathManager;
 import com.nova.novablock.spawn.SpawnManager;
+import com.nova.novablock.spawn.PlayerSpawnManager;
 import com.nova.novablock.command.SpawnCommand;
 import com.nova.novablock.command.SetSpawnCommand;
 import com.nova.novablock.storage.DataStorage;
@@ -72,6 +73,7 @@ public final class NovaBlock extends JavaPlugin {
     private OneBlockRepairService oneBlockRepairService;
     private PreviewHologramManager previewHologramManager;
     private SpawnManager spawnManager;
+    private PlayerSpawnManager playerSpawnManager;
 
     @Override
     public void onEnable() {
@@ -121,6 +123,7 @@ public final class NovaBlock extends JavaPlugin {
         this.oneBlockRepairService = new OneBlockRepairService(this);
         this.previewHologramManager = new PreviewHologramManager(this);
         this.spawnManager = new SpawnManager(this);
+        this.playerSpawnManager = new PlayerSpawnManager(this);
 
         getServer().getPluginManager().registerEvents(new BlockListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
@@ -184,6 +187,7 @@ public final class NovaBlock extends JavaPlugin {
         // Then persist.
         if (islandManager != null) islandManager.saveAll();
         if (progressionManager != null) progressionManager.saveAll();
+        if (playerSpawnManager != null) playerSpawnManager.saveNow();
         if (storage != null) storage.shutdown();
         instance = null;
     }
@@ -217,4 +221,5 @@ public final class NovaBlock extends JavaPlugin {
     public MainMenuConfig menuConfig() { return menuConfig; }
     public OneBlockRepairService repairs() { return oneBlockRepairService; }
     public SpawnManager spawn() { return spawnManager; }
+    public PlayerSpawnManager playerSpawns() { return playerSpawnManager; }
 }

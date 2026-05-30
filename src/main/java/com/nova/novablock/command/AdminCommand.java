@@ -21,7 +21,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
             "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
-            "flags", "storage", "menu", "path", "freshstart", "fix");
+            "flags", "storage", "menu", "path", "freshstart", "fix", "setspawn");
     private static final List<String> EVENTS = List.of(
             "diamond_hour", "double_coins", "blood_moon", "lush_bloom", "rift_storm", "stop");
 
@@ -145,6 +145,11 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             case "path" -> handlePath(sender, args);
             case "freshstart" -> handleFreshStart(sender, args);
             case "fix" -> handleFix(sender, args);
+            case "setspawn" -> {
+                if (!(sender instanceof Player p)) { Msg.send(sender, "<red>Players only."); return true; }
+                plugin.spawn().setLocation(p.getLocation());
+                Msg.send(sender, "<green>Server spawn set to your current location.");
+            }
             default -> Msg.send(sender, "<red>Unknown subcommand.");
         }
         return true;

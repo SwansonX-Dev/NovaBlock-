@@ -25,13 +25,19 @@ public class SpawnCommand implements CommandExecutor {
             com.nova.novablock.util.Msg.send(player, "<red>You don't have permission.");
             return true;
         }
-        Location dest = plugin.spawn().location();
-        if (dest == null) {
-            com.nova.novablock.util.Msg.send(player, "<red>Spawn is not set. Ask an admin to run /setspawn.");
+        Location personal = plugin.playerSpawns().get(player.getUniqueId());
+        if (personal != null) {
+            player.teleport(personal);
+            com.nova.novablock.util.Msg.send(player, "<gray>Teleported to your spawn.");
             return true;
         }
-        player.teleport(dest);
-        com.nova.novablock.util.Msg.send(player, "<gray>Teleported to spawn.");
+        Location server = plugin.spawn().location();
+        if (server == null) {
+            com.nova.novablock.util.Msg.send(player, "<red>No spawn set. Use <yellow>/setspawn</yellow> to set yours.");
+            return true;
+        }
+        player.teleport(server);
+        com.nova.novablock.util.Msg.send(player, "<gray>Teleported to server spawn.");
         return true;
     }
 }

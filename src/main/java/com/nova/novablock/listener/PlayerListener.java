@@ -45,7 +45,8 @@ public class PlayerListener implements Listener {
         boolean showFirstJoin = firstJoin;
         org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!p.isOnline()) return;
-            var dest = plugin.spawn().location();
+            var personal = plugin.playerSpawns().get(p.getUniqueId());
+            var dest = personal != null ? personal : plugin.spawn().location();
             if (dest != null) p.teleport(dest);
             if (showFirstJoin) {
                 Msg.title(p, "<gradient:#7B61FF:#4FC3F7>NovaBlock", "<gray>Your island is ready");
@@ -67,6 +68,16 @@ public class PlayerListener implements Listener {
 
     @EventHandler
     public void onRespawn(PlayerRespawnEvent event) {
+        var personal = plugin.playerSpawns().get(event.getPlayer().getUniqueId());
+        if (personal != null) {
+            event.setRespawnLocation(personal);
+            return;
+        }
+        var server = plugin.spawn().location();
+        if (server != null) {
+            event.setRespawnLocation(server);
+            return;
+        }
         Island island = plugin.islands().ofPlayer(event.getPlayer());
         if (island != null) event.setRespawnLocation(island.data().spawnLocation());
     }

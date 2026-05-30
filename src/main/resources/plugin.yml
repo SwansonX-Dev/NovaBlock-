@@ -41,7 +41,10 @@ permissions:
     description: Allows using /spawn.
     default: true
   novablock.setspawn:
-    description: Allows using /setspawn.
+    description: Allows using /setspawn to set your personal spawn.
+    default: true
+  novablock.admin.setspawn:
+    description: Allows /obadmin setspawn to set the server spawn.
     default: op
   novablock.create:
     description: Allows creating an island

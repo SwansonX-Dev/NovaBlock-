@@ -20,8 +20,13 @@ public class SetSpawnCommand implements CommandExecutor {
             sender.sendMessage("Players only.");
             return true;
         }
-        plugin.spawn().setLocation(player.getLocation());
-        com.nova.novablock.util.Msg.send(player, "<green>Spawn set to your current location.");
+        if (!player.hasPermission("novablock.setspawn")) {
+            com.nova.novablock.util.Msg.send(player, "<red>You don't have permission.");
+            return true;
+        }
+        plugin.playerSpawns().set(player.getUniqueId(), player.getLocation());
+        com.nova.novablock.util.Msg.send(player,
+                "<green>Spawn set. You'll respawn here and rejoin here. <gray>(<yellow>/spawn</yellow> to teleport back)");
         return true;
     }
 }
