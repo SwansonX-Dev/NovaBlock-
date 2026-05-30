@@ -50,17 +50,17 @@ public class WelcomeGui extends ChestGui {
 
         set(10, checklistItem("Break 100 blocks",
                 "<gray>Just mine the OneBlock. <yellow>(" + Math.min(100, blocksBroken) + "/100<yellow>)",
-                blocksBroken >= 100));
+                blocksBroken >= 100), null);
 
         set(11, checklistItem("Reach Phase 2",
                 "<gray>Mine through the first phase to unlock new themes.",
-                phaseIndex >= 1));
+                phaseIndex >= 1), null);
 
         set(12, checklistItem("Finish today's quest",
                 questTarget == 0
                         ? "<gray>Open <yellow>/ob quest<gray> when ready."
                         : "<gray>Open <yellow>/ob quest<gray> — <yellow>" + questProgress + "/" + questTarget + "<gray>.",
-                questTarget > 0 && questProgress >= questTarget));
+                questTarget > 0 && questProgress >= questTarget), null);
 
         set(16, ItemBuilder.of(Material.PAPER)
                 .name("<aqua>Tip: open the menu anytime")
