@@ -33,6 +33,9 @@ import com.nova.novablock.quest.QuestManager;
 import com.nova.novablock.scoreboard.ScoreboardManager;
 import com.nova.novablock.season.SeasonManager;
 import com.nova.novablock.season.SeasonalPathManager;
+import com.nova.novablock.spawn.SpawnManager;
+import com.nova.novablock.command.SpawnCommand;
+import com.nova.novablock.command.SetSpawnCommand;
 import com.nova.novablock.storage.DataStorage;
 import com.nova.novablock.storage.YamlStorage;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -68,6 +71,7 @@ public final class NovaBlock extends JavaPlugin {
     private MainMenuConfig menuConfig;
     private OneBlockRepairService oneBlockRepairService;
     private PreviewHologramManager previewHologramManager;
+    private SpawnManager spawnManager;
 
     @Override
     public void onEnable() {
@@ -116,6 +120,7 @@ public final class NovaBlock extends JavaPlugin {
         this.menuConfig = new MainMenuConfig(this);
         this.oneBlockRepairService = new OneBlockRepairService(this);
         this.previewHologramManager = new PreviewHologramManager(this);
+        this.spawnManager = new SpawnManager(this);
 
         getServer().getPluginManager().registerEvents(new BlockListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
@@ -129,6 +134,8 @@ public final class NovaBlock extends JavaPlugin {
         getCommand("obadmin").setTabCompleter(adminCmd);
         getCommand("sb").setExecutor(new ScoreboardCommand(this));
         getCommand("novahelp").setExecutor(new HelpCommand(this));
+        getCommand("spawn").setExecutor(new SpawnCommand(this));
+        getCommand("setspawn").setExecutor(new SetSpawnCommand(this));
 
         eventManager.startTimers();
         seasonManager.startSeasonTicker();
@@ -209,4 +216,5 @@ public final class NovaBlock extends JavaPlugin {
     public IslandStorageManager islandStorage() { return islandStorageManager; }
     public MainMenuConfig menuConfig() { return menuConfig; }
     public OneBlockRepairService repairs() { return oneBlockRepairService; }
+    public SpawnManager spawn() { return spawnManager; }
 }

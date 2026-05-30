@@ -32,22 +32,22 @@ public class PlayerListener implements Listener {
             plugin.seasonalPaths().award(p, SeasonalPathManager.PathSource.LOGIN, 50);
         }
         Island island = plugin.islands().ofPlayer(p);
-        boolean created = false;
+        boolean firstJoin = false;
         if (island == null) {
-            island = plugin.islands().create(p);
-            created = true;
+            plugin.islands().create(p);
+            firstJoin = true;
             Msg.send(p, com.nova.novablock.util.Messages.of("welcome-first",
-                    "<gray>Welcome to <gradient:#7B61FF:#4FC3F7>NovaBlock</gradient><gray>!"));
+                    "<gray>Welcome to <gradient:#7B61FF:#4FC3F7>NovaBlock</gradient><gray>! Use <yellow>/ob home</yellow> to visit your island."));
         } else {
             Msg.send(p, com.nova.novablock.util.Messages.of("welcome-back",
-                    "<gray>Welcome back. Sending you to your island."));
+                    "<gray>Welcome back."));
         }
-        Island target = island;
-        boolean firstJoinIsland = created;
+        boolean showFirstJoin = firstJoin;
         org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!p.isOnline()) return;
-            target.teleportHome(p);
-            if (firstJoinIsland) {
+            var dest = plugin.spawn().location();
+            if (dest != null) p.teleport(dest);
+            if (showFirstJoin) {
                 Msg.title(p, "<gradient:#7B61FF:#4FC3F7>NovaBlock", "<gray>Your island is ready");
                 p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
                 // First-ever join — show the help guide. Returning players can reopen

@@ -25,11 +25,24 @@ commands:
     description: Open the NovaBlock help GUI
     usage: /<command>
     aliases: [obhelp, guide]
+  spawn:
+    description: Teleport to the server spawn.
+    usage: /<command>
+  setspawn:
+    description: Set the server spawn to your current location.
+    usage: /<command>
+    permission: novablock.setspawn
 
 permissions:
   novablock.play:
     description: Allows playing NovaBlock
     default: true
+  novablock.spawn:
+    description: Allows using /spawn.
+    default: true
+  novablock.setspawn:
+    description: Allows using /setspawn.
+    default: op
   novablock.create:
     description: Allows creating an island
     default: true
