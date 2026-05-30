@@ -1,8 +1,10 @@
 package com.nova.novablock.gui;
 
 import com.nova.novablock.NovaBlock;
+import com.nova.novablock.compat.LuckPermsRanks;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.util.ItemBuilder;
+import com.nova.novablock.util.Msg;
 import dev.xsuite.economy.api.Bank;
 import dev.xsuite.economy.api.Stocks;
 import dev.xsuite.economy.api.XEconomy;
@@ -10,6 +12,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.SkullMeta;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -40,12 +44,11 @@ public class LeaderboardGui extends ChestGui {
         Bank bank = XEconomy.bank();
         Stocks stocks = XEconomy.stocks();
 
-        Material[] medals = {Material.NETHER_STAR, Material.DIAMOND_BLOCK, Material.GOLD_BLOCK};
         for (int i = 0; i < sorted.size(); i++) {
             Island island = sorted.get(i);
-            Material icon = i < medals.length ? medals[i] : Material.IRON_BLOCK;
             OfflinePlayer owner = Bukkit.getOfflinePlayer(island.data().getOwner());
             String name = owner.getName() == null ? "Unknown" : owner.getName();
+            String rankedName = LuckPermsRanks.rankedName(owner, name, "<yellow>");
 
             long wallet = plugin.economy().balance(island);
             long bankCoins   = (bank == null)   ? 0 : bank.balanceCents(owner.getUniqueId()) / 100;
@@ -53,6 +56,7 @@ public class LeaderboardGui extends ChestGui {
             long netWorth = wallet + bankCoins + stockCoins;
 
             List<String> lore = new ArrayList<>();
+            lore.add("<gray>Place: <gold>#" + (i + 1));
             lore.add("<gray>Blocks broken: <white>" + island.data().getBlocksBroken());
             lore.add("<gray>Phase: <white>" + (island.data().getPhaseIndex() + 1));
             lore.add("<gray>Coins: <yellow>" + wallet);
@@ -62,10 +66,7 @@ public class LeaderboardGui extends ChestGui {
                 lore.add("<gray>Net worth: <gold>" + netWorth);
             }
 
-            set(i, ItemBuilder.of(icon)
-                    .name("<gold>#" + (i + 1) + " <yellow>" + name)
-                    .lore(lore.toArray(new String[0]))
-                    .build(), null);
+            set(i, decorate(head(owner), rankedName, lore), null);
         }
         set(49, ItemBuilder.of(Material.GOLDEN_HOE)
                 .name("<gradient:#FF6B6B:#FFC940><bold>Weekly Sprint")
@@ -74,5 +75,25 @@ public class LeaderboardGui extends ChestGui {
                 e -> new SprintGui(plugin).open(viewer));
         set(53, ItemBuilder.of(Material.ARROW).name("<gray>Back").build(),
                 e -> new MainMenuGui(plugin).open(viewer));
+    }
+
+    private static ItemStack head(OfflinePlayer owner) {
+        ItemStack stack = new ItemStack(Material.PLAYER_HEAD);
+        if (stack.getItemMeta() instanceof SkullMeta meta) {
+            meta.setOwningPlayer(owner);
+            stack.setItemMeta(meta);
+        }
+        return stack;
+    }
+
+    private static ItemStack decorate(ItemStack stack, String name, List<String> lore) {
+        var meta = stack.getItemMeta();
+        if (meta == null) return stack;
+        meta.displayName(Msg.mm(name).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        var loreList = new ArrayList<net.kyori.adventure.text.Component>();
+        for (String line : lore) loreList.add(Msg.mm(line).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+        meta.lore(loreList);
+        stack.setItemMeta(meta);
+        return stack;
     }
 }
