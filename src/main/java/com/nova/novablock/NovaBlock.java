@@ -33,6 +33,7 @@ import com.nova.novablock.progression.ProgressionManager;
 import com.nova.novablock.prophecy.ProphecyManager;
 import com.nova.novablock.quest.QuestManager;
 import com.nova.novablock.scoreboard.ActionBarNudger;
+import com.nova.novablock.scoreboard.RankNameplateManager;
 import com.nova.novablock.scoreboard.ScoreboardManager;
 import com.nova.novablock.season.SeasonManager;
 import com.nova.novablock.season.SeasonalPathManager;
@@ -70,6 +71,7 @@ public final class NovaBlock extends JavaPlugin {
     private SeasonManager seasonManager;
     private SeasonalPathManager seasonalPathManager;
     private ScoreboardManager scoreboardManager;
+    private RankNameplateManager rankNameplateManager;
     private AntiAfkManager antiAfkManager;
     private IslandFlagsManager islandFlagsManager;
     private IslandStorageManager islandStorageManager;
@@ -123,6 +125,7 @@ public final class NovaBlock extends JavaPlugin {
         this.seasonalPathManager = new SeasonalPathManager(this);
         this.seasonalPathManager.load();
         this.scoreboardManager = new ScoreboardManager(this);
+        this.rankNameplateManager = new RankNameplateManager(this);
         this.antiAfkManager = new AntiAfkManager(this);
         this.islandFlagsManager = new IslandFlagsManager(this);
         this.islandStorageManager = new IslandStorageManager(this);
@@ -158,6 +161,7 @@ public final class NovaBlock extends JavaPlugin {
         sprintManager.startTicker();
         seasonalPathManager.ensureTags();
         scoreboardManager.startTicker();
+        rankNameplateManager.startTicker();
         oneBlockRepairService.start();
         previewHologramManager.start();
         minionManager.start();
@@ -192,6 +196,7 @@ public final class NovaBlock extends JavaPlugin {
         if (eventManager != null) eventManager.shutdown();
         if (seasonManager != null) seasonManager.shutdown();
         if (seasonalPathManager != null) seasonalPathManager.save();
+        if (rankNameplateManager != null) rankNameplateManager.shutdown();
         if (scoreboardManager != null) scoreboardManager.shutdown();
         if (oneBlockRepairService != null) oneBlockRepairService.shutdown();
         if (lootRoomManager != null) lootRoomManager.shutdown();
@@ -233,6 +238,7 @@ public final class NovaBlock extends JavaPlugin {
     public SeasonManager seasons() { return seasonManager; }
     public SeasonalPathManager seasonalPaths() { return seasonalPathManager; }
     public ScoreboardManager scoreboards() { return scoreboardManager; }
+    public RankNameplateManager rankNameplates() { return rankNameplateManager; }
     public AntiAfkManager antiAfk() { return antiAfkManager; }
     public IslandFlagsManager islandFlags() { return islandFlagsManager; }
     public IslandStorageManager islandStorage() { return islandStorageManager; }

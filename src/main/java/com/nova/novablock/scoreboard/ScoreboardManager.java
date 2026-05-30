@@ -96,6 +96,7 @@ public class ScoreboardManager {
             obj.getScore(entry).setScore(score - i);
         }
         p.setScoreboard(board);
+        plugin.rankNameplates().refreshViewer(p);
     }
 
     private List<String> buildLines(Player p) {
@@ -190,7 +191,10 @@ public class ScoreboardManager {
 
     public void clear(Player p) {
         Scoreboard b = boards.remove(p.getUniqueId());
-        if (b != null) p.setScoreboard(Bukkit.getScoreboardManager().getNewScoreboard());
+        if (b != null) {
+            p.setScoreboard(Bukkit.getScoreboardManager().getNewScoreboard());
+            plugin.rankNameplates().refreshViewer(p);
+        }
     }
 
     public void shutdown() {

@@ -64,13 +64,16 @@ public class PlayerListener implements Listener {
                 new HelpGui(plugin).open(p);
             }
             plugin.scoreboards().update(p);
+            plugin.rankNameplates().refreshAll();
         }, 20L);
         plugin.scoreboards().update(p);
+        plugin.rankNameplates().refreshAll();
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         plugin.progression().save(event.getPlayer().getUniqueId());
+        plugin.rankNameplates().remove(event.getPlayer());
         plugin.scoreboards().clear(event.getPlayer());
     }
 
@@ -106,6 +109,9 @@ public class PlayerListener implements Listener {
     @EventHandler
     public void onTeleport(PlayerTeleportEvent event) {
         // Update scoreboard a tick later
-        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> plugin.scoreboards().update(event.getPlayer()));
+        org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+            plugin.scoreboards().update(event.getPlayer());
+            plugin.rankNameplates().refreshAll();
+        });
     }
 }
