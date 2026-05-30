@@ -106,6 +106,11 @@ public class ScoreboardManager {
             int pLvl = island.data().getPrestigeLevel();
             if (pLvl > 0) {
                 lines.add(plugin.prestige().title(pLvl) + " <gray>(<white>" + pLvl + "<gray>)");
+                int coinPct = (int) Math.round(plugin.prestige().coinMultiplierAtLevel(pLvl) * 100) - 100;
+                int xpPct = (int) Math.round(plugin.prestige().xpMultiplierAtLevel(pLvl) * 100) - 100;
+                if (coinPct > 0 || xpPct > 0) {
+                    lines.add("<aqua>Bonus: <yellow>+" + coinPct + "%<gray> coins <yellow>+" + xpPct + "%<gray> xp");
+                }
             }
             Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
             String color = phase == null ? "white" : phase.getThemeColor();
@@ -113,12 +118,23 @@ public class ScoreboardManager {
             lines.add("<gray>Phase: <" + color + ">" + name);
             int prog2 = island.data().getPhaseProgress();
             int req = phase == null ? 1 : phase.getRequiredBlocks();
-            lines.add("<gray>" + prog2 + " / " + req + " blocks");
+            int remaining = Math.max(0, req - prog2);
+            if (remaining > 0 && remaining <= 50) {
+                lines.add("<gold><bold>" + remaining + "</bold> blocks to next phase!");
+            } else {
+                lines.add("<gray>" + prog2 + " / " + req + " blocks");
+            }
             lines.add("<gray>Total: <white>" + island.data().getBlocksBroken());
+            String riftLine = nextRiftLine(island);
+            if (riftLine != null) lines.add(riftLine);
             lines.add("<gold>Coins: <yellow>" + plugin.economy().balance(island));
             var path = plugin.seasonalPaths().activePath();
             int pathTier = plugin.seasonalPaths().tierFor(prog.getSeasonalPathPoints());
             lines.add("<" + path.color() + ">Path: <white>" + pathTier + "/" + com.nova.novablock.season.SeasonalPathManager.TIER_COUNT);
+            int streak = prog.getLoginStreak();
+            if (streak >= 2) {
+                lines.add("<light_purple>Streak: <white>" + streak + "d");
+            }
             lines.add(" ");
         }
         for (SkillType t : SkillType.values()) {
@@ -133,6 +149,30 @@ public class ScoreboardManager {
             lines.add(ev.color + "★ " + ev.displayName + " <gray>(" + formatTime(secs) + ")");
         }
         return lines;
+    }
+
+    /**
+     * "Next rift" is block-based, not time-based: a loot-room or boss roll happens
+     * only after the configured min-blocks gate elapses since the last drop. Surface
+     * it once the player is within 50 blocks of either gate so they feel something
+     * coming, instead of crunching aimlessly.
+     */
+    private String nextRiftLine(Island island) {
+        var cfg = plugin.getConfig();
+        int lootCd = Math.max(1, cfg.getInt("cooldowns.lootRoomMinBlocks", 150));
+        int bossCd = Math.max(1, cfg.getInt("cooldowns.bossMinBlocks", 300));
+        long broken = island.data().getBlocksBroken();
+        long lootSince = broken - island.data().getLastLootRoomAt();
+        long bossSince = broken - island.data().getLastBossAt();
+        long lootLeft = lootCd - lootSince;
+        long bossLeft = bossCd - bossSince;
+        if (lootLeft > 0 && lootLeft <= 50) {
+            return "<dark_purple>Next rift: <white>" + lootLeft + " blocks";
+        }
+        if (bossLeft > 0 && bossLeft <= 50) {
+            return "<red>Next boss: <white>" + bossLeft + " blocks";
+        }
+        return null;
     }
 
     private String formatTime(long seconds) {

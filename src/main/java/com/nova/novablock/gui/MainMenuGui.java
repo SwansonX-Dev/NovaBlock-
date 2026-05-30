@@ -47,6 +47,18 @@ public class MainMenuGui extends ChestGui {
                         .lore("<gray>Top islands by blocks broken.").build(),
                 e -> new LeaderboardGui(plugin).open(p));
 
+        int onlineFriendCount = plugin.friends().onlineFriends(p.getUniqueId()).size();
+        int incoming = plugin.friends().incoming(p.getUniqueId()).size();
+        var friendsLore = new java.util.ArrayList<String>();
+        friendsLore.add("<gray>" + onlineFriendCount + " online · " + plugin.friends().friends(p.getUniqueId()).size() + " total");
+        if (incoming > 0) friendsLore.add("<yellow>" + incoming + " pending request" + (incoming == 1 ? "" : "s"));
+        friendsLore.add("<dark_gray>/ob friend");
+        set(25, ItemBuilder.of(Material.PLAYER_HEAD)
+                        .name("<aqua>Friends")
+                        .lore(friendsLore.toArray(new String[0]))
+                        .build(),
+                e -> new FriendsGui(plugin).open(p));
+
         set(16, ItemBuilder.of(Material.ANVIL)
                         .name("<red>Fix OneBlock")
                         .lore("<gray>Restore your missing or invalid center block.",

@@ -140,6 +140,15 @@ public class HelpGui extends ChestGui {
                     p.performCommand("ob prestige");
                 });
 
+        set(28, ItemBuilder.of(Material.END_PORTAL_FRAME)
+                        .name("<gradient:#7B61FF:#4FC3F7><bold>Endgame Arc")
+                        .lore("<gray>How NovaBlock unfolds long-term:",
+                                "<gray>phases → bosses → prestige → atlas.",
+                                "<yellow>Click to see the path.")
+                        .glow()
+                        .build(),
+                e -> new EndgameArcGui(plugin).open(p));
+
         set(32, ItemBuilder.of(Material.NETHER_STAR)
                         .name("<gradient:#7B61FF:#4FC3F7><bold>Main Menu")
                         .lore("<gray>Open the NovaBlock hub menu.",

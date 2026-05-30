@@ -11,7 +11,7 @@ softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, xPets, xTags]
 commands:
   oneblock:
     description: Main NovaBlock command
-    usage: /<command> [create|home|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|toggle|setspawn|help]
+    usage: /<command> [create|home|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|toggle|setspawn|friend|help]
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command
@@ -38,6 +38,9 @@ permissions:
     default: true
   novablock.setspawn:
     description: Allows using /ob setspawn to set your personal spawn.
+    default: true
+  novablock.friend:
+    description: Allows using /ob friend (add/accept/deny/remove/list).
     default: true
   novablock.admin.setspawn:
     description: Allows /obadmin setspawn to set the server spawn.

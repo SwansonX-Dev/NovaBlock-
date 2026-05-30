@@ -30,11 +30,13 @@ import com.nova.novablock.progression.PrestigeManager;
 import com.nova.novablock.progression.ProgressionManager;
 import com.nova.novablock.prophecy.ProphecyManager;
 import com.nova.novablock.quest.QuestManager;
+import com.nova.novablock.scoreboard.ActionBarNudger;
 import com.nova.novablock.scoreboard.ScoreboardManager;
 import com.nova.novablock.season.SeasonManager;
 import com.nova.novablock.season.SeasonalPathManager;
 import com.nova.novablock.spawn.SpawnManager;
 import com.nova.novablock.spawn.PlayerSpawnManager;
+import com.nova.novablock.social.FriendManager;
 import com.nova.novablock.command.SpawnCommand;
 import com.nova.novablock.storage.DataStorage;
 import com.nova.novablock.storage.YamlStorage;
@@ -73,6 +75,7 @@ public final class NovaBlock extends JavaPlugin {
     private PreviewHologramManager previewHologramManager;
     private SpawnManager spawnManager;
     private PlayerSpawnManager playerSpawnManager;
+    private FriendManager friendManager;
 
     @Override
     public void onEnable() {
@@ -123,9 +126,11 @@ public final class NovaBlock extends JavaPlugin {
         this.previewHologramManager = new PreviewHologramManager(this);
         this.spawnManager = new SpawnManager(this);
         this.playerSpawnManager = new PlayerSpawnManager(this);
+        this.friendManager = new FriendManager(this);
 
         getServer().getPluginManager().registerEvents(new BlockListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
+        getServer().getPluginManager().registerEvents(new ActionBarNudger(this), this);
         getServer().getPluginManager().registerEvents(guiManager, this);
 
         OneBlockCommand obCmd = new OneBlockCommand(this);
@@ -186,6 +191,7 @@ public final class NovaBlock extends JavaPlugin {
         if (islandManager != null) islandManager.saveAll();
         if (progressionManager != null) progressionManager.saveAll();
         if (playerSpawnManager != null) playerSpawnManager.saveNow();
+        if (friendManager != null) friendManager.saveNow();
         if (storage != null) storage.shutdown();
         instance = null;
     }
@@ -220,4 +226,5 @@ public final class NovaBlock extends JavaPlugin {
     public OneBlockRepairService repairs() { return oneBlockRepairService; }
     public SpawnManager spawn() { return spawnManager; }
     public PlayerSpawnManager playerSpawns() { return playerSpawnManager; }
+    public FriendManager friends() { return friendManager; }
 }

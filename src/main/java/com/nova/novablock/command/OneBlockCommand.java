@@ -27,7 +27,8 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             "create", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
             "visit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
-            "setspawn", "help");
+            "setspawn", "friend", "friends", "help");
+    private static final List<String> FRIEND_SUBS = List.of("add", "accept", "deny", "remove", "list");
 
     private final NovaBlock plugin;
 
@@ -89,6 +90,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 plugin.playerSpawns().set(p.getUniqueId(), p.getLocation());
                 Msg.send(p, "<green>Spawn set. You'll respawn here and rejoin here. <gray>(<yellow>/spawn</yellow> to teleport back)");
             }
+            case "friend", "friends", "f" -> handleFriend(p, args);
             case "toggle" -> {
                 if (!p.hasPermission("novablock.toggle")) { denied(p); return true; }
                 plugin.hotbar().toggle(p);
@@ -241,6 +243,82 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         Msg.send(p, com.nova.novablock.util.Messages.of("no-permission", "<red>You don't have permission."));
     }
 
+    private void handleFriend(Player p, String[] args) {
+        if (!p.hasPermission("novablock.friend")) { denied(p); return; }
+        if (args.length < 2) {
+            new com.nova.novablock.gui.FriendsGui(plugin).open(p);
+            return;
+        }
+        String sub = args[1].toLowerCase();
+        if (sub.equals("list")) { new com.nova.novablock.gui.FriendsGui(plugin).open(p); return; }
+        if (args.length < 3) { Msg.send(p, "<red>/ob friend " + sub + " <player>"); return; }
+        org.bukkit.OfflinePlayer target = org.bukkit.Bukkit.getPlayerExact(args[2]);
+        if (target == null) target = org.bukkit.Bukkit.getOfflinePlayerIfCached(args[2]);
+        if (target == null) target = org.bukkit.Bukkit.getOfflinePlayer(args[2]);
+        if (target == null || (!target.hasPlayedBefore() && target.getPlayer() == null)) {
+            Msg.send(p, "<red>No such player.");
+            return;
+        }
+        java.util.UUID self = p.getUniqueId();
+        java.util.UUID other = target.getUniqueId();
+        if (self.equals(other)) { Msg.send(p, "<red>You can't friend yourself."); return; }
+        String targetName = target.getName() == null ? args[2] : target.getName();
+        switch (sub) {
+            case "add" -> {
+                var r = plugin.friends().addRequest(self, other);
+                switch (r) {
+                    case SENT -> {
+                        Msg.send(p, "<green>Friend request sent to <yellow>" + targetName + "<green>.");
+                        Player online = target.getPlayer();
+                        if (online != null) Msg.send(online,
+                                "<aqua>Friend request from <yellow>" + p.getName()
+                                        + "<aqua>. <gray>(<yellow>/ob friend accept " + p.getName() + "<gray>)");
+                    }
+                    case ACCEPTED_INCOMING -> {
+                        Msg.send(p, "<green>You and <yellow>" + targetName + "<green> are now friends.");
+                        Player online = target.getPlayer();
+                        if (online != null) Msg.send(online,
+                                "<green>You and <yellow>" + p.getName() + "<green> are now friends.");
+                    }
+                    case ALREADY_FRIENDS -> Msg.send(p, "<yellow>You're already friends with " + targetName + ".");
+                    case ALREADY_SENT -> Msg.send(p, "<yellow>You already sent a request to " + targetName + ".");
+                    case SELF -> Msg.send(p, "<red>You can't friend yourself.");
+                }
+            }
+            case "accept" -> {
+                var r = plugin.friends().acceptRequest(self, other);
+                switch (r) {
+                    case OK -> {
+                        Msg.send(p, "<green>You and <yellow>" + targetName + "<green> are now friends.");
+                        Player online = target.getPlayer();
+                        if (online != null) Msg.send(online,
+                                "<green>You and <yellow>" + p.getName() + "<green> are now friends.");
+                    }
+                    case NO_REQUEST -> Msg.send(p, "<red>No pending request from " + targetName + ".");
+                    case ALREADY_FRIENDS -> Msg.send(p, "<yellow>You're already friends with " + targetName + ".");
+                }
+            }
+            case "deny" -> {
+                if (plugin.friends().denyRequest(self, other)) {
+                    Msg.send(p, "<gray>Denied request from " + targetName + ".");
+                } else {
+                    Msg.send(p, "<red>No pending request from " + targetName + ".");
+                }
+            }
+            case "remove" -> {
+                if (plugin.friends().removeFriend(self, other)) {
+                    Msg.send(p, "<gray>Removed " + targetName + " from your friends.");
+                    Player online = target.getPlayer();
+                    if (online != null) Msg.send(online,
+                            "<gray>" + p.getName() + " removed you from their friends.");
+                } else {
+                    Msg.send(p, "<red>You weren't friends with " + targetName + ".");
+                }
+            }
+            default -> Msg.send(p, "<yellow>/ob friend <add|accept|deny|remove|list> [player]");
+        }
+    }
+
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
@@ -249,6 +327,17 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("invite") || args[0].equalsIgnoreCase("visit"))) {
             String prefix = args[1].toLowerCase();
+            return org.bukkit.Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(n -> n.toLowerCase().startsWith(prefix))
+                    .collect(Collectors.toList());
+        }
+        if (args.length == 2 && (args[0].equalsIgnoreCase("friend") || args[0].equalsIgnoreCase("friends") || args[0].equalsIgnoreCase("f"))) {
+            String prefix = args[1].toLowerCase();
+            return FRIEND_SUBS.stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
+        }
+        if (args.length == 3 && (args[0].equalsIgnoreCase("friend") || args[0].equalsIgnoreCase("friends") || args[0].equalsIgnoreCase("f"))) {
+            String prefix = args[2].toLowerCase();
             return org.bukkit.Bukkit.getOnlinePlayers().stream()
                     .map(Player::getName)
                     .filter(n -> n.toLowerCase().startsWith(prefix))

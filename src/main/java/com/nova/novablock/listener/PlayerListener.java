@@ -43,6 +43,14 @@ public class PlayerListener implements Listener {
                     "<gray>Welcome back."));
         }
         boolean showFirstJoin = firstJoin;
+        // Notify online friends — gated by the joining player's own opt-out so they
+        // can hide their join from friends without affecting incoming visibility.
+        if (plugin.friends().wantsJoinNotify(p.getUniqueId())) {
+            for (var friend : plugin.friends().onlineFriends(p.getUniqueId())) {
+                if (friend.equals(p)) continue;
+                Msg.send(friend, "<gray>[<aqua>Friend<gray>] <yellow>" + p.getName() + " <gray>joined.");
+            }
+        }
         org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!p.isOnline()) return;
             var personal = plugin.playerSpawns().get(p.getUniqueId());
