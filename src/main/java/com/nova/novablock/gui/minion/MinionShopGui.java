@@ -38,8 +38,10 @@ public class MinionShopGui extends ChestGui {
         if (!player.hasPermission("novablock.minions.buy")) { Msg.send(player, "<red>You don't have permission to buy minions."); return; }
         if (!enabled) { Msg.send(player, "<red>That minion is disabled in the shop."); return; }
         if (!unlocked && !player.hasPermission("novablock.minions.admin")) { Msg.send(player, "<red>Your island has not unlocked this minion."); return; }
+        var item = type.createItem(plugin, 1);
+        if (!plugin.minions().hasInventoryRoom(player.getInventory(), item)) { Msg.send(player, "<red>Make room in your inventory first."); return; }
         if (!plugin.economy().spend(player, price)) { Msg.send(player, "<red>You need <yellow>" + price + " coins<red>."); return; }
-        player.getInventory().addItem(type.createItem(plugin, 1));
+        player.getInventory().addItem(item);
         open(player);
     }
 }

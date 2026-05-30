@@ -120,7 +120,9 @@ public class MinionManager implements Listener {
     }
 
     public void beginLink(Player player, UUID minionId) {
-        if (!minions.containsKey(minionId)) { Msg.send(player, "<red>That minion no longer exists."); return; }
+        MinionData data = minions.get(minionId);
+        if (data == null) { Msg.send(player, "<red>That minion no longer exists."); return; }
+        if (!canManage(player, data)) return;
         pendingLinks.put(player.getUniqueId(), minionId);
         player.closeInventory();
         player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.6f, 1.4f);
@@ -196,6 +198,8 @@ public class MinionManager implements Listener {
         return data.type().rollOutput(random, data.upgrade(MinionUpgrade.YIELD), data.upgrade(MinionUpgrade.COMPACTOR), drops(data.type()));
     }
 
+    public boolean hasInventoryRoom(Inventory inventory, ItemStack stack) { return canFit(inventory, stack); }
+
     public boolean isShopEnabled(MinionType type) { return type.shopEnabled(plugin); }
     public void setShopEnabled(MinionType type, boolean enabled) {
         plugin.getConfig().set("minions.shop-enabled." + type.id(), enabled);
@@ -204,7 +208,12 @@ public class MinionManager implements Listener {
 
     public void reloadSettings() {
         plugin.reloadConfig();
-        tickRate = Math.max(20L, plugin.getConfig().getLong("minions.tick-rate-ticks", 20L));
+        long newTickRate = Math.max(20L, plugin.getConfig().getLong("minions.tick-rate-ticks", 20L));
+        if (newTickRate != tickRate) {
+            tickRate = newTickRate;
+            if (task != null) task.cancel();
+            task = Bukkit.getScheduler().runTaskTimer(plugin, (Runnable) this::tick, tickRate, tickRate);
+        }
         loadOutputTables();
         validateConfig();
     }
@@ -275,9 +284,14 @@ public class MinionManager implements Listener {
 
     public void pickup(Player player, MinionData data) {
         if (!canManage(player, data)) return;
+        ItemStack item = data.type().createItem(plugin, 1);
+        if (!hasInventoryRoom(player.getInventory(), item)) {
+            Msg.send(player, "<red>Make room in your inventory first.");
+            return;
+        }
         minions.remove(data.id());
         removeDisplay(data.id());
-        player.getInventory().addItem(data.type().createItem(plugin, 1));
+        player.getInventory().addItem(item);
         dirty = true; save(); player.closeInventory();
         player.playSound(player.getLocation(), Sound.ITEM_BUNDLE_INSERT, 0.7f, 1.1f);
     }
@@ -347,6 +361,7 @@ public class MinionManager implements Listener {
         if (type == null) return;
         event.setCancelled(true);
         Player player = event.getPlayer();
+        if (!player.hasPermission("novablock.minions.use")) { Msg.send(player, "<red>You don't have permission to use minions."); return; }
         Island island = plugin.islands().atLocation(event.getClickedBlock().getRelative(event.getBlockFace()).getLocation());
         if (island == null || !island.isMember(player)) { Msg.send(player, "<red>Place minions on your own island."); return; }
         if (!type.unlocked(island.data().getPhaseIndex()) && !player.hasPermission("novablock.minions.admin")) { Msg.send(player, "<red>Your island has not unlocked this minion."); return; }
