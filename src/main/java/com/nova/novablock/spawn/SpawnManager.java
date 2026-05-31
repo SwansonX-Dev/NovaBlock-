@@ -30,6 +30,23 @@ public class SpawnManager {
         return new Location(world, x, y, z, yaw, pitch);
     }
 
+    /**
+     * Resolved location of the community OneBlock: {@link #location()} plus
+     * {@code community.hub.offset.{x,y,z}}. Returns null if spawn isn't set.
+     */
+    public @Nullable Location communityBlockLocation() {
+        Location base = location();
+        if (base == null) return null;
+        FileConfiguration cfg = plugin.getConfig();
+        double dx = cfg.getDouble("community.hub.offset.x", 0.0);
+        double dy = cfg.getDouble("community.hub.offset.y", 0.0);
+        double dz = cfg.getDouble("community.hub.offset.z", 5.0);
+        return new Location(base.getWorld(),
+                base.getBlockX() + dx + 0.0,
+                base.getBlockY() + dy + 0.0,
+                base.getBlockZ() + dz + 0.0);
+    }
+
     public void setLocation(Location loc) {
         FileConfiguration cfg = plugin.getConfig();
         World world = loc.getWorld();

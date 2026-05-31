@@ -37,6 +37,8 @@ public final class HelpRegistrar {
             sb.append("§e/ob §7or §e/nb §7— open the main menu\n");
             sb.append("§e/ob create §7— claim your island\n");
             sb.append("§e/ob home §7— teleport to your OneBlock\n");
+            sb.append("§e/ob hub §7— community block, weekly goal, raids\n");
+            sb.append("§e/ob hub tp §7— teleport to the community hub\n");
             sb.append("§e/ob prophecy §7— see and lock upcoming blocks\n");
             sb.append("§e/ob skills §7— skill trees and perks\n");
             sb.append("§e/ob quest §7— today's daily challenge\n");
@@ -46,7 +48,7 @@ public final class HelpRegistrar {
             sb.append("§e/ob accept §7— accept a pending invite\n");
             sb.append("§e/ob toggle §7— show/hide the menu hotbar item\n");
             sb.append("§e/sb §7— toggle the sidebar scoreboard\n\n");
-            sb.append("§7Admin: §c/obadmin reload | setphase | spawnboss | givecoins | event | wipe\n");
+            sb.append("§7Admin: §c/obadmin reload | setphase | spawnboss | givecoins | event | wipe | hub\n");
             this.fullText = sb.toString();
         }
         @Override public boolean canSee(CommandSender sender) { return true; }

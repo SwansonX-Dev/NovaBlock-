@@ -99,24 +99,40 @@ public class FriendsGui extends ChestGui {
                 Player online = op.getPlayer();
                 String name = op.getName() == null ? "?" : op.getName();
                 String status = online != null ? "<green>Online" : "<dark_gray>Offline";
-                Consumer<InventoryClickEvent> handler = online != null
-                        ? click -> {
-                            p.closeInventory();
-                            p.performCommand("ob visit " + name);
-                        }
-                        : click -> {
-                            // Shift-click on an offline friend removes them — cheap rage-quit guardrail.
-                            if (click.getClick() == ClickType.SHIFT_LEFT || click.getClick() == ClickType.SHIFT_RIGHT) {
-                                if (manager.removeFriend(self, fid)) {
-                                    Msg.send(p, "<gray>Removed " + name + " from your friends.");
-                                }
-                                new FriendsGui(plugin).open(p);
+                com.nova.novablock.island.Island targetIsland = online == null
+                        ? null : plugin.islands().ofPlayer(fid);
+                boolean canJoin = online != null
+                        && targetIsland != null
+                        && plugin.visits().canVisit(p, targetIsland);
+                Consumer<InventoryClickEvent> handler;
+                if (online != null && canJoin) {
+                    handler = click -> {
+                        p.closeInventory();
+                        p.performCommand("ob visit " + name);
+                    };
+                } else if (online != null) {
+                    handler = click -> {
+                        p.closeInventory();
+                        Msg.send(p, "<gray>" + name + "'s island is closed. <yellow>Ask them to enable Open Visits in /ob flags.");
+                    };
+                } else {
+                    handler = click -> {
+                        if (click.getClick() == ClickType.SHIFT_LEFT || click.getClick() == ClickType.SHIFT_RIGHT) {
+                            if (manager.removeFriend(self, fid)) {
+                                Msg.send(p, "<gray>Removed " + name + " from your friends.");
                             }
-                        };
+                            new FriendsGui(plugin).open(p);
+                        }
+                    };
+                }
+                String hint = online == null
+                        ? "<dark_gray>Shift-click to remove."
+                        : (canJoin ? "<yellow>Click to <green>Join<yellow> their island."
+                                   : "<red>Island closed to visitors.");
                 ItemStack head = head(op,
                         (online != null ? "<green>" : "<gray>") + name,
                         status,
-                        online != null ? "<yellow>Click to visit their island." : "<dark_gray>Shift-click to remove.");
+                        hint);
                 set(slot++, head, handler);
             }
         }

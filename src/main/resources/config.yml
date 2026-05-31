@@ -36,9 +36,63 @@ cooldowns:
   netherLootRoomMinBlocks: 400
 
 anti-afk:
-  enabled: false
+  enabled: true
   challenge-interval-seconds: 1800
-  challenge-timeout-seconds: 60
+  challenge-timeout-seconds: 10
+
+# Community Hub — shared OneBlock at /warp spawn, weekly server-wide goal,
+# periodic raids, and co-op visit polish. Disable any sub-section independently.
+community:
+  enabled: true
+  # Operators can live-check or reload these settings with /obadmin hub status and /obadmin hub reload.
+
+  hub:
+    # Offset from /warp spawn where the community block sits.
+    offset: { x: 0, y: 0, z: 5 }
+
+  block:
+    # Drops still go 100% to the breaker. This is on TOP, into the shared pool.
+    coin-tax-fraction: 0.20
+    bonus-coins-per-break: 1
+    payout:
+      # First trigger to fire wins.
+      block-threshold: 500
+      interval-minutes: 60
+      min-contribution-coins: 25
+    broadcast:
+      every-nth-break: 500
+      phase-advance: true
+
+  weekly-goal:
+    enabled: true
+    target-blocks: 100000
+    rewards:
+      baseline-coins: 1000
+      baseline-min-contribution: 250
+      top-percent: 10
+      top-percent-bonus-coins: 10000
+    broadcast:
+      milestones-percent: [25, 50, 75, 100]
+
+  raids:
+    enabled: true
+    interval-minutes: 120
+    interval-jitter-percent: 20
+    boss-id: random           # picks from BossManager registry
+    despawn-after-minutes: 10
+    scaling:
+      base-multiplier: 2.5
+      per-online-player: 0.10
+      max-online-player-multiplier: 4.0
+    rewards:
+      base-coin-pool: 50000
+      pool-per-online-player: 2500
+      top-damage-drop: NETHER_STAR:1
+      min-damage-fraction: 0.02
+
+  coop:
+    allow-open-visits: true
+    members-advance-phase: true
 
 # Prestige — unlocked after completing the final phase.
 prestige:

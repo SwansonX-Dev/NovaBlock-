@@ -30,7 +30,7 @@ public class IslandFlagsGui extends ChestGui {
 
     /** Default — opens the viewer's own island, enforces per-flag perms. */
     public IslandFlagsGui(NovaBlock plugin) {
-        super("<gradient:#9C27B0:#03A9F4><bold>Island Flags", 4);
+        super("<gradient:#9C27B0:#03A9F4><bold>Island Flags", 5);
         this.plugin = plugin;
         this.target = null;
         this.adminOverride = false;
@@ -38,7 +38,7 @@ public class IslandFlagsGui extends ChestGui {
 
     /** Admin mode — opens the given island, viewer can toggle any flag. */
     public IslandFlagsGui(NovaBlock plugin, Island target) {
-        super("<gradient:#FF1744:#FF8A65><bold>Island Flags (admin)", 4);
+        super("<gradient:#FF1744:#FF8A65><bold>Island Flags (admin)", 5);
         this.plugin = plugin;
         this.target = target;
         this.adminOverride = true;
@@ -53,7 +53,9 @@ public class IslandFlagsGui extends ChestGui {
         }
 
         IslandFlag[] flags = IslandFlag.values();
-        int[] slots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22};
+        int[] slots = {10, 11, 12, 13, 14, 15, 16,
+                       19, 20, 21, 22, 23, 24, 25,
+                       28, 29, 30, 31, 32, 33, 34};
         for (int i = 0; i < flags.length && i < slots.length; i++) {
             IslandFlag flag = flags[i];
             boolean on = island.data().isFlag(flag);
@@ -96,7 +98,7 @@ public class IslandFlagsGui extends ChestGui {
             });
         }
 
-        set(31, ItemBuilder.of(Material.ARROW).name("<gray>Back").build(),
+        set(40, ItemBuilder.of(Material.ARROW).name("<gray>Back").build(),
                 e -> { if (!adminOverride) new MainMenuGui(plugin).open(viewer); else viewer.closeInventory(); });
 
         fill(Material.GRAY_STAINED_GLASS_PANE, " ");

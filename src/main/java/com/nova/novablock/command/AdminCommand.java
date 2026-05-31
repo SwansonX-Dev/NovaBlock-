@@ -5,6 +5,7 @@ import com.nova.novablock.island.Island;
 import com.nova.novablock.season.SeasonManager;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -21,7 +22,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
             "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
-            "flags", "storage", "menu", "path", "sprint", "freshstart", "fix", "setspawn");
+            "flags", "storage", "menu", "path", "sprint", "hub", "freshstart", "fix", "setspawn");
     private static final List<String> EVENTS = List.of(
             "diamond_hour", "double_coins", "blood_moon", "lush_bloom", "rift_storm", "stop");
 
@@ -34,7 +35,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         // Per-subcommand permission is checked below; allow entry if the user has
         // any admin permission at all (or the wildcard).
         if (args.length == 0) {
-            Msg.send(sender, "<yellow>/obadmin <reload|setphase|spawnboss|givecoins|event|wipe|sprint|freshstart>");
+            Msg.send(sender, "<yellow>/obadmin <reload|setphase|spawnboss|givecoins|event|wipe|sprint|hub|freshstart>");
             return true;
         }
         String sub = args[0].toLowerCase();
@@ -146,6 +147,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             case "menu" -> handleMenuEdit(sender, args);
             case "path" -> handlePath(sender, args);
             case "sprint" -> handleSprint(sender, args);
+            case "hub" -> handleHub(sender, args);
             case "freshstart" -> handleFreshStart(sender, args);
             case "fix" -> handleFix(sender, args);
             case "setspawn" -> {
@@ -263,6 +265,85 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 }
             }
             default -> Msg.send(sender, "<yellow>/obadmin sprint <status|reset|podium|addscore>");
+        }
+    }
+
+    private void handleHub(CommandSender sender, String[] args) {
+        if (plugin.community() == null) {
+            Msg.send(sender, "<red>Community hub is not initialized.");
+            return;
+        }
+        if (args.length < 2) {
+            Msg.send(sender, "<yellow>/obadmin hub <status|payout|raid|resetweekly|setblock|reload>");
+            return;
+        }
+        var hub = plugin.community();
+        switch (args[1].toLowerCase()) {
+            case "status" -> {
+                long nextRaidMs = Math.max(0, hub.raids().nextRaidAt() - System.currentTimeMillis());
+                Location block = plugin.spawn().communityBlockLocation();
+                Msg.send(sender, "<gold>Community Hub");
+                Msg.send(sender, "<gray>Enabled: <white>" + hub.isEnabled());
+                Msg.send(sender, "<gray>Block: <white>" + formatLocation(block));
+                Msg.send(sender, "<gray>Community pool: <yellow>" + hub.block().pool() + " coins");
+                Msg.send(sender, "<gray>Community blocks: <white>" + hub.block().blocksBroken());
+                Msg.send(sender, "<gray>Weekly goal: <white>" + hub.goal().progress() + "/" + hub.goal().target());
+                Msg.send(sender, "<gray>Next raid: <white>" + formatDuration(nextRaidMs));
+            }
+            case "payout" -> {
+                long poolPaid = hub.block().payout();
+                boolean weeklyPaid = args.length >= 3 && args[2].equalsIgnoreCase("weekly") && hub.goal().forcePayout();
+                hub.markDirty();
+                hub.flushNow();
+                Msg.send(sender, "<green>Paid community pool: " + poolPaid + " coins.");
+                if (args.length >= 3 && args[2].equalsIgnoreCase("weekly")) {
+                    Msg.send(sender, weeklyPaid
+                            ? "<green>Weekly goal rewards distributed."
+                            : "<gray>Weekly goal was not ready or already paid.");
+                }
+            }
+            case "raid" -> {
+                if (hub.raids().spawnRaidNow() == null) {
+                    Msg.send(sender, "<red>Could not spawn a raid. Check spawn location and boss config.");
+                } else {
+                    hub.markDirty();
+                    Msg.send(sender, "<green>Community raid spawned.");
+                }
+            }
+            case "resetweekly" -> {
+                hub.goal().resetCurrentWeek();
+                hub.markDirty();
+                hub.flushNow();
+                hub.leaderboard().refresh();
+                Msg.send(sender, "<green>Weekly community goal reset.");
+            }
+            case "setblock" -> {
+                if (!(sender instanceof Player p)) {
+                    Msg.send(sender, "<red>Players only.");
+                    return;
+                }
+                Location spawn = plugin.spawn().location();
+                if (spawn == null || spawn.getWorld() == null || p.getWorld() == null
+                        || !spawn.getWorld().equals(p.getWorld())) {
+                    Msg.send(sender, "<red>Stand in the same world as /warp spawn.");
+                    return;
+                }
+                Location at = p.getLocation().getBlock().getLocation();
+                plugin.getConfig().set("community.hub.offset.x", at.getBlockX() - spawn.getBlockX());
+                plugin.getConfig().set("community.hub.offset.y", at.getBlockY() - spawn.getBlockY());
+                plugin.getConfig().set("community.hub.offset.z", at.getBlockZ() - spawn.getBlockZ());
+                plugin.saveConfig();
+                hub.placeIfNeeded();
+                hub.leaderboard().refresh();
+                Msg.send(sender, "<green>Community block moved to your current block.");
+            }
+            case "reload" -> {
+                plugin.configs().loadAll();
+                hub.placeIfNeeded();
+                hub.leaderboard().refresh();
+                Msg.send(sender, "<green>Reloaded community config and refreshed hub displays.");
+            }
+            default -> Msg.send(sender, "<yellow>/obadmin hub <status|payout|raid|resetweekly|setblock|reload>");
         }
     }
 
@@ -421,6 +502,9 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 case "sprint" -> List.of("status", "reset", "podium", "addscore").stream()
                         .filter(n -> n.startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
+                case "hub" -> List.of("status", "payout", "raid", "resetweekly", "setblock", "reload").stream()
+                        .filter(n -> n.startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
                 case "fix" -> {
                     java.util.List<String> tabs = Bukkit.getOnlinePlayers().stream()
                             .map(Player::getName)
@@ -458,6 +542,9 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 return "reward".startsWith(args[2].toLowerCase()) ? List.of("reward") : Collections.emptyList();
             }
         }
+        if (args.length == 3 && args[0].equalsIgnoreCase("hub") && args[1].equalsIgnoreCase("payout")) {
+            return "weekly".startsWith(args[2].toLowerCase()) ? List.of("weekly") : Collections.emptyList();
+        }
         if (args.length == 4 && args[0].equalsIgnoreCase("sprint") && args[1].equalsIgnoreCase("addscore")) {
             return Bukkit.getOnlinePlayers().stream()
                     .map(Player::getName)
@@ -465,5 +552,23 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                     .collect(Collectors.toList());
         }
         return Collections.emptyList();
+    }
+
+    private static String formatLocation(Location loc) {
+        if (loc == null || loc.getWorld() == null) return "not set";
+        return loc.getWorld().getName() + " "
+                + loc.getBlockX() + ", "
+                + loc.getBlockY() + ", "
+                + loc.getBlockZ();
+    }
+
+    private static String formatDuration(long ms) {
+        long s = Math.max(0, ms / 1000);
+        long h = s / 3600;
+        long m = (s % 3600) / 60;
+        long sec = s % 60;
+        if (h > 0) return h + "h " + m + "m";
+        if (m > 0) return m + "m " + sec + "s";
+        return sec + "s";
     }
 }

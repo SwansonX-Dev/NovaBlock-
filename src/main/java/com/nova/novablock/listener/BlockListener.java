@@ -72,6 +72,22 @@ public class BlockListener implements Listener {
         Player player = event.getPlayer();
         Block block = event.getBlock();
         Location loc = block.getLocation();
+
+        // Community hub branch — handled before island lookup since the hub sits in
+        // the main spawn world, not an island slot.
+        if (plugin.community() != null) {
+            if (plugin.community().isAnchorBlock(loc)) {
+                event.setCancelled(true);
+                Msg.actionBar(player, "<red>Can't break the community block's bedrock anchor.");
+                return;
+            }
+            if (plugin.community().isCommunityBlock(loc)) {
+                event.setCancelled(true);
+                plugin.community().handleBreak(player, event);
+                return;
+            }
+        }
+
         Island island = plugin.islands().atLocation(loc);
         if (island == null) return;
 
@@ -213,6 +229,7 @@ public class BlockListener implements Listener {
         }
         island.recordBreak(broken);
         plugin.sprint().recordBlocksBroken(island.data().getId(), 1L);
+        if (plugin.community() != null) plugin.community().recordIslandBreak(player);
         // Block-break milestones — fire once at exact thresholds. Existing islands past
         // a threshold won't retroactively claim; the milestone is the act of crossing.
         // Overworld-only milestone in v1.
@@ -736,17 +753,22 @@ public class BlockListener implements Listener {
     /** Stop players placing on top of the center block (would prevent regen). */
     @EventHandler(ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
-        Island island = plugin.islands().atLocation(event.getBlock().getLocation());
+        Location placedLoc = event.getBlock().getLocation();
+        if (plugin.community() != null && plugin.community().isInRegenColumn(placedLoc)) {
+            event.setCancelled(true);
+            Msg.actionBar(event.getPlayer(), "<red>Keep the community block column clear.");
+            return;
+        }
+        Island island = plugin.islands().atLocation(placedLoc);
         if (island == null) return;
         if (!island.isMember(event.getPlayer())) return;
 
-        Location placed = event.getBlock().getLocation();
         Location center = island.centerBlock();
 
-        boolean inRegenColumn = placed.getBlockX() == center.getBlockX()
-                && placed.getBlockZ() == center.getBlockZ()
-                && placed.getBlockY() >= center.getBlockY() - 1
-                && placed.getBlockY() <= center.getBlockY() + 1;
+        boolean inRegenColumn = placedLoc.getBlockX() == center.getBlockX()
+                && placedLoc.getBlockZ() == center.getBlockZ()
+                && placedLoc.getBlockY() >= center.getBlockY() - 1
+                && placedLoc.getBlockY() <= center.getBlockY() + 1;
 
         if (inRegenColumn) {
             event.setCancelled(true);

@@ -155,6 +155,16 @@ public class ScoreboardManager {
             long secs = Math.max(0, (plugin.seasons().activeUntil() - System.currentTimeMillis()) / 1000);
             lines.add(ev.color + "★ " + ev.displayName + " <gray>(" + formatTime(secs) + ")");
         }
+        // Community weekly goal — only show in the final 24h to keep the sidebar tight.
+        if (plugin.community() != null
+                && plugin.getConfig().getBoolean("community.weekly-goal.enabled", true)) {
+            var goal = plugin.community().goal();
+            long remaining = goal.windowEnd() - System.currentTimeMillis();
+            if (remaining > 0 && remaining <= 24L * 60 * 60 * 1000
+                    && goal.progress() < goal.target()) {
+                lines.add("<gold>Goal: <white>" + goal.progress() + "/" + goal.target());
+            }
+        }
         return lines;
     }
 

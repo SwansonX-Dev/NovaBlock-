@@ -79,6 +79,14 @@ public enum IslandFlag {
             "Non-members can open chests, barrels, hoppers, etc.",
             "Default off — protects your loot from passers-by."),
 
+    OPEN_VISITS(
+            false,
+            "novablock.flag.open_visits",
+            Material.OAK_SIGN,
+            "Open Visits",
+            "Anyone can teleport to your island via /ob visit.",
+            "Members and admins always allowed regardless."),
+
     // ---- QOL / donor-rank perks ----
 
     ISLAND_FLY(

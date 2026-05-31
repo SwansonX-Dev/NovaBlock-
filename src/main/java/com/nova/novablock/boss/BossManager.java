@@ -94,6 +94,27 @@ public class BossManager implements Listener {
         return fight;
     }
 
+    /**
+     * Location-driven spawn for fights that aren't tied to an island (e.g. the
+     * community raid at /warp spawn). {@code triggering} may be null when the
+     * spawn is purely scheduled (no specific player to acquire as initial target).
+     */
+    public BossFight spawnAtLocation(String id, org.bukkit.Location at, Player triggering,
+                                     double scaling, double nightmareMult) {
+        Boss boss = registry.get(id);
+        if (!(boss instanceof AbstractBoss ab)) return null;
+        BossFight fight = ab.spawnAt(at, triggering, scaling, nightmareMult, null);
+        if (fight == null) return null;
+        active.put(fight.entityId(), fight);
+        if (triggering != null) {
+            fight.addParticipant(triggering);
+            triggering.playSound(triggering.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1f, 0.6f);
+        }
+        return fight;
+    }
+
+    public BossFight fightOf(UUID entityId) { return active.get(entityId); }
+
     private void tickAll() {
         for (var it = active.entrySet().iterator(); it.hasNext(); ) {
             BossFight fight = it.next().getValue();
@@ -119,11 +140,22 @@ public class BossManager implements Listener {
                 }
             }
             // Auto-add nearby owners to bossbar
-            Island island = plugin.islands().get(fight.islandId());
-            if (island != null) {
-                for (UUID memberId : island.data().getMembers()) {
-                    Player m = Bukkit.getPlayer(memberId);
-                    if (m != null && m.getLocation().distance(entity.getLocation()) < 32) {
+            if (fight.islandId() != null) {
+                Island island = plugin.islands().get(fight.islandId());
+                if (island != null) {
+                    for (UUID memberId : island.data().getMembers()) {
+                        Player m = Bukkit.getPlayer(memberId);
+                        if (m != null && m.getLocation().distance(entity.getLocation()) < 32) {
+                            fight.addParticipant(m);
+                        }
+                    }
+                }
+            } else {
+                // Raid fight: any online player within 32 blocks joins the bossbar (sightseers).
+                // Damage is still required to share rewards — that's enforced in RaidScheduler.
+                for (Player m : Bukkit.getOnlinePlayers()) {
+                    if (m.getWorld().equals(entity.getWorld())
+                            && m.getLocation().distance(entity.getLocation()) < 32) {
                         fight.addParticipant(m);
                     }
                 }
@@ -142,6 +174,8 @@ public class BossManager implements Listener {
             fight.addParticipant(attacker);
             applyCombatPerks(event, fight, attacker);
             fight.boss().onDamaged(fight, attacker, event.getFinalDamage());
+            // Per-fight damage hook — raid fights override this to record contribution.
+            fight.recordDamage(attacker, event.getFinalDamage());
             plugin.progression().addXp(attacker, com.nova.novablock.progression.SkillType.COMBAT, 3L);
         }
     }
@@ -175,6 +209,10 @@ public class BossManager implements Listener {
         fight.clearBar();
         restoreArena(fight);
         long coins = fight.boss().onDefeat(fight);
+        // Raid path: fight has no island, distribution is handled externally.
+        if (fight.distributeRewardsOnDeath(coins)) return;
+        if (fight.islandId() == null) return;
+
         Island island = plugin.islands().get(fight.islandId());
         if (island != null) {
             // BOSS_LOOT upgrade: +20% coin per level.
@@ -254,16 +292,22 @@ public class BossManager implements Listener {
             fight.clearBar();
             restoreArena(fight);
 
-            com.nova.novablock.island.Island island = plugin.islands().get(fight.islandId());
             long fullReward = fight.boss().onDefeat(fight);
             long participation = Math.max(50, (long) (fullReward * 0.4));
+            com.nova.novablock.island.Island island = fight.islandId() == null
+                    ? null : plugin.islands().get(fight.islandId());
             if (island != null) plugin.economy().award(island, participation);
 
             for (UUID id : fight.participants()) {
                 Player p = Bukkit.getPlayer(id);
                 if (p == null) continue;
-                Msg.title(p, "<gray>" + fight.boss().displayName() + " withdrew",
-                        "<yellow>+" + participation + " coins <gray>(participation)");
+                if (island != null) {
+                    Msg.title(p, "<gray>" + fight.boss().displayName() + " withdrew",
+                            "<yellow>+" + participation + " coins <gray>(participation)");
+                } else {
+                    Msg.title(p, "<gray>" + fight.boss().displayName() + " withdrew",
+                            "<gray>The raid ended without a winner.");
+                }
                 p.playSound(p.getLocation(), Sound.ENTITY_WITHER_HURT, 0.6f, 0.7f);
                 plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.COMBAT, 50L);
             }

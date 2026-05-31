@@ -11,11 +11,11 @@ softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, LuckPerms, xPets, xTags]
 commands:
   oneblock:
     description: Main NovaBlock command
-    usage: /<command> [create|home [nether]|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|toggle|setspawn|friend|minions|sprint|help]
+    usage: /<command> [create|home [nether]|hub|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|toggle|setspawn|friend|minions|sprint|help]
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command
-    usage: /<command> [reload|setphase|spawnboss|givecoins|event|wipe|fix|givepaxel|flags|storage|menu|path|sprint|freshstart|setspawn]
+    usage: /<command> [reload|setphase|spawnboss|givecoins|event|wipe|hub|fix|givepaxel|flags|storage|menu|path|sprint|freshstart|setspawn]
     permission: novablock.admin
   sb:
     description: Toggle the NovaBlock sidebar scoreboard
@@ -46,6 +46,12 @@ permissions:
   novablock.friend:
     description: Allows using /ob friend (add/accept/deny/remove/list).
     default: true
+  novablock.hub:
+    description: Allows opening the community hub and teleport shortcut.
+    default: true
+  novablock.visit.bypass:
+    description: Allows visiting islands regardless of their visit flags.
+    default: op
   novablock.admin.setspawn:
     description: Allows /obadmin setspawn to set the server spawn.
     default: op
@@ -133,6 +139,9 @@ permissions:
   novablock.flag.visitor_build:
     description: Allows toggling the visitor-build flag
     default: op
+  novablock.flag.open_visits:
+    description: Allows toggling the open-visits flag
+    default: true
   novablock.flag.island_fly:
     description: Allows toggling the island-fly flag
     default: op
@@ -167,6 +176,8 @@ permissions:
       novablock.admin.menu: true
       novablock.admin.path: true
       novablock.admin.sprint: true
+      novablock.admin.hub: true
       novablock.admin.freshstart: true
       novablock.admin.fix: true
       novablock.admin.minions: true
+      novablock.visit.bypass: true

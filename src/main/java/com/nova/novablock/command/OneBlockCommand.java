@@ -28,7 +28,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             "create", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
             "visit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
-            "setspawn", "friend", "friends", "sprint", "minion", "minions", "help");
+            "setspawn", "friend", "friends", "sprint", "minion", "minions", "hub", "community", "help");
     private static final List<String> FRIEND_SUBS = List.of("add", "accept", "deny", "remove", "list");
 
     private final NovaBlock plugin;
@@ -115,6 +115,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             }
             case "friend", "friends", "f" -> handleFriend(p, args);
             case "sprint" -> new com.nova.novablock.gui.SprintGui(plugin).open(p);
+            case "hub", "community" -> openHub(p, args);
             case "toggle" -> {
                 if (!p.hasPermission("novablock.toggle")) { denied(p); return true; }
                 plugin.hotbar().toggle(p);
@@ -180,11 +181,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
     }
 
     private void tryVisit(Player p, Island target, String ownerName) {
-        // Members and admins always allowed; everyone else needs VISITOR_BUILD.
-        boolean isMember = target.isMember(p);
-        boolean isAdmin = p.hasPermission("novablock.admin");
-        boolean allowed = isMember || isAdmin
-                || target.data().isFlag(com.nova.novablock.island.IslandFlag.VISITOR_BUILD);
+        boolean allowed = plugin.visits().canVisit(p, target);
         if (!allowed) {
             Msg.send(p, com.nova.novablock.util.Messages.format("visit-closed",
                     "<red>{target}'s island is closed to visitors.", "target", ownerName));
@@ -203,6 +200,21 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             return;
         }
         p.performCommand("pets");
+    }
+
+    private void openHub(Player p, String[] args) {
+        if (!p.hasPermission("novablock.hub")) {
+            denied(p);
+            return;
+        }
+        if (args.length >= 2 && (args[1].equalsIgnoreCase("tp")
+                || args[1].equalsIgnoreCase("warp")
+                || args[1].equalsIgnoreCase("spawn"))) {
+            p.closeInventory();
+            p.performCommand("warp spawn");
+            return;
+        }
+        new com.nova.novablock.gui.HubGui(plugin).open(p);
     }
 
     private void openPrestige(Player p) {
@@ -365,6 +377,10 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         if (args.length == 2 && (args[0].equalsIgnoreCase("friend") || args[0].equalsIgnoreCase("friends") || args[0].equalsIgnoreCase("f"))) {
             String prefix = args[1].toLowerCase();
             return FRIEND_SUBS.stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
+        }
+        if (args.length == 2 && (args[0].equalsIgnoreCase("hub") || args[0].equalsIgnoreCase("community"))) {
+            String prefix = args[1].toLowerCase();
+            return List.of("tp", "warp", "spawn").stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
         }
         if (args.length == 3 && (args[0].equalsIgnoreCase("friend") || args[0].equalsIgnoreCase("friends") || args[0].equalsIgnoreCase("f"))) {
             String prefix = args[2].toLowerCase();

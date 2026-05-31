@@ -49,19 +49,30 @@ public abstract class AbstractBoss implements Boss {
         Location base = arenaCenter == null ? island.centerBlock() : arenaCenter;
         Location loc = base.clone().add(0, 3, 0);
         if (loc.getWorld() == null) return null;
+        double scaling = 1.0 + island.data().getPhaseIndex() * tunedScalingPerPhase();
+        double nightmareMult = island.data().isFlag(com.nova.novablock.island.IslandFlag.NIGHTMARE_MODE) ? 2.0 : 1.0;
+        return spawnAt(loc, trigger, scaling, nightmareMult, island, base.clone());
+    }
+
+    /**
+     * Location-based spawn used by community raids. Caller computes scaling
+     * externally; no island arena platform is created for this path.
+     */
+    public BossFight spawnAt(Location loc, Player trigger, double scaling, double nightmareMult,
+                             Island contextIsland) {
+        return spawnAt(loc, trigger, scaling, nightmareMult, contextIsland, null);
+    }
+
+    private BossFight spawnAt(Location loc, Player trigger, double scaling, double nightmareMult,
+                              Island contextIsland, Location platformCenter) {
+        if (loc.getWorld() == null) return null;
         var entity = loc.getWorld().spawnEntity(loc, entityType());
         if (!(entity instanceof LivingEntity le)) {
             entity.remove();
             return null;
         }
-        double health = tunedHealth();
-        double damage = tunedDamage();
-        double scaling = 1.0 + island.data().getPhaseIndex() * tunedScalingPerPhase();
-        // NIGHTMARE_MODE flag — doubles boss stats outright.
-        if (island.data().isFlag(com.nova.novablock.island.IslandFlag.NIGHTMARE_MODE)) {
-            health *= 2.0;
-            damage *= 2.0;
-        }
+        double health = tunedHealth() * nightmareMult;
+        double damage = tunedDamage() * nightmareMult;
         if (le.getAttribute(Attribute.MAX_HEALTH) != null) {
             le.getAttribute(Attribute.MAX_HEALTH).setBaseValue(health * scaling);
             le.setHealth(health * scaling);
@@ -69,9 +80,6 @@ public abstract class AbstractBoss implements Boss {
         if (le.getAttribute(Attribute.ATTACK_DAMAGE) != null) {
             le.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(damage * scaling);
         }
-        // Knockback resistance maxed so players can't punt bosses off the island.
-        // Combined with the BossFight tether (anchored at spawn), this keeps the
-        // fight on the OneBlock platform.
         if (le.getAttribute(Attribute.KNOCKBACK_RESISTANCE) != null) {
             le.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(1.0);
         }
@@ -79,7 +87,7 @@ public abstract class AbstractBoss implements Boss {
         le.setPersistent(true);
         le.customName(com.nova.novablock.util.Msg.mm("<" + themeColor() + "><bold>" + displayName()));
         le.setCustomNameVisible(true);
-        if (le instanceof Mob mob) mob.setTarget(trigger);
+        if (le instanceof Mob mob && trigger != null) mob.setTarget(trigger);
 
         le.getPersistentDataContainer().set(BossManager.BOSS_KEY, PersistentDataType.STRING, id());
 
@@ -87,23 +95,24 @@ public abstract class AbstractBoss implements Boss {
                 com.nova.novablock.util.Msg.mm("<" + themeColor() + "><bold>" + displayName()),
                 1.0f, barColor(), BossBar.Overlay.PROGRESS);
 
-        BossFight fight = new BossFight(this, island, le, bar);
+        BossFight fight = new BossFight(this, contextIsland, le, bar);
         fight.setArenaCenter(loc.clone());
-        buildArenaPlatform(fight, base.clone());
+        if (platformCenter != null) {
+            buildArenaPlatform(fight, platformCenter);
+        }
         le.getPersistentDataContainer().set(BossManager.FIGHT_KEY, PersistentDataType.STRING, le.getUniqueId().toString());
         return fight;
     }
 
     /**
      * Place a temporary 5x5 cobblestone arena at the OneBlock platform level so
-     * the boss fight has guaranteed footing and the player doesn't fall into
-     * the void. Original blocks are snapshotted and restored when the fight ends.
+     * island boss fights have guaranteed footing. Original blocks are restored
+     * when the fight ends.
      */
     private void buildArenaPlatform(BossFight fight, Location center) {
         if (center.getWorld() == null) return;
         for (int dx = -2; dx <= 2; dx++) {
             for (int dz = -2; dz <= 2; dz++) {
-                // Skip the centre column so the OneBlock continues to function.
                 if (dx == 0 && dz == 0) continue;
                 org.bukkit.block.Block b = center.clone().add(dx, 0, dz).getBlock();
                 if (b.getType() != org.bukkit.Material.AIR) continue;

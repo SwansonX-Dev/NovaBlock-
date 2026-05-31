@@ -1,6 +1,7 @@
 package com.nova.novablock;
 
 import com.nova.novablock.antiafk.AntiAfkManager;
+import com.nova.novablock.community.CommunityHubManager;
 import com.nova.novablock.gui.MainMenuConfig;
 import com.nova.novablock.island.IslandFlagsManager;
 import com.nova.novablock.island.IslandStorageManager;
@@ -18,6 +19,7 @@ import com.nova.novablock.help.HelpRegistrar;
 import com.nova.novablock.hotbar.HotbarMenuManager;
 import com.nova.novablock.island.InviteManager;
 import com.nova.novablock.island.IslandManager;
+import com.nova.novablock.island.IslandVisitService;
 import com.nova.novablock.island.IslandWorldManager;
 import com.nova.novablock.island.OneBlockRepairService;
 import com.nova.novablock.island.PreviewHologramManager;
@@ -83,6 +85,8 @@ public final class NovaBlock extends JavaPlugin {
     private FriendManager friendManager;
     private WeeklySprintManager sprintManager;
     private MinionManager minionManager;
+    private CommunityHubManager communityHubManager;
+    private IslandVisitService islandVisitService;
 
     @Override
     public void onEnable() {
@@ -141,6 +145,8 @@ public final class NovaBlock extends JavaPlugin {
         this.friendManager = new FriendManager(this);
         this.sprintManager = new WeeklySprintManager(this);
         this.minionManager = new MinionManager(this);
+        this.communityHubManager = new CommunityHubManager(this);
+        this.islandVisitService = new IslandVisitService(this);
 
         getServer().getPluginManager().registerEvents(new BlockListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
@@ -175,6 +181,10 @@ public final class NovaBlock extends JavaPlugin {
         // Crash-recovery: clean up orphan bosses and leftover loot-room worlds.
         bossManager.cleanupOrphans();
         lootRoomManager.cleanupOrphanWorlds();
+        // Place the community OneBlock if missing (runs next tick once worlds are stable).
+        if (getConfig().getBoolean("community.enabled", true)) {
+            communityHubManager.placeIfNeeded();
+        }
 
         // Plug NovaBlock into the /help index so players can discover commands without leaving chat.
         HelpRegistrar.register(this);
@@ -210,6 +220,7 @@ public final class NovaBlock extends JavaPlugin {
         if (paxelManager != null) paxelManager.shutdown();
         if (previewHologramManager != null) previewHologramManager.shutdown();
         if (minionManager != null) minionManager.shutdown();
+        if (communityHubManager != null) communityHubManager.shutdown();
 
         // Then persist.
         if (islandManager != null) islandManager.saveAll();
@@ -255,4 +266,6 @@ public final class NovaBlock extends JavaPlugin {
     public FriendManager friends() { return friendManager; }
     public WeeklySprintManager sprint() { return sprintManager; }
     public MinionManager minions() { return minionManager; }
+    public CommunityHubManager community() { return communityHubManager; }
+    public IslandVisitService visits() { return islandVisitService; }
 }

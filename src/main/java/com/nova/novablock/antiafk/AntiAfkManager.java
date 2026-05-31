@@ -21,7 +21,7 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * Anti-AFK chat challenge. After the configured interval of mining activity,
  * the player is prompted to type a random letter in chat. If they don't respond
- * within the configured timeout they're kicked.
+ * within the configured timeout they're warped to spawn (via `/warp spawn`).
  *
  * <p>"Activity" is bumped from {@link com.nova.novablock.listener.BlockListener}
  * each time the player breaks their OneBlock — that's the loop we care about
@@ -31,8 +31,8 @@ import java.util.concurrent.ThreadLocalRandom;
 public class AntiAfkManager implements Listener {
 
     private static final long DEFAULT_CHALLENGE_INTERVAL_MS = 30L * 60L * 1000L;   // 30 min
-    private static final long DEFAULT_CHALLENGE_TIMEOUT_MS  = 60L * 1000L;          // 60s
-    private static final long TICK_PERIOD_TICKS     = 20L * 5L;             // every 5s
+    private static final long DEFAULT_CHALLENGE_TIMEOUT_MS  = 10L * 1000L;          // 10s
+    private static final long TICK_PERIOD_TICKS     = 20L;                          // every 1s
 
     private final NovaBlock plugin;
     private final Map<UUID, State> states = new HashMap<>();
@@ -93,9 +93,9 @@ public class AntiAfkManager implements Listener {
             State s = states.get(p.getUniqueId());
             if (s == null) continue;
             if (s.activeChallenge != 0) {
-                // Pending challenge — kick on timeout.
+                // Pending challenge — warp to spawn on timeout.
                 if (now - s.challengeIssuedAt > challengeTimeoutMs) {
-                    p.kick(Msg.mm("<red>Kicked for AFK — no chat response to the captcha."));
+                    failChallenge(p, s);
                 }
                 continue;
             }
@@ -112,6 +112,15 @@ public class AntiAfkManager implements Listener {
         Msg.send(p, "<gold>★ Anti-AFK check: <yellow>type the letter <white><bold>" + letter
                 + " <yellow>in chat within " + (challengeTimeoutMs / 1000L) + "s.");
         p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1.2f);
+    }
+
+    private void failChallenge(Player p, State s) {
+        s.activeChallenge = 0;
+        s.challengeIssuedAt = 0;
+        s.nextCheckAt = Long.MAX_VALUE;
+        Msg.send(p, "<red>AFK check failed — sending you to spawn.");
+        // performCommand runs as the player so warp permissions/cooldowns apply.
+        p.performCommand("warp spawn");
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
