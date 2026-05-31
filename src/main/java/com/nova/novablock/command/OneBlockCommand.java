@@ -211,7 +211,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 || args[1].equalsIgnoreCase("warp")
                 || args[1].equalsIgnoreCase("spawn"))) {
             p.closeInventory();
-            p.performCommand("warp spawn");
+            p.performCommand("warp community");
             return;
         }
         new com.nova.novablock.gui.HubGui(plugin).open(p);

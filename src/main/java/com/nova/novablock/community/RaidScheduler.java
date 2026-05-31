@@ -149,9 +149,9 @@ public class RaidScheduler implements Listener {
         var bossName = fight.boss().displayName();
         var color = fight.boss().themeColor();
         Bukkit.broadcast(Msg.mm("<gold>✦ <" + color + "><bold>COMMUNITY RAID<reset><gold> ✦"));
-        Bukkit.broadcast(Msg.mm("<" + color + ">" + bossName + " <gray>has appeared at <yellow>/warp spawn<gray>!"));
+        Bukkit.broadcast(Msg.mm("<" + color + ">" + bossName + " <gray>has appeared at <yellow>/warp community<gray>!"));
         Component tp = Component.text("[Teleport to raid]", NamedTextColor.YELLOW)
-                .clickEvent(ClickEvent.runCommand("/warp spawn"));
+                .clickEvent(ClickEvent.runCommand("/warp community"));
         Bukkit.broadcast(tp);
         for (Player p : Bukkit.getOnlinePlayers()) {
             p.playSound(p.getLocation(), org.bukkit.Sound.EVENT_RAID_HORN, 1f, 1f);
@@ -172,12 +172,12 @@ public class RaidScheduler implements Listener {
         long remaining = nextRaidAt - now;
         if (!warnedFiveMinutes && remaining <= 5L * 60_000L && remaining > 60_000L) {
             warnedFiveMinutes = true;
-            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Community raid in <white>5 minutes<yellow>. <gray>Meet at <yellow>/warp spawn<gray>."));
+            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Community raid in <white>5 minutes<yellow>. <gray>Meet at <yellow>/warp community<gray>."));
             return;
         }
         if (!warnedOneMinute && remaining <= 60_000L && remaining > 0L) {
             warnedOneMinute = true;
-            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Community raid in <white>1 minute<yellow>. <gray>Meet at <yellow>/warp spawn<gray>."));
+            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Community raid in <white>1 minute<yellow>. <gray>Meet at <yellow>/warp community<gray>."));
         }
     }
 

@@ -40,7 +40,7 @@ anti-afk:
   challenge-interval-seconds: 1800
   challenge-timeout-seconds: 10
 
-# Community Hub — shared OneBlock at /warp spawn, weekly server-wide goal,
+# Community Hub — shared OneBlock at /warp community, weekly server-wide goal,
 # periodic raids, and co-op visit polish. Disable any sub-section independently.
 community:
   enabled: true

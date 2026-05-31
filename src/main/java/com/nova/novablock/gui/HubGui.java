@@ -145,8 +145,8 @@ public class HubGui extends ChestGui {
         // --- Teleport to hub tile ---
         set(40, ItemBuilder.of(Material.ENDER_PEARL)
                 .name("<gold>Teleport to Hub")
-                .lore("<gray>Take me to <yellow>/warp spawn<gray>.").build(),
-                e -> { viewer.closeInventory(); viewer.performCommand("warp spawn"); });
+                .lore("<gray>Take me to <yellow>/warp community<gray>.").build(),
+                e -> { viewer.closeInventory(); viewer.performCommand("warp community"); });
 
         fill(Material.BLACK_STAINED_GLASS_PANE, " ");
     }

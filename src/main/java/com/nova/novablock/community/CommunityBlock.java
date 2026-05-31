@@ -22,7 +22,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Shared OneBlock at {@code /warp spawn}. Any online player may mine it: drops
+ * Shared OneBlock at {@code /warp community}. Any online player may mine it: drops
  * go to the breaker normally, plus a configurable fraction of coin value is
  * siphoned into a shared pool that periodically pays out to contributors.
  *
