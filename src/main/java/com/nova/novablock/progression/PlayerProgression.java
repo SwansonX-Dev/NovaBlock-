@@ -22,6 +22,7 @@ public class PlayerProgression {
     private int atlasScore;
     private String seasonalPathKey = "";
     private int seasonalPathPoints;
+    private long claimRewardBreaks;
     private final Set<Integer> claimedSeasonalTiers = new HashSet<>();
     private final Set<String> pendingRewardCommands = new HashSet<>();
 
@@ -73,6 +74,10 @@ public class PlayerProgression {
     public int getSeasonalPathPoints() { return seasonalPathPoints; }
     public void addSeasonalPathPoints(int amount) { this.seasonalPathPoints = Math.max(0, this.seasonalPathPoints + amount); }
     public void setSeasonalPathPoints(int value) { this.seasonalPathPoints = Math.max(0, value); }
+
+    public long getClaimRewardBreaks() { return claimRewardBreaks; }
+    public void setClaimRewardBreaks(long value) { this.claimRewardBreaks = Math.max(0L, value); }
+    public long incrementClaimRewardBreaks() { return ++claimRewardBreaks; }
 
     public Set<Integer> getClaimedSeasonalTiers() { return claimedSeasonalTiers; }
     public void setClaimedSeasonalTiers(Set<Integer> tiers) {

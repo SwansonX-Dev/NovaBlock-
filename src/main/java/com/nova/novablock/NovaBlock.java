@@ -1,6 +1,7 @@
 package com.nova.novablock;
 
 import com.nova.novablock.antiafk.AntiAfkManager;
+import com.nova.novablock.community.ClaimBlockRewardService;
 import com.nova.novablock.community.CommunityHubManager;
 import com.nova.novablock.gui.MainMenuConfig;
 import com.nova.novablock.island.IslandFlagsManager;
@@ -86,6 +87,7 @@ public final class NovaBlock extends JavaPlugin {
     private WeeklySprintManager sprintManager;
     private MinionManager minionManager;
     private CommunityHubManager communityHubManager;
+    private ClaimBlockRewardService claimBlockRewardService;
     private IslandVisitService islandVisitService;
 
     @Override
@@ -146,6 +148,7 @@ public final class NovaBlock extends JavaPlugin {
         this.sprintManager = new WeeklySprintManager(this);
         this.minionManager = new MinionManager(this);
         this.communityHubManager = new CommunityHubManager(this);
+        this.claimBlockRewardService = new ClaimBlockRewardService(this);
         this.islandVisitService = new IslandVisitService(this);
 
         getServer().getPluginManager().registerEvents(new BlockListener(this), this);
@@ -267,5 +270,6 @@ public final class NovaBlock extends JavaPlugin {
     public WeeklySprintManager sprint() { return sprintManager; }
     public MinionManager minions() { return minionManager; }
     public CommunityHubManager community() { return communityHubManager; }
+    public ClaimBlockRewardService claimBlockRewards() { return claimBlockRewardService; }
     public IslandVisitService visits() { return islandVisitService; }
 }

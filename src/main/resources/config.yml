@@ -40,6 +40,18 @@ anti-afk:
   challenge-interval-seconds: 1800
   challenge-timeout-seconds: 10
 
+# Claim block earning for xGuard. Rewards are tracked per player and paid in
+# batches so we don't dispatch a command on every OneBlock break.
+claim-block-rewards:
+  enabled: true
+  include-personal-oneblock: true
+  include-community-oneblock: true
+  # Default is effectively 1 claim block earned per OneBlock broken.
+  every-oneblock-breaks: 100
+  claim-blocks-per-reward: 100
+  command: "claimblocks give %player% %amount%"
+  actionbar: true
+
 # Community Hub — shared OneBlock at /warp community, weekly server-wide goal,
 # periodic raids, and co-op visit polish. Disable any sub-section independently.
 community:

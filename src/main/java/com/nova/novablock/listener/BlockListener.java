@@ -245,6 +245,7 @@ public class BlockListener implements Listener {
             island.data().incrementPhaseProgress();
         }
         island.recordBreak(broken);
+        plugin.claimBlockRewards().recordPersonalBreak(player);
         plugin.sprint().recordBlocksBroken(island.data().getId(), 1L);
         if (plugin.community() != null) plugin.community().recordIslandBreak(player);
         // Block-break milestones — fire once at exact thresholds. Existing islands past

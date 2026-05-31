@@ -209,6 +209,7 @@ public class YamlStorage implements DataStorage {
         p.setSeasonalPathPoints(y.getInt("seasonal.points", 0));
         p.setClaimedSeasonalTiers(new java.util.HashSet<>(y.getIntegerList("seasonal.claimedTiers")));
         p.setPendingRewardCommands(new java.util.HashSet<>(y.getStringList("seasonal.pendingCommands")));
+        p.setClaimRewardBreaks(y.getLong("claimBlocks.oneBlockBreaks", 0));
         return p;
     }
 
@@ -234,6 +235,7 @@ public class YamlStorage implements DataStorage {
         y.set("seasonal.points", p.getSeasonalPathPoints());
         y.set("seasonal.claimedTiers", p.getClaimedSeasonalTiers().stream().sorted().toList());
         y.set("seasonal.pendingCommands", p.getPendingRewardCommands().stream().sorted().toList());
+        y.set("claimBlocks.oneBlockBreaks", p.getClaimRewardBreaks());
         try { atomicSave(y, f); }
         catch (IOException ex) { plugin.getLogger().warning("Failed to save progression: " + ex.getMessage()); }
     }

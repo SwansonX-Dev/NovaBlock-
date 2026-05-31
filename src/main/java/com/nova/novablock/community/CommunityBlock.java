@@ -135,6 +135,7 @@ public class CommunityBlock {
 
         blocksBroken++;
         phaseProgress++;
+        plugin.claimBlockRewards().recordCommunityBreak(player);
         int required = phase == null ? Integer.MAX_VALUE : scaledRequiredBlocks(phase);
         if (phase != null && phaseProgress >= required) {
             int nextIdx = phaseIndex + 1;
