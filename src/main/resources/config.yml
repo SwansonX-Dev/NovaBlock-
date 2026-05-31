@@ -46,6 +46,11 @@ community:
   enabled: true
   # Operators can live-check or reload these settings with /obadmin hub status and /obadmin hub reload.
 
+  world:
+    name: community_oneblock
+    platform-size: 10
+    spawn: { x: 0, y: 80, z: 0 }
+
   hub:
     # Exact community block location. Use /obadmin hub setblock in any world to update this.
     location:
@@ -55,6 +60,16 @@ community:
       z: 0
     # Legacy fallback if location.world is removed: offset from /warp spawn.
     offset: { x: 0, y: 0, z: 5 }
+
+  oneblocks:
+    # Community phases intentionally take much longer than personal islands.
+    phase-required-multiplier: 10.0
+    positions:
+      - { x: 0, y: 81, z: 0 }
+      - { x: 2, y: 81, z: 0 }
+      - { x: -2, y: 81, z: 0 }
+      - { x: 0, y: 81, z: 2 }
+      - { x: 0, y: 81, z: -2 }
 
   block:
     # Drops still go 100% to the breaker. This is on TOP, into the shared pool.

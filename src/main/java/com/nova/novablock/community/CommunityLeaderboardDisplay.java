@@ -39,7 +39,7 @@ public class CommunityLeaderboardDisplay {
             remove();
             return;
         }
-        Location base = plugin.spawn().communityBlockLocation();
+        Location base = hub.primaryBlockLocation();
         if (base == null || base.getWorld() == null) {
             remove();
             return;

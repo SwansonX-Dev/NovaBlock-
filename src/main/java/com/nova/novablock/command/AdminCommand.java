@@ -281,7 +281,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         switch (args[1].toLowerCase()) {
             case "status" -> {
                 long nextRaidMs = Math.max(0, hub.raids().nextRaidAt() - System.currentTimeMillis());
-                Location block = plugin.spawn().communityBlockLocation();
+                Location block = hub.primaryBlockLocation();
                 Msg.send(sender, "<gold>Community Hub");
                 Msg.send(sender, "<gray>Enabled: <white>" + hub.isEnabled());
                 Msg.send(sender, "<gray>Block: <white>" + formatLocation(block));
@@ -323,10 +323,23 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                     return;
                 }
                 Location at = p.getLocation().getBlock().getLocation();
-                plugin.spawn().setCommunityBlockLocation(at);
+                plugin.getConfig().set("community.world.name", at.getWorld() == null ? "community_oneblock" : at.getWorld().getName());
+                plugin.getConfig().set("community.world.spawn.x", at.getBlockX());
+                plugin.getConfig().set("community.world.spawn.y", at.getBlockY());
+                plugin.getConfig().set("community.world.spawn.z", at.getBlockZ());
+                int y = at.getBlockY() + 1;
+                java.util.List<java.util.Map<String, Object>> positions = java.util.List.of(
+                        java.util.Map.of("x", at.getBlockX(), "y", y, "z", at.getBlockZ()),
+                        java.util.Map.of("x", at.getBlockX() + 2, "y", y, "z", at.getBlockZ()),
+                        java.util.Map.of("x", at.getBlockX() - 2, "y", y, "z", at.getBlockZ()),
+                        java.util.Map.of("x", at.getBlockX(), "y", y, "z", at.getBlockZ() + 2),
+                        java.util.Map.of("x", at.getBlockX(), "y", y, "z", at.getBlockZ() - 2)
+                );
+                plugin.getConfig().set("community.oneblocks.positions", positions);
+                plugin.saveConfig();
                 hub.placeIfNeeded();
                 hub.leaderboard().refresh();
-                Msg.send(sender, "<green>Community block moved to <white>" + formatLocation(at) + "<green>.");
+                Msg.send(sender, "<green>Community platform centered at <white>" + formatLocation(at) + "<green>.");
             }
             case "reload" -> {
                 plugin.configs().loadAll();

@@ -3,9 +3,14 @@ package com.nova.novablock.community;
 import com.nova.novablock.NovaBlock;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -40,15 +45,18 @@ public class CommunityHubManager {
     public RaidScheduler raids() { return raids; }
     public CommunityLeaderboardDisplay leaderboard() { return leaderboard; }
 
-    /** Place the bedrock anchor + starter material if missing. Called from NovaBlock after worlds load. */
+    /** Place the shared platform + OneBlocks if missing. Called from NovaBlock after worlds load. */
     public void placeIfNeeded() {
-        Location at = plugin.spawn().communityBlockLocation();
-        if (at == null) {
-            plugin.getLogger().warning("Community block can't be placed yet — spawn location not set.");
+        Location spawn = hubSpawnLocation();
+        if (spawn == null) {
+            plugin.getLogger().warning("Community world can't be placed yet — world not loaded.");
             return;
         }
         // Defer one tick so the world is fully ready when called from onEnable.
-        Bukkit.getScheduler().runTask(plugin, () -> block.placeInitial(at));
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            buildStarterPlatform(spawn);
+            for (Location at : blockLocations()) block.placeInitial(at);
+        });
     }
 
     /**
@@ -57,12 +65,12 @@ public class CommunityHubManager {
      */
     public void repairIfNeeded() {
         if (!isEnabled()) return;
-        Location at = plugin.spawn().communityBlockLocation();
-        if (at == null) return;
-        if (block.placeInitial(at)) {
-            plugin.getLogger().info("Repaired missing community OneBlock at "
-                    + at.getWorld().getName() + " "
-                    + at.getBlockX() + "," + at.getBlockY() + "," + at.getBlockZ());
+        for (Location at : blockLocations()) {
+            if (block.placeInitial(at)) {
+                plugin.getLogger().info("Repaired missing community OneBlock at "
+                        + at.getWorld().getName() + " "
+                        + at.getBlockX() + "," + at.getBlockY() + "," + at.getBlockZ());
+            }
         }
     }
 
@@ -73,42 +81,44 @@ public class CommunityHubManager {
     /** True if the broken location matches the community block coordinates. */
     public boolean isCommunityBlock(Location loc) {
         if (!isEnabled() || loc == null) return false;
-        Location at = plugin.spawn().communityBlockLocation();
-        if (at == null || at.getWorld() == null) return false;
-        if (!at.getWorld().equals(loc.getWorld())) return false;
-        return at.getBlockX() == loc.getBlockX()
-                && at.getBlockY() == loc.getBlockY()
-                && at.getBlockZ() == loc.getBlockZ();
+        for (Location at : blockLocations()) {
+            if (sameBlock(at, loc)) return true;
+        }
+        return false;
     }
 
     /** True if loc is the bedrock anchor directly below the community block. */
     public boolean isAnchorBlock(Location loc) {
         if (!isEnabled() || loc == null) return false;
-        Location at = plugin.spawn().communityBlockLocation();
-        if (at == null || at.getWorld() == null) return false;
-        if (!at.getWorld().equals(loc.getWorld())) return false;
-        return at.getBlockX() == loc.getBlockX()
-                && at.getBlockY() - 1 == loc.getBlockY()
-                && at.getBlockZ() == loc.getBlockZ();
+        for (Location at : blockLocations()) {
+            if (at == null || at.getWorld() == null || loc.getWorld() == null) continue;
+            if (!at.getWorld().equals(loc.getWorld())) continue;
+            if (at.getBlockX() == loc.getBlockX()
+                    && at.getBlockY() - 1 == loc.getBlockY()
+                    && at.getBlockZ() == loc.getBlockZ()) return true;
+        }
+        return false;
     }
 
     /** True if loc is in the regen column (block ± 1 vertical, same x/z). */
     public boolean isInRegenColumn(Location loc) {
         if (!isEnabled() || loc == null) return false;
-        Location at = plugin.spawn().communityBlockLocation();
-        if (at == null || at.getWorld() == null) return false;
-        if (!at.getWorld().equals(loc.getWorld())) return false;
-        return at.getBlockX() == loc.getBlockX()
-                && at.getBlockZ() == loc.getBlockZ()
-                && loc.getBlockY() >= at.getBlockY() - 1
-                && loc.getBlockY() <= at.getBlockY() + 1;
+        for (Location at : blockLocations()) {
+            if (at == null || at.getWorld() == null || loc.getWorld() == null) continue;
+            if (!at.getWorld().equals(loc.getWorld())) continue;
+            if (at.getBlockX() == loc.getBlockX()
+                    && at.getBlockZ() == loc.getBlockZ()
+                    && loc.getBlockY() >= at.getBlockY() - 1
+                    && loc.getBlockY() <= at.getBlockY() + 1) return true;
+        }
+        return false;
     }
 
     /** Routes a break through CommunityBlock, then counts it toward the weekly goal. */
     public void handleBreak(Player player, BlockBreakEvent event) {
         if (!isEnabled()) return;
-        Location at = plugin.spawn().communityBlockLocation();
-        if (at == null) return;
+        Location at = event.getBlock().getLocation();
+        if (!isCommunityBlock(at)) return;
         block.onBreak(player, event.getBlock().getType(), event, at);
         goal.recordBreak(player, 1L);
         block.tickPayoutIfDue();
@@ -135,6 +145,76 @@ public class CommunityHubManager {
     private void flush() {
         if (!dirty.compareAndSet(true, false)) return;
         storage.save(block, goal, raids);
+    }
+
+    public Location primaryBlockLocation() {
+        List<Location> blocks = blockLocations();
+        return blocks.isEmpty() ? null : blocks.get(0);
+    }
+
+    public Location hubSpawnLocation() {
+        String worldName = plugin.getConfig().getString("community.world.name", "community_oneblock");
+        World world = plugin.worlds().ensureWorld(worldName);
+        if (world == null) return null;
+        double x = plugin.getConfig().getDouble("community.world.spawn.x", 0.0);
+        double y = plugin.getConfig().getDouble("community.world.spawn.y", 80.0);
+        double z = plugin.getConfig().getDouble("community.world.spawn.z", 0.0);
+        return new Location(world, x, y, z);
+    }
+
+    public List<Location> blockLocations() {
+        Location spawn = hubSpawnLocation();
+        if (spawn == null || spawn.getWorld() == null) {
+            Location legacy = plugin.spawn().communityBlockLocation();
+            return legacy == null ? List.of() : List.of(legacy);
+        }
+
+        List<Map<?, ?>> raw = plugin.getConfig().getMapList("community.oneblocks.positions");
+        if (raw.isEmpty()) {
+            Location legacy = plugin.spawn().communityBlockLocation();
+            return legacy == null ? List.of(spawn.clone().add(0, 1, 0)) : List.of(legacy);
+        }
+
+        List<Location> out = new ArrayList<>();
+        for (Map<?, ?> row : raw) {
+            double x = number(row.get("x"), spawn.getX());
+            double y = number(row.get("y"), spawn.getY() + 1);
+            double z = number(row.get("z"), spawn.getZ());
+            out.add(new Location(spawn.getWorld(), x, y, z));
+        }
+        return out;
+    }
+
+    private void buildStarterPlatform(Location spawn) {
+        if (spawn.getWorld() == null) return;
+        int size = Math.max(1, plugin.getConfig().getInt("community.world.platform-size", 10));
+        int start = -size / 2;
+        int end = start + size - 1;
+        int y = spawn.getBlockY();
+        for (int dx = start; dx <= end; dx++) {
+            for (int dz = start; dz <= end; dz++) {
+                spawn.getWorld().getBlockAt(spawn.getBlockX() + dx, y, spawn.getBlockZ() + dz)
+                        .setType(Material.BEDROCK, false);
+            }
+        }
+    }
+
+    private static boolean sameBlock(Location a, Location b) {
+        return a != null && b != null
+                && a.getWorld() != null && b.getWorld() != null
+                && a.getWorld().equals(b.getWorld())
+                && a.getBlockX() == b.getBlockX()
+                && a.getBlockY() == b.getBlockY()
+                && a.getBlockZ() == b.getBlockZ();
+    }
+
+    private static double number(Object raw, double fallback) {
+        if (raw instanceof Number n) return n.doubleValue();
+        if (raw instanceof String s) {
+            try { return Double.parseDouble(s); }
+            catch (NumberFormatException ignored) {}
+        }
+        return fallback;
     }
 
     public void shutdown() {

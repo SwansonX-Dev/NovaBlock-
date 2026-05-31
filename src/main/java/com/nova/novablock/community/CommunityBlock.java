@@ -135,7 +135,8 @@ public class CommunityBlock {
 
         blocksBroken++;
         phaseProgress++;
-        if (phase != null && phaseProgress >= phase.getRequiredBlocks()) {
+        int required = phase == null ? Integer.MAX_VALUE : scaledRequiredBlocks(phase);
+        if (phase != null && phaseProgress >= required) {
             int nextIdx = phaseIndex + 1;
             Phase nextPhase = plugin.phases().get(nextIdx);
             if (nextPhase != null) {
@@ -230,5 +231,11 @@ public class CommunityBlock {
             case CAKE -> 600;
             default -> 0;
         };
+    }
+
+    private int scaledRequiredBlocks(Phase phase) {
+        double mult = Math.max(1.0, plugin.getConfig()
+                .getDouble("community.oneblocks.phase-required-multiplier", 10.0));
+        return Math.max(1, (int) Math.ceil(phase.getRequiredBlocks() * mult));
     }
 }

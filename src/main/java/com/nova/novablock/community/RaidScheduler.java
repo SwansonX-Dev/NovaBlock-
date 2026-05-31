@@ -108,9 +108,9 @@ public class RaidScheduler implements Listener {
     }
 
     private BossFight spawnRaid() {
-        Location at = plugin.spawn().communityBlockLocation();
+        Location at = plugin.community() == null ? null : plugin.community().hubSpawnLocation();
         if (at == null) {
-            plugin.getLogger().warning("Raid skipped: no community block location available.");
+            plugin.getLogger().warning("Raid skipped: no community hub location available.");
             return null;
         }
         at = at.clone().add(0, 2, 0);

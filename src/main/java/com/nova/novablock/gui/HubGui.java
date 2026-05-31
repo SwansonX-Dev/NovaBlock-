@@ -48,7 +48,9 @@ public class HubGui extends ChestGui {
         String phaseColor = phase == null ? "white" : phase.getThemeColor();
         String phaseName = phase == null ? "?" : phase.getDisplayName();
         int phaseProg = hub.block().phaseProgress();
-        int phaseReq = phase == null ? 1 : phase.getRequiredBlocks();
+        double phaseMult = Math.max(1.0, plugin.getConfig()
+                .getDouble("community.oneblocks.phase-required-multiplier", 10.0));
+        int phaseReq = phase == null ? 1 : Math.max(1, (int) Math.ceil(phase.getRequiredBlocks() * phaseMult));
         long pool = hub.block().pool();
         set(11, ItemBuilder.of(Material.NETHER_STAR)
                 .name("<gold><bold>Community OneBlock")
