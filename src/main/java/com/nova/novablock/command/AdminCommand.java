@@ -322,20 +322,11 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                     Msg.send(sender, "<red>Players only.");
                     return;
                 }
-                Location spawn = plugin.spawn().location();
-                if (spawn == null || spawn.getWorld() == null || p.getWorld() == null
-                        || !spawn.getWorld().equals(p.getWorld())) {
-                    Msg.send(sender, "<red>Stand in the same world as /warp spawn.");
-                    return;
-                }
                 Location at = p.getLocation().getBlock().getLocation();
-                plugin.getConfig().set("community.hub.offset.x", at.getBlockX() - spawn.getBlockX());
-                plugin.getConfig().set("community.hub.offset.y", at.getBlockY() - spawn.getBlockY());
-                plugin.getConfig().set("community.hub.offset.z", at.getBlockZ() - spawn.getBlockZ());
-                plugin.saveConfig();
+                plugin.spawn().setCommunityBlockLocation(at);
                 hub.placeIfNeeded();
                 hub.leaderboard().refresh();
-                Msg.send(sender, "<green>Community block moved to your current block.");
+                Msg.send(sender, "<green>Community block moved to <white>" + formatLocation(at) + "<green>.");
             }
             case "reload" -> {
                 plugin.configs().loadAll();

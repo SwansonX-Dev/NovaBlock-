@@ -47,7 +47,13 @@ community:
   # Operators can live-check or reload these settings with /obadmin hub status and /obadmin hub reload.
 
   hub:
-    # Offset from /warp spawn where the community block sits.
+    # Exact community block location. Use /obadmin hub setblock in any world to update this.
+    location:
+      world: world
+      x: 0
+      y: 64
+      z: 0
+    # Legacy fallback if location.world is removed: offset from /warp spawn.
     offset: { x: 0, y: 0, z: 5 }
 
   block:

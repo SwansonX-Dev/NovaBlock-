@@ -31,13 +31,24 @@ public class SpawnManager {
     }
 
     /**
-     * Resolved location of the community OneBlock: {@link #location()} plus
-     * {@code community.hub.offset.{x,y,z}}. Returns null if spawn isn't set.
+     * Resolved location of the community OneBlock. Prefer explicit
+     * {@code community.hub.location} so the hub can live in a combat-enabled
+     * world; fall back to the original spawn offset for existing configs.
      */
     public @Nullable Location communityBlockLocation() {
+        FileConfiguration cfg = plugin.getConfig();
+        if (cfg.isSet("community.hub.location.world")) {
+            String worldName = cfg.getString("community.hub.location.world");
+            World world = worldName == null ? null : Bukkit.getWorld(worldName);
+            if (world == null) return null;
+            return new Location(world,
+                    cfg.getDouble("community.hub.location.x"),
+                    cfg.getDouble("community.hub.location.y"),
+                    cfg.getDouble("community.hub.location.z"));
+        }
+
         Location base = location();
         if (base == null) return null;
-        FileConfiguration cfg = plugin.getConfig();
         double dx = cfg.getDouble("community.hub.offset.x", 0.0);
         double dy = cfg.getDouble("community.hub.offset.y", 0.0);
         double dz = cfg.getDouble("community.hub.offset.z", 5.0);
@@ -45,6 +56,16 @@ public class SpawnManager {
                 base.getBlockX() + dx + 0.0,
                 base.getBlockY() + dy + 0.0,
                 base.getBlockZ() + dz + 0.0);
+    }
+
+    public void setCommunityBlockLocation(Location loc) {
+        FileConfiguration cfg = plugin.getConfig();
+        World world = loc.getWorld();
+        cfg.set("community.hub.location.world", world == null ? null : world.getName());
+        cfg.set("community.hub.location.x", loc.getBlockX());
+        cfg.set("community.hub.location.y", loc.getBlockY());
+        cfg.set("community.hub.location.z", loc.getBlockZ());
+        plugin.saveConfig();
     }
 
     public void setLocation(Location loc) {

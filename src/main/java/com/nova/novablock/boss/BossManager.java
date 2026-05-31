@@ -32,6 +32,9 @@ public class BossManager implements Listener {
 
     public static final NamespacedKey BOSS_KEY = new NamespacedKey("novablock", "boss_id");
     public static final NamespacedKey FIGHT_KEY = new NamespacedKey("novablock", "boss_fight");
+    private static final double ARENA_RADIUS = 8.0;
+    private static final double MIN_Y_OFFSET = -4.0;
+    private static final double MAX_Y_OFFSET = 6.0;
 
     private final NovaBlock plugin;
     private final Map<String, Boss> registry = new HashMap<>();
@@ -124,21 +127,9 @@ public class BossManager implements Listener {
             try { fight.boss().onTick(fight); } catch (Throwable t) {
                 plugin.getLogger().warning("Boss tick error " + fight.boss().id() + ": " + t);
             }
-            // Tether: pull bosses back to spawn if they get punched off the platform
-            // or fall into the void. Combined with maxed knockback resistance this
-            // keeps the fight in one place.
+            // Arena boundary: bosses may move around the fight area, but never leave it.
             var center = fight.arenaCenter();
-            if (center != null && entity.getWorld().equals(center.getWorld())) {
-                double horizDist = Math.hypot(
-                        entity.getLocation().getX() - center.getX(),
-                        entity.getLocation().getZ() - center.getZ());
-                boolean tooFar = horizDist > 14;
-                boolean tooLow = entity.getLocation().getY() < center.getY() - 8;
-                if (tooFar || tooLow) {
-                    entity.teleport(center);
-                    entity.setFallDistance(0);
-                }
-            }
+            if (center != null) keepInsideArena(entity, center);
             // Auto-add nearby owners to bossbar
             if (fight.islandId() != null) {
                 Island island = plugin.islands().get(fight.islandId());
@@ -160,6 +151,27 @@ public class BossManager implements Listener {
                     }
                 }
             }
+        }
+    }
+
+    private void keepInsideArena(LivingEntity entity, org.bukkit.Location center) {
+        if (center.getWorld() == null) return;
+        boolean wrongWorld = !entity.getWorld().equals(center.getWorld());
+        double horizDist = wrongWorld ? Double.MAX_VALUE : Math.hypot(
+                entity.getLocation().getX() - center.getX(),
+                entity.getLocation().getZ() - center.getZ());
+        double dy = wrongWorld ? 0.0 : entity.getLocation().getY() - center.getY();
+        boolean outOfBounds = wrongWorld
+                || horizDist > ARENA_RADIUS
+                || dy < MIN_Y_OFFSET
+                || dy > MAX_Y_OFFSET;
+        if (!outOfBounds) return;
+
+        entity.teleport(center);
+        entity.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+        entity.setFallDistance(0);
+        if (entity instanceof org.bukkit.entity.Mob mob) {
+            mob.setTarget(null);
         }
     }
 

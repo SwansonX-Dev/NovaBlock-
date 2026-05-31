@@ -24,6 +24,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
@@ -748,6 +749,15 @@ public class BlockListener implements Listener {
                  NETHER_QUARTZ_ORE, ANCIENT_DEBRIS -> true;
             default -> false;
         };
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityChangeBlock(EntityChangeBlockEvent event) {
+        if (plugin.community() == null) return;
+        Location loc = event.getBlock().getLocation();
+        if (plugin.community().isCommunityBlock(loc) || plugin.community().isAnchorBlock(loc)) {
+            event.setCancelled(true);
+        }
     }
 
     /** Stop players placing on top of the center block (would prevent regen). */
