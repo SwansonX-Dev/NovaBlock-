@@ -163,6 +163,7 @@ public class ScoreboardManager {
             if (remaining > 0 && remaining <= 24L * 60 * 60 * 1000
                     && goal.progress() < goal.target()) {
                 lines.add("<gold>Goal: <white>" + goal.progress() + "/" + goal.target());
+                lines.add("<gray>Ends: <yellow>" + formatGoalTime(remaining / 1000));
             }
         }
         return lines;
@@ -201,6 +202,15 @@ public class ScoreboardManager {
         long m = seconds / 60;
         long s = seconds % 60;
         return m + ":" + (s < 10 ? "0" : "") + s;
+    }
+
+    private String formatGoalTime(long seconds) {
+        long d = seconds / 86400;
+        long h = (seconds % 86400) / 3600;
+        long m = (seconds % 3600) / 60;
+        if (d > 0) return d + "d " + h + "h";
+        if (h > 0) return h + "h " + m + "m";
+        return Math.max(0, m) + "m";
     }
 
     /** Builds a 1–2 char unique entry string per line (invisible-ish). */
