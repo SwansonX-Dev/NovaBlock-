@@ -51,6 +51,21 @@ public class CommunityHubManager {
         Bukkit.getScheduler().runTask(plugin, () -> block.placeInitial(at));
     }
 
+    /**
+     * Cheap self-heal used by the existing one-minute community tick. It checks
+     * only the configured block and anchor, so it stays effectively free.
+     */
+    public void repairIfNeeded() {
+        if (!isEnabled()) return;
+        Location at = plugin.spawn().communityBlockLocation();
+        if (at == null) return;
+        if (block.placeInitial(at)) {
+            plugin.getLogger().info("Repaired missing community OneBlock at "
+                    + at.getWorld().getName() + " "
+                    + at.getBlockX() + "," + at.getBlockY() + "," + at.getBlockZ());
+        }
+    }
+
     public boolean isEnabled() {
         return plugin.getConfig().getBoolean("community.enabled", true);
     }

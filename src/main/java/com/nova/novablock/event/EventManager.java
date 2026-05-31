@@ -30,6 +30,7 @@ public class EventManager {
     private void tickCommunity() {
         if (plugin.community() == null) return;
         if (!plugin.community().isEnabled()) return;
+        plugin.community().repairIfNeeded();
         plugin.community().goal().tick();
         plugin.community().raids().tick();
         plugin.community().block().tickPayoutIfDue();

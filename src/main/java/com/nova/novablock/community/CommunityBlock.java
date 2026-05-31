@@ -72,17 +72,23 @@ public class CommunityBlock {
      * Initial placement: lay the bedrock anchor + put a starter block on top.
      * Called from CommunityHubManager on enable when block is missing.
      */
-    public void placeInitial(Location center) {
-        if (center == null || center.getWorld() == null) return;
+    public boolean placeInitial(Location center) {
+        if (center == null || center.getWorld() == null) return false;
+        boolean repaired = false;
         Location anchor = center.clone().add(0, -1, 0);
         if (anchor.getBlock().getType() != Material.BEDROCK) {
             anchor.getBlock().setType(Material.BEDROCK, false);
+            repaired = true;
         }
-        if (center.getBlock().getType() == Material.AIR) {
+        if (center.getBlock().getType() == Material.AIR
+                || center.getBlock().getType() == Material.BEDROCK
+                || center.getBlock().isLiquid()) {
             Phase phase = plugin.phases().getOrLast(phaseIndex);
             Material first = phase != null ? phase.rollBlock(ThreadLocalRandom.current()) : Material.STONE;
             center.getBlock().setType(first, false);
+            repaired = true;
         }
+        return repaired;
     }
 
     /**
