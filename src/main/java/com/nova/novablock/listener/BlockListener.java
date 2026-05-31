@@ -68,6 +68,22 @@ public class BlockListener implements Listener {
         this.oneBlockLootKey = new NamespacedKey(plugin, "oneblock_loot_filled");
     }
 
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onCommunityBreak(BlockBreakEvent event) {
+        if (plugin.community() == null) return;
+        Player player = event.getPlayer();
+        Location loc = event.getBlock().getLocation();
+        if (plugin.community().isAnchorBlock(loc)) {
+            event.setCancelled(true);
+            Msg.actionBar(player, "<red>Can't break the community block's bedrock anchor.");
+            return;
+        }
+        if (plugin.community().isCommunityBlock(loc)) {
+            event.setCancelled(true);
+            plugin.community().handleBreak(player, event);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
