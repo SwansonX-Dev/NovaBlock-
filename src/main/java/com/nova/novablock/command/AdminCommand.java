@@ -274,7 +274,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (args.length < 2) {
-            Msg.send(sender, "<yellow>/obadmin hub <status|create|payout|raid|resetweekly|setblock|reload>");
+            Msg.send(sender, "<yellow>/obadmin hub <status|create|resetworld|payout|raid|resetweekly|setblock|reload>");
             return;
         }
         var hub = plugin.community();
@@ -298,6 +298,25 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 hub.leaderboard().refresh();
                 Msg.send(sender, "<green>Requested community world/platform creation for <white>"
                         + hub.communityWorldName() + "<green>. Check console for the exact result.");
+            }
+            case "resetworld" -> {
+                plugin.getConfig().set("community.world.name", "community_oneblock");
+                plugin.getConfig().set("community.world.platform-size", 10);
+                plugin.getConfig().set("community.world.spawn.x", 0);
+                plugin.getConfig().set("community.world.spawn.y", 80);
+                plugin.getConfig().set("community.world.spawn.z", 0);
+                java.util.List<java.util.Map<String, Object>> positions = java.util.List.of(
+                        java.util.Map.of("x", 0, "y", 81, "z", 0),
+                        java.util.Map.of("x", 2, "y", 81, "z", 0),
+                        java.util.Map.of("x", -2, "y", 81, "z", 0),
+                        java.util.Map.of("x", 0, "y", 81, "z", 2),
+                        java.util.Map.of("x", 0, "y", 81, "z", -2)
+                );
+                plugin.getConfig().set("community.oneblocks.positions", positions);
+                plugin.saveConfig();
+                hub.placeIfNeeded();
+                hub.leaderboard().refresh();
+                Msg.send(sender, "<green>Reset community hub to <white>community_oneblock 0,80,0<green> and requested creation.");
             }
             case "payout" -> {
                 long poolPaid = hub.block().payout();
@@ -355,7 +374,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 hub.leaderboard().refresh();
                 Msg.send(sender, "<green>Reloaded community config and refreshed hub displays.");
             }
-            default -> Msg.send(sender, "<yellow>/obadmin hub <status|create|payout|raid|resetweekly|setblock|reload>");
+            default -> Msg.send(sender, "<yellow>/obadmin hub <status|create|resetworld|payout|raid|resetweekly|setblock|reload>");
         }
     }
 
@@ -514,7 +533,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 case "sprint" -> List.of("status", "reset", "podium", "addscore").stream()
                         .filter(n -> n.startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
-                case "hub" -> List.of("status", "create", "payout", "raid", "resetweekly", "setblock", "reload").stream()
+                case "hub" -> List.of("status", "create", "resetworld", "payout", "raid", "resetweekly", "setblock", "reload").stream()
                         .filter(n -> n.startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
                 case "fix" -> {
