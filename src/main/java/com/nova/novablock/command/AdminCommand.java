@@ -274,7 +274,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (args.length < 2) {
-            Msg.send(sender, "<yellow>/obadmin hub <status|payout|raid|resetweekly|setblock|reload>");
+            Msg.send(sender, "<yellow>/obadmin hub <status|create|payout|raid|resetweekly|setblock|reload>");
             return;
         }
         var hub = plugin.community();
@@ -282,13 +282,22 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             case "status" -> {
                 long nextRaidMs = Math.max(0, hub.raids().nextRaidAt() - System.currentTimeMillis());
                 Location block = hub.primaryBlockLocation();
+                Location spawn = hub.hubSpawnLocation();
                 Msg.send(sender, "<gold>Community Hub");
                 Msg.send(sender, "<gray>Enabled: <white>" + hub.isEnabled());
+                Msg.send(sender, "<gray>World config: <white>" + hub.communityWorldName());
+                Msg.send(sender, "<gray>Hub spawn: <white>" + formatLocation(spawn));
                 Msg.send(sender, "<gray>Block: <white>" + formatLocation(block));
                 Msg.send(sender, "<gray>Community pool: <yellow>" + hub.block().pool() + " coins");
                 Msg.send(sender, "<gray>Community blocks: <white>" + hub.block().blocksBroken());
                 Msg.send(sender, "<gray>Weekly goal: <white>" + hub.goal().progress() + "/" + hub.goal().target());
                 Msg.send(sender, "<gray>Next raid: <white>" + formatDuration(nextRaidMs));
+            }
+            case "create" -> {
+                hub.placeIfNeeded();
+                hub.leaderboard().refresh();
+                Msg.send(sender, "<green>Requested community world/platform creation for <white>"
+                        + hub.communityWorldName() + "<green>. Check console for the exact result.");
             }
             case "payout" -> {
                 long poolPaid = hub.block().payout();
@@ -323,7 +332,6 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                     return;
                 }
                 Location at = p.getLocation().getBlock().getLocation();
-                plugin.getConfig().set("community.world.name", at.getWorld() == null ? "community_oneblock" : at.getWorld().getName());
                 plugin.getConfig().set("community.world.spawn.x", at.getBlockX());
                 plugin.getConfig().set("community.world.spawn.y", at.getBlockY());
                 plugin.getConfig().set("community.world.spawn.z", at.getBlockZ());
@@ -347,7 +355,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 hub.leaderboard().refresh();
                 Msg.send(sender, "<green>Reloaded community config and refreshed hub displays.");
             }
-            default -> Msg.send(sender, "<yellow>/obadmin hub <status|payout|raid|resetweekly|setblock|reload>");
+            default -> Msg.send(sender, "<yellow>/obadmin hub <status|create|payout|raid|resetweekly|setblock|reload>");
         }
     }
 
@@ -506,7 +514,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 case "sprint" -> List.of("status", "reset", "podium", "addscore").stream()
                         .filter(n -> n.startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
-                case "hub" -> List.of("status", "payout", "raid", "resetweekly", "setblock", "reload").stream()
+                case "hub" -> List.of("status", "create", "payout", "raid", "resetweekly", "setblock", "reload").stream()
                         .filter(n -> n.startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
                 case "fix" -> {

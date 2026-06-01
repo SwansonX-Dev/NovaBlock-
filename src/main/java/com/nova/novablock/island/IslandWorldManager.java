@@ -43,10 +43,10 @@ public class IslandWorldManager {
         SLOT_SIZE = Math.max(32, plugin.getConfig().getInt("slotSize", 256));
         this.world = ensureWorld(worldName);
         // Reapply gamerules every startup so config edits take effect even on existing worlds.
-        if (world != null) configure(world);
+        if (world != null) configureVoidWorld(world);
         if (netherEnabled) {
             this.netherWorld = ensureNetherWorld();
-            if (netherWorld != null) configure(netherWorld);
+            if (netherWorld != null) configureVoidWorld(netherWorld);
         }
     }
 
@@ -62,7 +62,7 @@ public class IslandWorldManager {
                 .generateStructures(false);
         World created = wc.createWorld();
         if (created != null) {
-            configure(created);
+            configureVoidWorld(created);
         }
         return created;
     }
@@ -83,12 +83,12 @@ public class IslandWorldManager {
                 .generateStructures(false);
         World created = wc.createWorld();
         if (created != null) {
-            configure(created);
+            configureVoidWorld(created);
         }
         return created;
     }
 
-    private void configure(World world) {
+    public void configureVoidWorld(World world) {
         var cfg = plugin.getConfig();
         boolean disableSpawning = cfg.getBoolean("disableNaturalSpawning", true);
         boolean keepInv = cfg.getBoolean("keepInventoryOnDeath", true);

@@ -5,6 +5,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.WorldCreator;
+import org.bukkit.block.Biome;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
 
@@ -55,7 +57,13 @@ public class CommunityHubManager {
         // Defer one tick so the world is fully ready when called from onEnable.
         Bukkit.getScheduler().runTask(plugin, () -> {
             buildStarterPlatform(spawn);
-            for (Location at : blockLocations()) block.placeInitial(at);
+            int placed = 0;
+            for (Location at : blockLocations()) {
+                if (block.placeInitial(at)) placed++;
+            }
+            plugin.getLogger().info("Community hub ready in world '" + spawn.getWorld().getName()
+                    + "' at " + spawn.getBlockX() + "," + spawn.getBlockY() + "," + spawn.getBlockZ()
+                    + " (" + blockLocations().size() + " OneBlock location(s), " + placed + " repaired/placed).");
         });
     }
 
@@ -153,13 +161,39 @@ public class CommunityHubManager {
     }
 
     public Location hubSpawnLocation() {
-        String worldName = plugin.getConfig().getString("community.world.name", "community_oneblock");
-        World world = plugin.worlds().ensureWorld(worldName);
+        String worldName = communityWorldName();
+        World world = ensureCommunityWorld(worldName);
         if (world == null) return null;
         double x = plugin.getConfig().getDouble("community.world.spawn.x", 0.0);
         double y = plugin.getConfig().getDouble("community.world.spawn.y", 80.0);
         double z = plugin.getConfig().getDouble("community.world.spawn.z", 0.0);
         return new Location(world, x, y, z);
+    }
+
+    public String communityWorldName() {
+        String configured = plugin.getConfig().getString("community.world.name", "community_oneblock");
+        if (configured == null || configured.isBlank()) {
+            plugin.getLogger().warning("community.world.name is blank; using community_oneblock.");
+            return "community_oneblock";
+        }
+        return configured;
+    }
+
+    public World ensureCommunityWorld(String worldName) {
+        World existing = Bukkit.getWorld(worldName);
+        if (existing != null) return existing;
+        plugin.getLogger().info("Creating community OneBlock world '" + worldName + "'.");
+        WorldCreator creator = new WorldCreator(worldName)
+                .generator(new com.nova.novablock.island.IslandWorldManager.VoidGenerator())
+                .biomeProvider(new com.nova.novablock.island.IslandWorldManager.SingleBiomeProvider(Biome.PLAINS))
+                .generateStructures(false);
+        World created = creator.createWorld();
+        if (created == null) {
+            plugin.getLogger().warning("Failed to create community OneBlock world '" + worldName + "'.");
+            return null;
+        }
+        plugin.worlds().configureVoidWorld(created);
+        return created;
     }
 
     public List<Location> blockLocations() {
