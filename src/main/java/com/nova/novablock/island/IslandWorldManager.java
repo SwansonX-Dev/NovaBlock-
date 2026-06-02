@@ -3,10 +3,12 @@ package com.nova.novablock.island;
 import com.nova.novablock.NovaBlock;
 import org.bukkit.Bukkit;
 import org.bukkit.Difficulty;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.block.Biome;
 import org.bukkit.generator.BiomeProvider;
+import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.generator.WorldInfo;
 
@@ -163,6 +165,8 @@ public class IslandWorldManager {
         @Override public void generateSurface(WorldInfo w, Random r, int cx, int cz, ChunkData d) {}
         @Override public void generateBedrock(WorldInfo w, Random r, int cx, int cz, ChunkData d) {}
         @Override public void generateCaves(WorldInfo w, Random r, int cx, int cz, ChunkData d) {}
+
+        // No-arg variants for older API consumers.
         @Override public boolean shouldGenerateNoise() { return false; }
         @Override public boolean shouldGenerateSurface() { return false; }
         @Override public boolean shouldGenerateBedrock() { return false; }
@@ -170,6 +174,26 @@ public class IslandWorldManager {
         @Override public boolean shouldGenerateDecorations() { return false; }
         @Override public boolean shouldGenerateMobs() { return false; }
         @Override public boolean shouldGenerateStructures() { return false; }
+
+        // Per-chunk variants — Paper consults these on every chunk and has, on
+        // some versions, skipped the no-arg forwarders. Without these overrides
+        // vanilla terrain leaked into chunks generated far from spawn.
+        @Override public boolean shouldGenerateNoise(WorldInfo w, Random r, int cx, int cz) { return false; }
+        @Override public boolean shouldGenerateSurface(WorldInfo w, Random r, int cx, int cz) { return false; }
+        @Override public boolean shouldGenerateCaves(WorldInfo w, Random r, int cx, int cz) { return false; }
+        @Override public boolean shouldGenerateDecorations(WorldInfo w, Random r, int cx, int cz) { return false; }
+        @Override public boolean shouldGenerateMobs(WorldInfo w, Random r, int cx, int cz) { return false; }
+        @Override public boolean shouldGenerateStructures(WorldInfo w, Random r, int cx, int cz) { return false; }
+
+        @Override
+        public Location getFixedSpawnLocation(World world, Random random) {
+            return new Location(world, 0, 80, 0);
+        }
+
+        @Override
+        public List<BlockPopulator> getDefaultPopulators(World world) {
+            return List.of();
+        }
     }
 
     public static final class SingleBiomeProvider extends BiomeProvider {

@@ -181,7 +181,15 @@ public class CommunityHubManager {
 
     public World ensureCommunityWorld(String worldName) {
         World existing = Bukkit.getWorld(worldName);
-        if (existing != null) return existing;
+        if (existing != null) {
+            if (!(existing.getGenerator() instanceof com.nova.novablock.island.IslandWorldManager.VoidGenerator)) {
+                plugin.getLogger().warning("Community world '" + worldName + "' is already loaded with a "
+                        + "non-void generator (" + (existing.getGenerator() == null ? "vanilla" : existing.getGenerator().getClass().getName())
+                        + "). New chunks will not be void. Unload it via Multiverse / restart with the world deleted "
+                        + "so NovaBlock can recreate it with its void generator.");
+            }
+            return existing;
+        }
         plugin.getLogger().info("Creating community OneBlock world '" + worldName + "'.");
         WorldCreator creator = new WorldCreator(worldName)
                 .generator(new com.nova.novablock.island.IslandWorldManager.VoidGenerator())
