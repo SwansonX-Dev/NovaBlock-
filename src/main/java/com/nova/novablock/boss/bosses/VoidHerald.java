@@ -32,6 +32,14 @@ public class VoidHerald extends AbstractBoss {
     public void onTick(BossFight fight) {
         LivingEntity e = fight.entity();
         if (e == null) return;
+        // Endermen teleport in rain — keep the fight world dry so the boss stays in melee
+        // range instead of strobing across the arena.
+        var world = e.getWorld();
+        if (world.hasStorm() || world.isThundering()) {
+            world.setStorm(false);
+            world.setThundering(false);
+            world.setWeatherDuration(20 * 60 * 10);
+        }
         if (--cooldown > 0) return;
         cooldown = 25;
         // Random teleport-strike: teleport behind a random participant and deal physical damage
