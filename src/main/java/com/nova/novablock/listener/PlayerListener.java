@@ -6,8 +6,10 @@ import com.nova.novablock.island.Island;
 import com.nova.novablock.season.SeasonalPathManager;
 import com.nova.novablock.util.Msg;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -93,12 +95,31 @@ public class PlayerListener implements Listener {
         if (island != null) event.setRespawnLocation(island.data().spawnLocation());
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onVoid(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof org.bukkit.entity.Player p)) return;
         if (event.getCause() != EntityDamageEvent.DamageCause.VOID) return;
+        if (p.getGameMode() == GameMode.CREATIVE) return;
+
+        String world = p.getWorld().getName();
+
+        // OG OneBlock world is handled by the OGOneBlock plugin's own void listener.
+        String ogWorld = plugin.getConfig().getString("ogWorld", "OGOBworld");
+        if (world.equals(ogWorld)) return;
+
+        if (plugin.community() != null && world.equals(plugin.community().communityWorldName())) {
+            Location hub = plugin.community().hubSpawnLocation();
+            if (hub == null || hub.getWorld() == null) return;
+            event.setCancelled(true);
+            p.setFallDistance(0);
+            hub.getChunk().load();
+            p.teleportAsync(hub);
+            Msg.actionBar(p, "<red>Saved you from the void.");
+            return;
+        }
+
         Island island = plugin.islands().ofPlayer(p);
-        if (island != null && p.getGameMode() != GameMode.CREATIVE) {
+        if (island != null) {
             event.setCancelled(true);
             p.setFallDistance(0);
             island.teleportHome(p);
