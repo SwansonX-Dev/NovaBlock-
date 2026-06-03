@@ -427,7 +427,7 @@ public class BlockListener implements Listener {
         }
     }
 
-    private void fillPhaseChest(Block block, Phase phase) {
+    public void fillPhaseChest(Block block, Phase phase) {
         if (block.getType() != Material.CHEST || !(block.getState() instanceof Container container)) return;
         if (isLootMarked(container)) return;
         var inventory = container.getSnapshotInventory();
@@ -802,7 +802,8 @@ public class BlockListener implements Listener {
             Msg.actionBar(event.getPlayer(), "<red>Keep the OneBlock column clear.");
             return;
         }
-
-        playPlaceSound(event.getBlockPlaced());
+        // No manual playPlaceSound here — vanilla plays it. The OB-center regen
+        // and unsafe-material replacement paths still call playPlaceSound because
+        // they use setType(..., false) and vanilla never gets a chance to.
     }
 }

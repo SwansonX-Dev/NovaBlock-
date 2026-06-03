@@ -108,7 +108,7 @@ community:
       milestones-percent: [25, 50, 75, 100]
 
   raids:
-    enabled: true
+    enabled: false             # temporarily disabled — re-enable once the community boss flow is re-tuned
     interval-minutes: 120
     interval-jitter-percent: 20
     boss-id: random           # picks from BossManager registry

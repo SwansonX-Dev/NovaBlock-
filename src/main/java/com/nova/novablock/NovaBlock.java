@@ -67,6 +67,7 @@ public final class NovaBlock extends JavaPlugin {
     private LoginStreakManager loginStreakManager;
     private QuestManager questManager;
     private PaxelManager paxelManager;
+    private BlockListener blockListener;
     private HotbarMenuManager hotbarManager;
     private EconomyManager economyManager;
     private GuiManager guiManager;
@@ -151,7 +152,8 @@ public final class NovaBlock extends JavaPlugin {
         this.claimBlockRewardService = new ClaimBlockRewardService(this);
         this.islandVisitService = new IslandVisitService(this);
 
-        getServer().getPluginManager().registerEvents(new BlockListener(this), this);
+        this.blockListener = new BlockListener(this);
+        getServer().getPluginManager().registerEvents(blockListener, this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
         getServer().getPluginManager().registerEvents(new ActionBarNudger(this), this);
         getServer().getPluginManager().registerEvents(
@@ -251,6 +253,7 @@ public final class NovaBlock extends JavaPlugin {
     public LoginStreakManager loginStreaks() { return loginStreakManager; }
     public QuestManager quests() { return questManager; }
     public PaxelManager paxels() { return paxelManager; }
+    public BlockListener blockListener() { return blockListener; }
     public HotbarMenuManager hotbar() { return hotbarManager; }
     public EconomyManager economy() { return economyManager; }
     public GuiManager guis() { return guiManager; }

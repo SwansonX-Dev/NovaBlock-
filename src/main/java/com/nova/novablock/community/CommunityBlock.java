@@ -103,6 +103,15 @@ public class CommunityBlock {
         // Drop natural drops to breaker, no perk-stacking — community block is intentionally
         // independent of personal-island progression so it can't be used to power-level.
         var loc = center.clone().add(0.5, 0.5, 0.5);
+        // If the community block was a chest (or other container), drop its contents
+        // explicitly — block.getDrops() only returns the chest item, not the inventory.
+        if (event.getBlock().getState() instanceof org.bukkit.block.Container container) {
+            for (var content : container.getInventory().getContents()) {
+                if (content == null || content.getType().isAir()) continue;
+                center.getWorld().dropItemNaturally(loc, content);
+            }
+            container.getInventory().clear();
+        }
         for (var drop : event.getBlock().getDrops(player.getInventory().getItemInMainHand())) {
             center.getWorld().dropItemNaturally(loc, drop);
         }
@@ -113,6 +122,13 @@ public class CommunityBlock {
         if (next == null && phase != null) next = phase.rollBlock(ThreadLocalRandom.current());
         if (next == null) next = Material.STONE;
         center.getBlock().setType(next, false);
+        if (next == Material.CHEST && phase != null && plugin.blockListener() != null) {
+            // Reuse the island chest-fill (phase-themed loot, dedup mark, tile-init race fallback)
+            // so community chests pay out the same way personal-island ones do.
+            plugin.blockListener().fillPhaseChest(center.getBlock(), phase);
+            final Phase phaseRef = phase;
+            Bukkit.getScheduler().runTask(plugin, () -> plugin.blockListener().fillPhaseChest(center.getBlock(), phaseRef));
+        }
         Location anchor = center.clone().add(0, -1, 0);
         if (anchor.getBlock().getType() != Material.BEDROCK) {
             anchor.getBlock().setType(Material.BEDROCK, false);

@@ -275,9 +275,21 @@ public class LootRoomManager implements Listener {
     public void onBreakInRoom(BlockBreakEvent event) {
         LootRoomRun run = runAt(event.getBlock().getLocation());
         if (run == null) return;
-        if ("puzzle".equals(run.room().id()) && event.getBlock().getType() == Material.AMETHYST_BLOCK) return;
+        // Crystal Cache rooms ID as "puzzle_<theme>"; the bare "puzzle" check
+        // never matched so amethyst targets were uncuttable.
+        if (run.room().id().startsWith("puzzle_") && event.getBlock().getType() == Material.AMETHYST_BLOCK) return;
         event.setCancelled(true);
         Msg.actionBar(event.getPlayer(), "<red>You can't break blocks inside a rift.");
+    }
+
+    /** Parkour rifts forfeit on fall via teleport-to-start; suppress the actual fall damage so the player survives the drop. */
+    @EventHandler(ignoreCancelled = true)
+    public void onFallInRoom(org.bukkit.event.entity.EntityDamageEvent event) {
+        if (event.getCause() != org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL) return;
+        if (!(event.getEntity() instanceof Player)) return;
+        LootRoomRun run = runAt(event.getEntity().getLocation());
+        if (run == null || !run.room().id().startsWith("parkour_")) return;
+        event.setCancelled(true);
     }
 
     @EventHandler(ignoreCancelled = true)

@@ -345,13 +345,18 @@ public class PaxelManager implements Listener {
     // ---------------- break handler: telekinesis + vein-mine ----------------
 
     /**
-     * Runs at NORMAL priority. BlockListener at HIGH still owns OneBlock-center
-     * regen — we explicitly skip the center here so it doesn't double-handle.
-     * For every other paxel break we suppress vanilla drops/XP and route them
-     * directly to the player's inventory, then vein-mine ores (capped at
-     * {@link #VEIN_MINE_LIMIT} blocks, never touching the OB center).
+     * Runs at HIGHEST priority with ignoreCancelled so every other handler
+     * (loot-room protection, visitor-build flag, OneBlock-center take-over at
+     * HIGH, anti-grief plugins) has already either claimed or cancelled the
+     * break by the time we get here. Without that ordering, telekinesis could
+     * fire on a break a later handler then cancels — giving the player drops
+     * while the block stays in place (a real duplication vector inside loot
+     * rooms and on visited islands).
+     *
+     * <p>BlockListener at HIGH still owns OneBlock-center regen; we explicitly
+     * skip the center here so it doesn't double-handle.
      */
-    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPaxelBreak(org.bukkit.event.block.BlockBreakEvent event) {
         Player p = event.getPlayer();
         ItemStack tool = p.getInventory().getItemInMainHand();
