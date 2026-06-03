@@ -2,6 +2,7 @@ package com.nova.novablock.community;
 
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.phase.Phase;
+import com.nova.novablock.phase.PhaseBlock;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -18,6 +19,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -30,6 +32,182 @@ import java.util.concurrent.ThreadLocalRandom;
  * Phase progression uses the shared {@link com.nova.novablock.phase.PhaseManager}.
  */
 public class CommunityBlock {
+
+    /**
+     * Hand-tuned weighted block pool for the community OneBlock. This is the server's
+     * primary resource-gathering OneBlock, so the pool spans every overworld+nether+end
+     * stone, every wood/leaf type, every ore (with deepslate variants), common foodstuffs,
+     * and a small tail of rare loot blocks. Phase-themed selection is bypassed for the
+     * community block — the pool is identical regardless of how far the community has phased.
+     */
+    private static final List<PhaseBlock> COMMUNITY_BLOCKS = List.of(
+            // --- stones (common) ---
+            new PhaseBlock(Material.STONE, 30),
+            new PhaseBlock(Material.COBBLESTONE, 22),
+            new PhaseBlock(Material.DEEPSLATE, 18),
+            new PhaseBlock(Material.COBBLED_DEEPSLATE, 14),
+            new PhaseBlock(Material.ANDESITE, 10),
+            new PhaseBlock(Material.DIORITE, 10),
+            new PhaseBlock(Material.GRANITE, 10),
+            new PhaseBlock(Material.TUFF, 8),
+            new PhaseBlock(Material.CALCITE, 6),
+            new PhaseBlock(Material.DRIPSTONE_BLOCK, 6),
+            new PhaseBlock(Material.BASALT, 8),
+            new PhaseBlock(Material.BLACKSTONE, 8),
+            new PhaseBlock(Material.NETHERRACK, 12),
+            new PhaseBlock(Material.END_STONE, 5),
+            // --- earth ---
+            new PhaseBlock(Material.DIRT, 22),
+            new PhaseBlock(Material.GRASS_BLOCK, 18),
+            new PhaseBlock(Material.COARSE_DIRT, 8),
+            new PhaseBlock(Material.PODZOL, 5),
+            new PhaseBlock(Material.MYCELIUM, 4),
+            new PhaseBlock(Material.ROOTED_DIRT, 5),
+            new PhaseBlock(Material.MOSS_BLOCK, 6),
+            new PhaseBlock(Material.MUD, 6),
+            new PhaseBlock(Material.CLAY, 5),
+            // --- sands / gravel ---
+            new PhaseBlock(Material.SAND, 16),
+            new PhaseBlock(Material.RED_SAND, 6),
+            new PhaseBlock(Material.GRAVEL, 12),
+            new PhaseBlock(Material.SOUL_SAND, 3),
+            new PhaseBlock(Material.SOUL_SOIL, 3),
+            // --- snow / ice ---
+            new PhaseBlock(Material.SNOW_BLOCK, 6),
+            new PhaseBlock(Material.ICE, 3),
+            new PhaseBlock(Material.PACKED_ICE, 2),
+            new PhaseBlock(Material.BLUE_ICE, 1),
+            // --- logs (every wood type) ---
+            new PhaseBlock(Material.OAK_LOG, 10),
+            new PhaseBlock(Material.BIRCH_LOG, 8),
+            new PhaseBlock(Material.SPRUCE_LOG, 8),
+            new PhaseBlock(Material.JUNGLE_LOG, 6),
+            new PhaseBlock(Material.ACACIA_LOG, 6),
+            new PhaseBlock(Material.DARK_OAK_LOG, 6),
+            new PhaseBlock(Material.MANGROVE_LOG, 6),
+            new PhaseBlock(Material.CHERRY_LOG, 5),
+            new PhaseBlock(Material.PALE_OAK_LOG, 5),
+            new PhaseBlock(Material.CRIMSON_STEM, 5),
+            new PhaseBlock(Material.WARPED_STEM, 5),
+            new PhaseBlock(Material.BAMBOO_BLOCK, 4),
+            // --- leaves ---
+            new PhaseBlock(Material.OAK_LEAVES, 5),
+            new PhaseBlock(Material.BIRCH_LEAVES, 4),
+            new PhaseBlock(Material.SPRUCE_LEAVES, 4),
+            new PhaseBlock(Material.JUNGLE_LEAVES, 3),
+            new PhaseBlock(Material.ACACIA_LEAVES, 3),
+            new PhaseBlock(Material.DARK_OAK_LEAVES, 3),
+            new PhaseBlock(Material.MANGROVE_LEAVES, 3),
+            new PhaseBlock(Material.CHERRY_LEAVES, 2),
+            new PhaseBlock(Material.PALE_OAK_LEAVES, 2),
+            new PhaseBlock(Material.AZALEA_LEAVES, 2),
+            new PhaseBlock(Material.FLOWERING_AZALEA_LEAVES, 1),
+            new PhaseBlock(Material.NETHER_WART_BLOCK, 2),
+            new PhaseBlock(Material.WARPED_WART_BLOCK, 2),
+            // --- ores (rarer) ---
+            new PhaseBlock(Material.COAL_ORE, 8),
+            new PhaseBlock(Material.DEEPSLATE_COAL_ORE, 4),
+            new PhaseBlock(Material.IRON_ORE, 8),
+            new PhaseBlock(Material.DEEPSLATE_IRON_ORE, 4),
+            new PhaseBlock(Material.COPPER_ORE, 6),
+            new PhaseBlock(Material.DEEPSLATE_COPPER_ORE, 3),
+            new PhaseBlock(Material.GOLD_ORE, 4),
+            new PhaseBlock(Material.DEEPSLATE_GOLD_ORE, 2),
+            new PhaseBlock(Material.REDSTONE_ORE, 4),
+            new PhaseBlock(Material.DEEPSLATE_REDSTONE_ORE, 2),
+            new PhaseBlock(Material.LAPIS_ORE, 3),
+            new PhaseBlock(Material.DEEPSLATE_LAPIS_ORE, 2),
+            new PhaseBlock(Material.DIAMOND_ORE, 2),
+            new PhaseBlock(Material.DEEPSLATE_DIAMOND_ORE, 1),
+            new PhaseBlock(Material.EMERALD_ORE, 2),
+            new PhaseBlock(Material.DEEPSLATE_EMERALD_ORE, 1),
+            new PhaseBlock(Material.NETHER_QUARTZ_ORE, 3),
+            new PhaseBlock(Material.NETHER_GOLD_ORE, 2),
+            new PhaseBlock(Material.ANCIENT_DEBRIS, 1),
+            // --- food + plants ---
+            new PhaseBlock(Material.HAY_BLOCK, 3),
+            new PhaseBlock(Material.PUMPKIN, 4),
+            new PhaseBlock(Material.MELON, 4),
+            new PhaseBlock(Material.SWEET_BERRY_BUSH, 2),
+            new PhaseBlock(Material.CACTUS, 3),
+            new PhaseBlock(Material.SUGAR_CANE, 3),
+            new PhaseBlock(Material.KELP, 2),
+            // --- specials ---
+            new PhaseBlock(Material.AMETHYST_BLOCK, 3),
+            new PhaseBlock(Material.GLOWSTONE, 3),
+            new PhaseBlock(Material.MAGMA_BLOCK, 2),
+            new PhaseBlock(Material.OBSIDIAN, 2),
+            new PhaseBlock(Material.SCULK, 1),
+            new PhaseBlock(Material.RED_MUSHROOM_BLOCK, 1),
+            new PhaseBlock(Material.BROWN_MUSHROOM_BLOCK, 1),
+            new PhaseBlock(Material.PURPUR_BLOCK, 1),
+            // --- building stones (variant family) ---
+            new PhaseBlock(Material.SANDSTONE, 6),
+            new PhaseBlock(Material.RED_SANDSTONE, 3),
+            new PhaseBlock(Material.SMOOTH_STONE, 4),
+            new PhaseBlock(Material.SMOOTH_SANDSTONE, 2),
+            new PhaseBlock(Material.STONE_BRICKS, 4),
+            new PhaseBlock(Material.MOSSY_STONE_BRICKS, 2),
+            new PhaseBlock(Material.DEEPSLATE_BRICKS, 3),
+            new PhaseBlock(Material.POLISHED_DEEPSLATE, 3),
+            new PhaseBlock(Material.POLISHED_GRANITE, 2),
+            new PhaseBlock(Material.POLISHED_DIORITE, 2),
+            new PhaseBlock(Material.POLISHED_ANDESITE, 2),
+            new PhaseBlock(Material.POLISHED_TUFF, 2),
+            new PhaseBlock(Material.POLISHED_BLACKSTONE, 2),
+            new PhaseBlock(Material.GILDED_BLACKSTONE, 1),
+            new PhaseBlock(Material.NETHER_BRICKS, 3),
+            new PhaseBlock(Material.RED_NETHER_BRICKS, 1),
+            new PhaseBlock(Material.END_STONE_BRICKS, 2),
+            new PhaseBlock(Material.PRISMARINE, 2),
+            new PhaseBlock(Material.TERRACOTTA, 3),
+            // --- metal / raw blocks ---
+            new PhaseBlock(Material.RAW_IRON_BLOCK, 2),
+            new PhaseBlock(Material.RAW_COPPER_BLOCK, 2),
+            new PhaseBlock(Material.RAW_GOLD_BLOCK, 1),
+            new PhaseBlock(Material.IRON_BLOCK, 1),
+            new PhaseBlock(Material.COPPER_BLOCK, 1),
+            new PhaseBlock(Material.GOLD_BLOCK, 1),
+            new PhaseBlock(Material.DIAMOND_BLOCK, 1),
+            new PhaseBlock(Material.EMERALD_BLOCK, 1),
+            // --- crops + naturals ---
+            new PhaseBlock(Material.WHEAT, 2),
+            new PhaseBlock(Material.CARROTS, 2),
+            new PhaseBlock(Material.POTATOES, 2),
+            new PhaseBlock(Material.BEETROOTS, 1),
+            new PhaseBlock(Material.SUSPICIOUS_SAND, 1),
+            new PhaseBlock(Material.SUSPICIOUS_GRAVEL, 1),
+            new PhaseBlock(Material.HONEYCOMB_BLOCK, 1),
+            new PhaseBlock(Material.SHROOMLIGHT, 1),
+            new PhaseBlock(Material.SEA_LANTERN, 1),
+            new PhaseBlock(Material.DRIED_KELP_BLOCK, 1),
+            new PhaseBlock(Material.MUSHROOM_STEM, 1),
+            // --- rare loot (very tail) ---
+            new PhaseBlock(Material.CHEST, 5),
+            new PhaseBlock(Material.ENDER_CHEST, 1),
+            new PhaseBlock(Material.SCULK_CATALYST, 1),
+            new PhaseBlock(Material.BEACON, 1),
+            new PhaseBlock(Material.CONDUIT, 1),
+            new PhaseBlock(Material.SHULKER_BOX, 1),
+            new PhaseBlock(Material.NETHERITE_BLOCK, 1)
+    );
+    private static final int COMMUNITY_TOTAL_WEIGHT;
+    static {
+        int sum = 0;
+        for (PhaseBlock b : COMMUNITY_BLOCKS) sum += b.weight();
+        COMMUNITY_TOTAL_WEIGHT = sum;
+    }
+
+    private static Material rollCommunityBlock(Random rng) {
+        if (COMMUNITY_TOTAL_WEIGHT <= 0) return Material.STONE;
+        int roll = rng.nextInt(COMMUNITY_TOTAL_WEIGHT);
+        int acc = 0;
+        for (PhaseBlock b : COMMUNITY_BLOCKS) {
+            acc += b.weight();
+            if (roll < acc) return b.material();
+        }
+        return COMMUNITY_BLOCKS.get(COMMUNITY_BLOCKS.size() - 1).material();
+    }
 
     private final NovaBlock plugin;
 
@@ -83,9 +261,7 @@ public class CommunityBlock {
         if (center.getBlock().getType() == Material.AIR
                 || center.getBlock().getType() == Material.BEDROCK
                 || center.getBlock().isLiquid()) {
-            Phase phase = plugin.phases().getOrLast(phaseIndex);
-            Material first = phase != null ? phase.rollBlock(ThreadLocalRandom.current()) : Material.STONE;
-            center.getBlock().setType(first, false);
+            center.getBlock().setType(rollCommunityBlock(ThreadLocalRandom.current()), false);
             repaired = true;
         }
         return repaired;
@@ -116,11 +292,11 @@ public class CommunityBlock {
             center.getWorld().dropItemNaturally(loc, drop);
         }
 
-        // Pick the next block from upcoming queue or roll fresh.
+        // Pick the next block from upcoming queue or roll fresh from the community pool
+        // (phase-independent so the community block is a stable resource source).
         Phase phase = plugin.phases().getOrLast(phaseIndex);
         Material next = upcoming.pollFirst();
-        if (next == null && phase != null) next = phase.rollBlock(ThreadLocalRandom.current());
-        if (next == null) next = Material.STONE;
+        if (next == null) next = rollCommunityBlock(ThreadLocalRandom.current());
         center.getBlock().setType(next, false);
         if (next == Material.CHEST && phase != null && plugin.blockListener() != null) {
             // Reuse the island chest-fill (phase-themed loot, dedup mark, tile-init race fallback)
@@ -144,10 +320,8 @@ public class CommunityBlock {
             contributionByPlayer.merge(player.getUniqueId(), contributionThisBreak, Long::sum);
         }
 
-        // Refill the prophecy queue lazily.
-        if (phase != null) {
-            while (upcoming.size() < 5) upcoming.addLast(phase.rollBlock(ThreadLocalRandom.current()));
-        }
+        // Refill the prophecy queue lazily from the same community pool.
+        while (upcoming.size() < 5) upcoming.addLast(rollCommunityBlock(ThreadLocalRandom.current()));
 
         blocksBroken++;
         phaseProgress++;
