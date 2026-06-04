@@ -218,7 +218,6 @@ public class BossManager implements Listener {
         String fid = event.getEntity().getPersistentDataContainer().get(FIGHT_KEY, PersistentDataType.STRING);
         BossFight fight = active.remove(UUID.fromString(fid));
         if (fight == null) return;
-        fight.clearBar();
         restoreArena(fight);
         long coins = fight.boss().onDefeat(fight);
         // Raid path: fight has no island, distribution is handled externally.
@@ -249,6 +248,7 @@ public class BossManager implements Listener {
                 plugin.seasonalPaths().award(p, com.nova.novablock.season.SeasonalPathManager.PathSource.BOSS, 100);
             }
         }
+        fight.clearBar();
     }
 
     private Player resolvePlayer(org.bukkit.entity.Entity damager) {
@@ -301,7 +301,6 @@ public class BossManager implements Listener {
             active.remove(fight.entityId());
             org.bukkit.entity.LivingEntity entity = fight.entity();
             if (entity != null) entity.remove();
-            fight.clearBar();
             restoreArena(fight);
 
             long fullReward = fight.boss().onDefeat(fight);
@@ -323,6 +322,7 @@ public class BossManager implements Listener {
                 p.playSound(p.getLocation(), Sound.ENTITY_WITHER_HURT, 0.6f, 0.7f);
                 plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.COMBAT, 50L);
             }
+            fight.clearBar();
         }
     }
 }

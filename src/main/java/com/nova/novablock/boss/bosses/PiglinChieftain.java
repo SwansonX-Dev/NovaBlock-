@@ -47,12 +47,11 @@ public class PiglinChieftain extends AbstractBoss {
         if (fight.entity() instanceof Piglin piglin) {
             EntityEquipment eq = piglin.getEquipment();
             if (eq != null) {
-                eq.setItemInMainHand(new ItemStack(Material.CROSSBOW));
+                eq.setItemInMainHand(new ItemStack(Material.GOLDEN_SWORD));
                 eq.setItemInMainHandDropChance(0f);
                 eq.setHelmet(new ItemStack(Material.GOLDEN_HELMET));
                 eq.setHelmetDropChance(0f);
             }
-            // Adult Piglin so the crossbow animation reads correctly.
             piglin.setAdult();
             piglin.setImmuneToZombification(true);
         }
@@ -77,6 +76,8 @@ public class PiglinChieftain extends AbstractBoss {
             if (guard instanceof Piglin p) {
                 p.setAdult();
                 p.setImmuneToZombification(true);
+                p.customName(Msg.mm("<#C7A04B>Chieftain's Guard"));
+                p.setCustomNameVisible(true);
                 EntityEquipment eq = p.getEquipment();
                 if (eq != null) {
                     eq.setItemInMainHand(new ItemStack(Material.GOLDEN_SWORD));

@@ -14,11 +14,13 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -126,21 +128,38 @@ public class HotbarMenuManager implements Listener {
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onClick(InventoryClickEvent event) {
-        boolean targetIsMenu = isMenuItem(event.getCurrentItem()) || isMenuItem(event.getCursor());
-        if (!targetIsMenu) return;
-        // Block any inventory click action that would move it out of the player inventory.
-        InventoryType top = event.getView().getTopInventory().getType();
-        boolean foreignTop = top != InventoryType.CRAFTING && top != InventoryType.PLAYER;
-        boolean shiftIntoContainer = event.isShiftClick() && foreignTop;
-        boolean clickInForeign = event.getClickedInventory() != null
-                && event.getClickedInventory().getType() != InventoryType.PLAYER
-                && event.getClickedInventory().getType() != InventoryType.CRAFTING;
-        if (shiftIntoContainer || clickInForeign) {
-            event.setCancelled(true);
-            if (event.getWhoClicked() instanceof Player p) Msg.actionBar(p, "<red>Menu item can't be moved.");
+        boolean involvesMenu = isMenuItem(event.getCurrentItem()) || isMenuItem(event.getCursor());
+        // Number-key hotbar swap can yank the menu item out of its slot even
+        // when the hovered slot doesn't contain it.
+        if (!involvesMenu && event.getHotbarButton() >= 0
+                && event.getWhoClicked() instanceof Player hp) {
+            involvesMenu = isMenuItem(hp.getInventory().getItem(event.getHotbarButton()));
         }
+        if (!involvesMenu) return;
+        event.setCancelled(true);
+        if (event.getWhoClicked() instanceof Player p) Msg.actionBar(p, "<red>Menu item can't be moved.");
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onDrag(InventoryDragEvent event) {
+        if (!isMenuItem(event.getOldCursor()) && !isMenuItem(event.getCursor())) return;
+        event.setCancelled(true);
+        if (event.getWhoClicked() instanceof Player p) Msg.actionBar(p, "<red>Menu item can't be moved.");
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onSwapHand(PlayerSwapHandItemsEvent event) {
+        if (isMenuItem(event.getMainHandItem()) || isMenuItem(event.getOffHandItem())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** Last line of defence for hopper / dropper / comparator moves involving the menu item. */
+    @EventHandler(ignoreCancelled = true)
+    public void onContainerMove(InventoryMoveItemEvent event) {
+        if (isMenuItem(event.getItem())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
