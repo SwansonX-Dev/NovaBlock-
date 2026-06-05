@@ -22,7 +22,7 @@ public class MinionControlGui extends ChestGui {
         MinionData data = plugin.minions().get(minionId);
         if (data == null) { set(22, ItemBuilder.of(Material.BARRIER).name("<red>Missing Minion").build(), null); return; }
         set(4, ItemBuilder.of(data.type().displayMaterial()).name("<gold>" + data.type().displayName()).lore(statusLore(data)).hideFlags().build(), null);
-        set(10, ItemBuilder.of(data.hasLinkedChest() ? Material.CHEST : Material.CHAIN).name("<yellow>Link Chest").lore("<gray>Click, then punch a chest or barrel.").build(), e -> plugin.minions().beginLink(player, data.id()));
+        set(10, ItemBuilder.of(data.hasLinkedChest() ? Material.CHEST : Material.IRON_CHAIN).name("<yellow>Link Chest").lore("<gray>Click, then punch a chest or barrel.").build(), e -> plugin.minions().beginLink(player, data.id()));
         set(12, ItemBuilder.of(Material.COAL).name("<yellow>Add Fuel").lore("<gray>Click with fuel on cursor or main hand.").build(), e -> {
             ItemStack fuel = e.getCursor();
             if (fuel == null || fuel.getType().isAir()) fuel = player.getInventory().getItemInMainHand();

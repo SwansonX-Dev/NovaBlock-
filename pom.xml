@@ -6,12 +6,12 @@
 
     <groupId>com.nova</groupId>
     <artifactId>novablock</artifactId>
-    <version>0.6.10</version>
+    <version>0.7.0</version>
     <packaging>jar</packaging>
     <name>NovaBlock</name>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>25</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -32,7 +32,7 @@
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>1.21.4-R0.1-SNAPSHOT</version>
+            <version>[26.1.2.build,)</version>
             <scope>provided</scope>
         </dependency>
         <!-- xEconomy native API. NovaBlock hard-depends on xEconomy for currency;

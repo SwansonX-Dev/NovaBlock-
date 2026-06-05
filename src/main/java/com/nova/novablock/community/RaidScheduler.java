@@ -285,8 +285,11 @@ public class RaidScheduler implements Listener {
     }
 
     private boolean isEnabled() {
+        // Default false: a missing community.raids.enabled key means raids stay off
+        // (matches the shipped config) — earlier the fallback was true, which let
+        // raids spawn on configs generated before the key existed.
         return plugin.getConfig().getBoolean("community.enabled", true)
-                && plugin.getConfig().getBoolean("community.raids.enabled", true);
+                && plugin.getConfig().getBoolean("community.raids.enabled", false);
     }
 
     /** Stop the scheduler + despawn any in-flight raid bosses. */

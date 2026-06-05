@@ -1,7 +1,7 @@
 name: NovaBlock
 version: ${project.version}
 main: com.nova.novablock.NovaBlock
-api-version: '1.21'
+api-version: '26.1'
 authors: [Nova]
 description: A reimagined OneBlock experience with phases, bosses, loot rooms, skill trees, prophecies and more.
 load: POSTWORLD

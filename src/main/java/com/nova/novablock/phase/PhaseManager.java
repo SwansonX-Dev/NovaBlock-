@@ -345,7 +345,7 @@ public class PhaseManager {
                         b(Material.NETHER_BRICKS, 14),
                         b(Material.GILDED_BLACKSTONE, 10),
                         b(Material.GOLD_BLOCK, 4),
-                        b(Material.CHAIN, 4),
+                        b(Material.IRON_CHAIN, 4),
                         b(Material.LODESTONE, 2),
                         b(Material.MAGMA_BLOCK, 8),
                         b(Material.CHEST, 3)
