@@ -148,6 +148,19 @@ public class LootRoomManager implements Listener {
         // Tick runs
         for (var it = active.entrySet().iterator(); it.hasNext(); ) {
             LootRoomRun run = it.next().getValue();
+            // If the player has left the rift world (teleport, portal,
+            // plugin-driven warp) the run would tick forever and ArenaRoom's
+            // p.getWorld().getNearbyEntities(run.anchor(), ...) would throw
+            // "Location cannot be in a different world" every cadence. Abort
+            // the run cleanly instead — no reward, mobs and rift world purged.
+            Player p = run.player();
+            World anchorWorld = run.anchor().getWorld();
+            if (p == null || anchorWorld == null || !p.getWorld().equals(anchorWorld)) {
+                cleanupRoomMobs(run);
+                cleanupRunWorld(run);
+                it.remove();
+                continue;
+            }
             try { run.room().tick(run); } catch (Throwable t) {
                 plugin.getLogger().warning("Loot room tick error: " + t);
             }
