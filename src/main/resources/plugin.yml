@@ -11,7 +11,7 @@ softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, LuckPerms, xPets, xTags]
 commands:
   oneblock:
     description: Main NovaBlock command
-    usage: /<command> [create|home [nether]|hub|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|toggle|setspawn|friend|minions|sprint|help]
+    usage: /<command> [create|delete|home [nether]|hub|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|toggle|setspawn|friend|minions|sprint|help]
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command
@@ -57,6 +57,9 @@ permissions:
     default: op
   novablock.create:
     description: Allows creating an island
+    default: true
+  novablock.delete:
+    description: Allows the island owner to permanently delete their own island via /ob delete
     default: true
   novablock.home:
     description: Allows /ob home

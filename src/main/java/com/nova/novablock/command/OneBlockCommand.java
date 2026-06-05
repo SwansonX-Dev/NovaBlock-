@@ -19,19 +19,24 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class OneBlockCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS = List.of(
-            "create", "home", "menu", "prophecy", "skills", "flags", "storage",
+            "create", "delete", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
             "visit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
             "setspawn", "friend", "friends", "sprint", "minion", "minions", "hub", "community", "help");
     private static final List<String> FRIEND_SUBS = List.of("add", "accept", "deny", "remove", "list");
+    private static final long DELETE_CONFIRM_WINDOW_MS = 30_000L;
 
     private final NovaBlock plugin;
+    private final Map<UUID, Long> pendingDeletes = new HashMap<>();
 
     public OneBlockCommand(NovaBlock plugin) { this.plugin = plugin; }
 
@@ -56,6 +61,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 Msg.send(p, "<green>Island created! Teleporting...");
                 island.teleportHome(p);
             }
+            case "delete", "wipe" -> deleteIsland(p, args);
             case "home" -> {
                 if (!p.hasPermission("novablock.home")) { denied(p); return true; }
                 Island island = plugin.islands().ofPlayer(p);
@@ -146,6 +152,44 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         Msg.send(p, "<green>Invited <yellow>" + target.getName() + "<green>. They have 60 seconds to <yellow>/ob accept</yellow>.");
         Msg.send(target, "<gold>" + p.getName() + " <gray>invited you to their island. Tap <yellow>/ob accept</yellow> within 60s.");
         target.playSound(target.getLocation(), org.bukkit.Sound.UI_TOAST_IN, 1f, 1.4f);
+    }
+
+    private void deleteIsland(Player p, String[] args) {
+        if (!p.hasPermission("novablock.delete")) { denied(p); return; }
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) { Msg.send(p, "<gray>You don't have an island."); return; }
+        if (!island.data().getOwner().equals(p.getUniqueId())) {
+            Msg.send(p, "<red>Only the owner can delete the island. Use <yellow>/ob leave<red> to leave it.");
+            return;
+        }
+        boolean confirming = args.length > 1 && args[1].equalsIgnoreCase("confirm");
+        long now = System.currentTimeMillis();
+        Long expiry = pendingDeletes.get(p.getUniqueId());
+        boolean hasPending = expiry != null && expiry > now;
+        if (!confirming) {
+            pendingDeletes.put(p.getUniqueId(), now + DELETE_CONFIRM_WINDOW_MS);
+            Msg.send(p, "<red>⚠ This will permanently delete your island — phase progress, minions,");
+            Msg.send(p, "<red>storage, upgrades, and member access are all wiped. <bold>This cannot be undone.</bold>");
+            Msg.send(p, "<yellow>Type <white>/ob delete confirm<yellow> within 30 seconds to proceed.");
+            return;
+        }
+        if (!hasPending) {
+            Msg.send(p, "<gray>Confirmation expired. Run <yellow>/ob delete<gray> again to start over.");
+            return;
+        }
+        pendingDeletes.remove(p.getUniqueId());
+        java.util.List<UUID> memberSnapshot = new java.util.ArrayList<>(island.data().getMembers());
+        plugin.islands().delete(island);
+        org.bukkit.Location spawn = plugin.spawn().location();
+        if (spawn != null) p.teleport(spawn);
+        Msg.send(p, "<green>Your island has been deleted.");
+        for (UUID m : memberSnapshot) {
+            if (m.equals(p.getUniqueId())) continue;
+            Player member = org.bukkit.Bukkit.getPlayer(m);
+            if (member != null) {
+                Msg.send(member, "<red>" + p.getName() + " deleted the island. You no longer have an island.");
+            }
+        }
     }
 
     private void leave(Player p) {
@@ -366,6 +410,12 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             return org.bukkit.Bukkit.getOnlinePlayers().stream()
                     .map(Player::getName)
                     .filter(n -> n.toLowerCase().startsWith(prefix))
+                    .collect(Collectors.toList());
+        }
+        if (args.length == 2 && (args[0].equalsIgnoreCase("delete") || args[0].equalsIgnoreCase("wipe"))) {
+            String prefix = args[1].toLowerCase();
+            return java.util.stream.Stream.of("confirm")
+                    .filter(s -> s.startsWith(prefix))
                     .collect(Collectors.toList());
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("home")) {
