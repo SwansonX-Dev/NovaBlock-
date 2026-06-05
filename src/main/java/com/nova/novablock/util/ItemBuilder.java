@@ -32,7 +32,8 @@ public final class ItemBuilder {
     }
 
     public ItemBuilder lore(String... lines) {
-        List<Component> list = new ArrayList<>();
+        List<Component> existing = meta.lore();
+        List<Component> list = existing != null ? new ArrayList<>(existing) : new ArrayList<>();
         for (String l : lines) list.add(Msg.mm(l).decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
         meta.lore(list);
         return this;
