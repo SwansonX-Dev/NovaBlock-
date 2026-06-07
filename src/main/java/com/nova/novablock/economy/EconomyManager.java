@@ -79,6 +79,11 @@ public class EconomyManager {
         depositCoins(p.getUniqueId(), amount);
     }
 
+    /** Thousands-separated coin amount for display, e.g. 12345 → "12,345". */
+    public String format(long coins) {
+        return String.format("%,d", coins);
+    }
+
     // ----- xEconomy adapters (whole coins → cents) -----
 
     private void depositCoins(UUID id, long coins) {

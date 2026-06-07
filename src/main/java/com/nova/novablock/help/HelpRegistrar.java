@@ -44,8 +44,12 @@ public final class HelpRegistrar {
             sb.append("§e/ob quest §7— today's daily challenge\n");
             sb.append("§e/ob leaderboard §7— top islands\n");
             sb.append("§e/ob phase §7— current phase status\n");
-            sb.append("§e/ob invite §6<player> §7— team up\n");
+            sb.append("§e/ob invite §6<player> §7— team up (owner + co-owners)\n");
             sb.append("§e/ob accept §7— accept a pending invite\n");
+            sb.append("§e/ob team §7— roster, roles, and bank balance\n");
+            sb.append("§e/ob promote§7/§edemote §6<player> §7— manage co-owners (owner)\n");
+            sb.append("§e/ob kick §6<player> §7— remove a member (owner + co-owners)\n");
+            sb.append("§e/ob bank §6<deposit|withdraw> <amount> §7— island bank (members deposit; owner withdraws)\n");
             sb.append("§e/ob toggle §7— show/hide the menu hotbar item\n");
             sb.append("§e/sb §7— toggle the sidebar scoreboard\n\n");
             sb.append("§7Admin: §c/obadmin reload | setphase | spawnboss | givecoins | event | wipe | hub\n");

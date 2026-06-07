@@ -6,6 +6,7 @@ import org.bukkit.Location;
 import org.bukkit.World;
 
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -22,8 +23,12 @@ public class IslandData {
     private final int slotX;
     private final int slotZ;
     private final Set<UUID> members = new HashSet<>();
+    /** Per-member rank. The owner is implicitly OWNER; non-owner members default to MEMBER. */
+    private final Map<UUID, IslandRole> roles = new HashMap<>();
     private final Map<IslandFlag, Boolean> flags = new EnumMap<>(IslandFlag.class);
     private final Map<IslandUpgrade, Integer> upgrades = new EnumMap<>(IslandUpgrade.class);
+    /** Shared island bank, in whole coins. Funds upgrades; members deposit, owner withdraws. */
+    private long bankBalance;
     /** Material names of smithing templates this island has already earned from prestige. */
     private final Set<String> receivedPrestigeTemplates = new HashSet<>();
 
@@ -63,6 +68,30 @@ public class IslandData {
     public int getSlotX() { return slotX; }
     public int getSlotZ() { return slotZ; }
     public Set<UUID> getMembers() { return members; }
+
+    // --- roles ---------------------------------------------------------------
+
+    /** Live role map (non-owner members only; owner is always OWNER via {@link #getRole}). */
+    public Map<UUID, IslandRole> getRoles() { return roles; }
+
+    /** Effective role: OWNER for the owner, the stored role for members, MEMBER otherwise. */
+    public IslandRole getRole(UUID playerId) {
+        if (owner.equals(playerId)) return IslandRole.OWNER;
+        if (!members.contains(playerId)) return IslandRole.MEMBER;
+        return roles.getOrDefault(playerId, IslandRole.MEMBER);
+    }
+
+    /** Set a member's role. No-op for the owner (always OWNER) or non-members. */
+    public void setRole(UUID playerId, IslandRole role) {
+        if (owner.equals(playerId) || !members.contains(playerId)) return;
+        if (role == null || role == IslandRole.MEMBER) roles.remove(playerId);
+        else roles.put(playerId, role);
+    }
+
+    // --- island bank ---------------------------------------------------------
+
+    public long getBankBalance() { return bankBalance; }
+    public void setBankBalance(long v) { this.bankBalance = Math.max(0, v); }
 
     /** Live flag map. Missing entries fall back to {@link IslandFlag#defaultValue}. */
     public Map<IslandFlag, Boolean> getFlags() { return flags; }

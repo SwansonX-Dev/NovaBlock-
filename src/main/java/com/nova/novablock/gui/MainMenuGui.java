@@ -115,9 +115,18 @@ public class MainMenuGui extends ChestGui {
                 e -> { p.closeInventory(); p.performCommand("stocks"); });
 
         // Row 3: island settings + storage
+        var islandForTeam = plugin.islands().ofPlayer(p);
+        long bankCoins = islandForTeam == null ? 0 : islandForTeam.data().getBankBalance();
+        set(28, ItemBuilder.of(Material.PLAYER_HEAD)
+                        .name("<#7FFFE0>Island Team")
+                        .lore("<gray>Roster, roles, and the shared island bank.",
+                                "<gray>Bank: <yellow>" + plugin.economy().format(bankCoins) + " coins",
+                                "<dark_gray>/ob team · /ob bank · /ob promote").build(),
+                e -> { p.closeInventory(); p.performCommand("ob team"); });
+
         set(29, ItemBuilder.of(Material.ANVIL)
                         .name("<gold>Island Upgrades")
-                        .lore("<gray>Spend coins on permanent perks for your island.",
+                        .lore("<gray>Spend the island bank on permanent perks.",
                                 "<dark_gray>/ob upgrades").build(),
                 e -> new UpgradesGui(plugin).open(p));
 

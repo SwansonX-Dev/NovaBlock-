@@ -174,7 +174,52 @@ public class IslandManager {
     public boolean removeMember(Island island, UUID playerId) {
         if (island.data().getOwner().equals(playerId)) return false;
         if (!island.data().getMembers().remove(playerId)) return false;
+        island.data().getRoles().remove(playerId);
         playerToIsland.remove(playerId);
+        plugin.storage().saveIsland(island.data());
+        return true;
+    }
+
+    /** Set a member's role and persist. No-op for the owner or non-members. */
+    public void setMemberRole(Island island, UUID playerId, IslandRole role) {
+        island.data().setRole(playerId, role);
+        plugin.storage().saveIsland(island.data());
+    }
+
+    // --- island bank ---------------------------------------------------------
+
+    /**
+     * Move {@code coins} from {@code payer}'s personal wallet into the island
+     * bank. Returns false (and changes nothing) if the wallet can't cover it.
+     */
+    public boolean bankDeposit(Island island, Player payer, long coins) {
+        if (coins <= 0) return false;
+        if (!plugin.economy().spend(payer, coins)) return false;
+        island.data().setBankBalance(island.data().getBankBalance() + coins);
+        plugin.storage().saveIsland(island.data());
+        return true;
+    }
+
+    /**
+     * Move {@code coins} from the island bank into {@code payee}'s wallet.
+     * Returns false if the bank balance is insufficient.
+     */
+    public boolean bankWithdraw(Island island, org.bukkit.OfflinePlayer payee, long coins) {
+        if (coins <= 0 || island.data().getBankBalance() < coins) return false;
+        island.data().setBankBalance(island.data().getBankBalance() - coins);
+        plugin.economy().deposit(payee, coins);
+        plugin.storage().saveIsland(island.data());
+        return true;
+    }
+
+    /**
+     * Debit {@code coins} from the island bank for an in-plugin purchase
+     * (upgrades). Returns false if the balance is insufficient. No wallet
+     * movement — the coins are consumed.
+     */
+    public boolean bankSpend(Island island, long coins) {
+        if (coins <= 0 || island.data().getBankBalance() < coins) return false;
+        island.data().setBankBalance(island.data().getBankBalance() - coins);
         plugin.storage().saveIsland(island.data());
         return true;
     }

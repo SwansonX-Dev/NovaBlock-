@@ -21,7 +21,17 @@ public class UpgradesGui extends ChestGui {
     protected void build(Player p) {
         Island island = plugin.islands().ofPlayer(p);
         if (island == null) return;
-        long coins = plugin.economy().balance(island);
+        // Upgrades are funded by the shared island bank, spendable by owner + co-owners.
+        long coins = island.data().getBankBalance();
+        boolean canSpend = island.roleOf(p).canSpendBank();
+
+        set(4, ItemBuilder.of(Material.GOLD_INGOT)
+                .name("<gold>Island Bank: <yellow>" + plugin.economy().format(coins) + " coins")
+                .lore(canSpend
+                                ? "<gray>Upgrades are paid from the island bank."
+                                : "<red>Only the owner or a co-owner can buy upgrades.",
+                        "<dark_gray>Deposit with /ob bank deposit <amount>")
+                .build(), null);
 
         int[] slots = {11, 13, 15, 22};
         IslandUpgrade[] upgrades = IslandUpgrade.values();
@@ -56,14 +66,18 @@ public class UpgradesGui extends ChestGui {
     }
 
     private void tryPurchase(Player p, Island island, IslandUpgrade up) {
+        if (!island.roleOf(p).canSpendBank()) {
+            Msg.actionBar(p, "<red>Only the owner or a co-owner can buy upgrades.");
+            return;
+        }
         int level = island.data().getUpgradeLevel(up);
         long cost = up.costFor(level);
         if (cost < 0) {
             Msg.actionBar(p, "<gray>Already maxed.");
             return;
         }
-        if (!plugin.economy().spend(island, cost)) {
-            Msg.actionBar(p, "<red>Not enough coins.");
+        if (!plugin.islands().bankSpend(island, cost)) {
+            Msg.actionBar(p, "<red>The island bank can't cover that. <gray>/ob bank deposit <amount>");
             return;
         }
         island.data().setUpgradeLevel(up, level + 1);

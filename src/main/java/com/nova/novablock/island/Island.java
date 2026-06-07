@@ -91,6 +91,12 @@ public class Island {
     public boolean isMember(UUID id) { return data.getMembers().contains(id); }
     public boolean isMember(Player p) { return isMember(p.getUniqueId()); }
 
+    public boolean isOwner(UUID id) { return data.getOwner().equals(id); }
+    public boolean isOwner(Player p) { return isOwner(p.getUniqueId()); }
+
+    public IslandRole roleOf(UUID id) { return data.getRole(id); }
+    public IslandRole roleOf(Player p) { return roleOf(p.getUniqueId()); }
+
     public void teleportHome(Player p) {
         Location loc = data.spawnLocation();
         if (loc.getWorld() == null) {

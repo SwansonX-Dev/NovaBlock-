@@ -31,8 +31,10 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             "create", "delete", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
             "visit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
-            "setspawn", "friend", "friends", "sprint", "minion", "minions", "hub", "community", "help");
+            "setspawn", "friend", "friends", "sprint", "minion", "minions", "hub", "community",
+            "team", "members", "promote", "demote", "kick", "bank", "help");
     private static final List<String> FRIEND_SUBS = List.of("add", "accept", "deny", "remove", "list");
+    private static final List<String> BANK_SUBS = List.of("deposit", "withdraw", "balance");
     private static final long DELETE_CONFIRM_WINDOW_MS = 30_000L;
 
     private final NovaBlock plugin;
@@ -101,6 +103,11 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "invite" -> invite(p, args);
             case "accept" -> accept(p);
             case "leave" -> leave(p);
+            case "team", "members" -> showTeam(p);
+            case "promote" -> promote(p, args);
+            case "demote" -> demote(p, args);
+            case "kick" -> kick(p, args);
+            case "bank" -> bank(p, args);
             case "visit" -> visit(p, args);
             case "upgrades", "upgrade" -> new com.nova.novablock.gui.UpgradesGui(plugin).open(p);
             case "path", "pass", "season", "atlas" -> new SeasonalPathGui(plugin).open(p);
@@ -135,8 +142,8 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
     private void invite(Player p, String[] args) {
         Island island = plugin.islands().ofPlayer(p);
         if (island == null) { Msg.send(p, "<red>You need an island first. Try <yellow>/ob create</yellow>."); return; }
-        if (!island.data().getOwner().equals(p.getUniqueId())) {
-            Msg.send(p, "<red>Only the island owner can invite people.");
+        if (!island.roleOf(p).canManageRoster()) {
+            Msg.send(p, "<red>Only the owner or a co-owner can invite people.");
             return;
         }
         if (args.length < 2) { Msg.send(p, "<gray>Usage: <yellow>/ob invite <player>"); return; }
@@ -205,6 +212,174 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             Player member = org.bukkit.Bukkit.getPlayer(m);
             if (member != null) Msg.send(member, "<gray>" + p.getName() + " left the island.");
         }
+    }
+
+    // ---------------- team roles ----------------
+
+    private void showTeam(Player p) {
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) { Msg.send(p, "<red>You aren't on an island."); return; }
+        Msg.send(p, "<gold><bold>Island Team");
+        Msg.send(p, "<gray>Bank: <yellow>" + plugin.economy().format(island.data().getBankBalance()) + " coins");
+        // Owner first, then co-owners, then members.
+        java.util.List<UUID> ordered = new java.util.ArrayList<>(island.data().getMembers());
+        ordered.sort(java.util.Comparator.comparingInt(u -> {
+            switch (island.data().getRole(u)) {
+                case OWNER: return 0;
+                case CO_OWNER: return 1;
+                default: return 2;
+            }
+        }));
+        for (UUID u : ordered) {
+            com.nova.novablock.island.IslandRole role = island.data().getRole(u);
+            org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(u);
+            String name = op.getName() != null ? op.getName() : u.toString().substring(0, 8);
+            boolean online = op.isOnline();
+            Msg.send(p, "<" + role.color + ">" + role.displayName + " <gray>· "
+                    + (online ? "<green>" : "<dark_gray>") + name);
+        }
+        if (island.roleOf(p).canManageRoles()) {
+            Msg.send(p, "<dark_gray>/ob promote · /ob demote · /ob kick · /ob bank");
+        } else if (island.roleOf(p).canManageRoster()) {
+            Msg.send(p, "<dark_gray>/ob invite · /ob kick · /ob bank");
+        } else {
+            Msg.send(p, "<dark_gray>/ob bank deposit <amount>");
+        }
+    }
+
+    private void promote(Player p, String[] args) {
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) { Msg.send(p, "<red>You aren't on an island."); return; }
+        if (!island.roleOf(p).canManageRoles()) { Msg.send(p, "<red>Only the owner can promote members."); return; }
+        if (args.length < 2) { Msg.send(p, "<gray>Usage: <yellow>/ob promote <player>"); return; }
+        UUID target = resolveMember(island, args[1]);
+        if (target == null) { Msg.send(p, "<red>No island member named " + args[1] + "."); return; }
+        if (target.equals(p.getUniqueId())) { Msg.send(p, "<red>You're already the owner."); return; }
+        com.nova.novablock.island.IslandRole current = island.data().getRole(target);
+        if (current == com.nova.novablock.island.IslandRole.CO_OWNER) {
+            Msg.send(p, "<gray>They're already a co-owner.");
+            return;
+        }
+        plugin.islands().setMemberRole(island, target, com.nova.novablock.island.IslandRole.CO_OWNER);
+        String name = nameOf(target);
+        Msg.send(p, "<green>Promoted <yellow>" + name + "<green> to Co-Owner.");
+        Player online = org.bukkit.Bukkit.getPlayer(target);
+        if (online != null) Msg.send(online, "<gold>★ You were promoted to <#7FFFE0>Co-Owner<gold> of the island.");
+    }
+
+    private void demote(Player p, String[] args) {
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) { Msg.send(p, "<red>You aren't on an island."); return; }
+        if (!island.roleOf(p).canManageRoles()) { Msg.send(p, "<red>Only the owner can demote members."); return; }
+        if (args.length < 2) { Msg.send(p, "<gray>Usage: <yellow>/ob demote <player>"); return; }
+        UUID target = resolveMember(island, args[1]);
+        if (target == null) { Msg.send(p, "<red>No island member named " + args[1] + "."); return; }
+        if (island.data().getRole(target) != com.nova.novablock.island.IslandRole.CO_OWNER) {
+            Msg.send(p, "<gray>That player isn't a co-owner.");
+            return;
+        }
+        plugin.islands().setMemberRole(island, target, com.nova.novablock.island.IslandRole.MEMBER);
+        String name = nameOf(target);
+        Msg.send(p, "<gray>Demoted <yellow>" + name + "<gray> to Member.");
+        Player online = org.bukkit.Bukkit.getPlayer(target);
+        if (online != null) Msg.send(online, "<gray>You were demoted to Member on the island.");
+    }
+
+    private void kick(Player p, String[] args) {
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) { Msg.send(p, "<red>You aren't on an island."); return; }
+        if (!island.roleOf(p).canManageRoster()) { Msg.send(p, "<red>Only the owner or a co-owner can kick members."); return; }
+        if (args.length < 2) { Msg.send(p, "<gray>Usage: <yellow>/ob kick <player>"); return; }
+        UUID target = resolveMember(island, args[1]);
+        if (target == null) { Msg.send(p, "<red>No island member named " + args[1] + "."); return; }
+        if (target.equals(island.data().getOwner())) { Msg.send(p, "<red>You can't kick the owner."); return; }
+        if (target.equals(p.getUniqueId())) { Msg.send(p, "<gray>Use <yellow>/ob leave<gray> to leave your own island."); return; }
+        // Co-owners can't kick other co-owners — only the owner can.
+        com.nova.novablock.island.IslandRole targetRole = island.data().getRole(target);
+        if (targetRole == com.nova.novablock.island.IslandRole.CO_OWNER && !island.roleOf(p).canManageRoles()) {
+            Msg.send(p, "<red>Only the owner can remove another co-owner.");
+            return;
+        }
+        String name = nameOf(target);
+        if (!plugin.islands().removeMember(island, target)) {
+            Msg.send(p, "<red>Couldn't remove " + name + ".");
+            return;
+        }
+        Msg.send(p, "<gray>Removed <yellow>" + name + "<gray> from the island.");
+        Player online = org.bukkit.Bukkit.getPlayer(target);
+        if (online != null) {
+            Msg.send(online, "<red>You were removed from " + p.getName() + "'s island.");
+            org.bukkit.Location spawn = plugin.spawn().location();
+            if (spawn != null) online.teleport(spawn);
+        }
+        for (UUID m : island.data().getMembers()) {
+            Player member = org.bukkit.Bukkit.getPlayer(m);
+            if (member != null && !member.equals(p)) Msg.send(member, "<gray>" + name + " was removed from the island.");
+        }
+    }
+
+    // ---------------- island bank ----------------
+
+    private void bank(Player p, String[] args) {
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) { Msg.send(p, "<red>You aren't on an island."); return; }
+        if (args.length < 2 || args[1].equalsIgnoreCase("balance")) {
+            Msg.send(p, "<gold>Island Bank: <yellow>" + plugin.economy().format(island.data().getBankBalance()) + " coins");
+            Msg.send(p, "<gray>Deposit: <yellow>/ob bank deposit <amount|all>");
+            if (island.roleOf(p).canWithdrawBank()) Msg.send(p, "<gray>Withdraw: <yellow>/ob bank withdraw <amount|all>");
+            return;
+        }
+        String sub = args[1].toLowerCase();
+        if (!sub.equals("deposit") && !sub.equals("withdraw")) {
+            Msg.send(p, "<gray>Usage: <yellow>/ob bank <deposit|withdraw|balance> [amount]");
+            return;
+        }
+        if (sub.equals("withdraw") && !island.roleOf(p).canWithdrawBank()) {
+            Msg.send(p, "<red>Only the owner can withdraw from the island bank.");
+            return;
+        }
+        if (args.length < 3) { Msg.send(p, "<gray>Usage: <yellow>/ob bank " + sub + " <amount|all>"); return; }
+
+        boolean deposit = sub.equals("deposit");
+        long available = deposit ? plugin.economy().balance(p) : island.data().getBankBalance();
+        long amount;
+        if (args[2].equalsIgnoreCase("all")) {
+            amount = available;
+        } else {
+            try { amount = Long.parseLong(args[2].replace(",", "")); }
+            catch (NumberFormatException ex) { Msg.send(p, "<red>'" + args[2] + "' isn't a number."); return; }
+        }
+        if (amount <= 0) { Msg.send(p, "<red>Enter a positive amount."); return; }
+
+        if (deposit) {
+            if (!plugin.islands().bankDeposit(island, p, amount)) {
+                Msg.send(p, "<red>You don't have <yellow>" + plugin.economy().format(amount) + "<red> coins.");
+                return;
+            }
+            Msg.send(p, "<green>Deposited <yellow>" + plugin.economy().format(amount)
+                    + "<green> coins. Bank: <yellow>" + plugin.economy().format(island.data().getBankBalance()));
+        } else {
+            if (!plugin.islands().bankWithdraw(island, p, amount)) {
+                Msg.send(p, "<red>The bank only has <yellow>" + plugin.economy().format(island.data().getBankBalance()) + "<red> coins.");
+                return;
+            }
+            Msg.send(p, "<green>Withdrew <yellow>" + plugin.economy().format(amount)
+                    + "<green> coins. Bank: <yellow>" + plugin.economy().format(island.data().getBankBalance()));
+        }
+    }
+
+    /** Resolve a name to a member UUID of this island (online or offline). Null if not a member. */
+    private UUID resolveMember(Island island, String name) {
+        for (UUID u : island.data().getMembers()) {
+            org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(u);
+            if (op.getName() != null && op.getName().equalsIgnoreCase(name)) return u;
+        }
+        return null;
+    }
+
+    private String nameOf(UUID id) {
+        org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(id);
+        return op.getName() != null ? op.getName() : id.toString().substring(0, 8);
     }
 
     private void visit(Player p, String[] args) {
@@ -411,6 +586,30 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                     .map(Player::getName)
                     .filter(n -> n.toLowerCase().startsWith(prefix))
                     .collect(Collectors.toList());
+        }
+        if (args.length == 2 && (args[0].equalsIgnoreCase("promote")
+                || args[0].equalsIgnoreCase("demote") || args[0].equalsIgnoreCase("kick"))
+                && sender instanceof Player tp) {
+            String prefix = args[1].toLowerCase();
+            Island island = plugin.islands().ofPlayer(tp);
+            if (island == null) return Collections.emptyList();
+            java.util.List<String> names = new java.util.ArrayList<>();
+            for (UUID u : island.data().getMembers()) {
+                if (u.equals(tp.getUniqueId())) continue;
+                org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(u);
+                if (op.getName() != null && op.getName().toLowerCase().startsWith(prefix)) names.add(op.getName());
+            }
+            return names;
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("bank")) {
+            String prefix = args[1].toLowerCase();
+            return BANK_SUBS.stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("bank")
+                && (args[1].equalsIgnoreCase("deposit") || args[1].equalsIgnoreCase("withdraw"))) {
+            String prefix = args[2].toLowerCase();
+            return java.util.stream.Stream.of("all")
+                    .filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("delete") || args[0].equalsIgnoreCase("wipe"))) {
             String prefix = args[1].toLowerCase();

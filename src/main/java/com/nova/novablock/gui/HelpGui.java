@@ -130,6 +130,16 @@ public class HelpGui extends ChestGui {
                         .build(),
                 e -> new IslandFlagsGui(plugin).open(p));
 
+        set(25, ItemBuilder.of(Material.PLAYER_HEAD)
+                        .name("<#7FFFE0>Island Team & Bank")
+                        .lore("<gray>Invite members, then <yellow>/ob promote<gray> them to",
+                                "<gray>Co-Owner so they can run the roster and spend",
+                                "<gray>the shared island bank on upgrades.",
+                                "<gray>Members deposit; the owner can withdraw.",
+                                "<dark_gray>/ob team · /ob bank · /ob promote · /ob kick")
+                        .build(),
+                e -> { p.closeInventory(); p.performCommand("ob team"); });
+
         set(30, ItemBuilder.of(Material.BEACON)
                         .name("<gold>Prestige")
                         .lore("<gray>Reset phase to 1 for permanent coin and XP boosts.",

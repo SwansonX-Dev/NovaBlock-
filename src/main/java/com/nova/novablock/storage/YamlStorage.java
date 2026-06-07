@@ -105,6 +105,19 @@ public class YamlStorage implements DataStorage {
                 data.setNetherUnlocked(netherUnlocked);
                 data.setFirstNetherVisit(firstNetherVisit);
                 data.getMembers().addAll(memberIds);
+                data.setBankBalance(y.getLong("bankBalance", 0));
+                ConfigurationSection rolesSec = y.getConfigurationSection("roles");
+                if (rolesSec != null) {
+                    for (String key : rolesSec.getKeys(false)) {
+                        try {
+                            UUID memberId = UUID.fromString(key);
+                            data.setRole(memberId,
+                                    com.nova.novablock.island.IslandRole.byKey(rolesSec.getString(key)));
+                        } catch (IllegalArgumentException ignored) {
+                            // Malformed UUID key — skip rather than fail the whole island load.
+                        }
+                    }
+                }
                 ConfigurationSection flagsSec = y.getConfigurationSection("flags");
                 if (flagsSec != null) {
                     for (String key : flagsSec.getKeys(false)) {
@@ -156,6 +169,13 @@ public class YamlStorage implements DataStorage {
         List<String> mem = new ArrayList<>();
         for (UUID u : data.getMembers()) mem.add(u.toString());
         y.set("members", mem);
+        if (data.getBankBalance() > 0) y.set("bankBalance", data.getBankBalance());
+        // Only non-default (non-MEMBER) roles are persisted; owner role is implicit.
+        for (var e : data.getRoles().entrySet()) {
+            if (e.getValue() != null && e.getValue() != com.nova.novablock.island.IslandRole.MEMBER) {
+                y.set("roles." + e.getKey(), e.getValue().name());
+            }
+        }
         for (var e : data.getFlags().entrySet()) {
             y.set("flags." + e.getKey().storageKey(), e.getValue());
         }
