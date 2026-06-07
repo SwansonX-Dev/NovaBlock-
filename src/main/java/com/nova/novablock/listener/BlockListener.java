@@ -177,8 +177,7 @@ public class BlockListener implements Listener {
                 Msg.actionBar(player, "<green>✦ Lucky Break! <gray>(double drops)");
             }
             if (deepVein) {
-                block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5),
-                        new ItemStack(broken));
+                dropDeepVeinBonus(block, player, player.getInventory().getItemInMainHand());
             }
         }
         playBreakSound(block);
@@ -414,6 +413,26 @@ public class BlockListener implements Listener {
             if (paxel) drop = plugin.paxels().maybeSmelt(drop);
             giveOrDrop(player, block, loc, drop, paxel);
         }
+    }
+
+    /**
+     * DEEP_VEIN bonus: +1 of the ore's actual drop item, run through the same
+     * paxel pipeline as the natural drop (auto-smelt + telekinesis). Previously
+     * this dropped {@code new ItemStack(broken)} — the ore <em>block</em> itself —
+     * which looked like silk touch and bypassed auto-smelt entirely.
+     */
+    private void dropDeepVeinBonus(Block block, Player player, ItemStack tool) {
+        boolean paxel = plugin.paxels().isPaxel(tool);
+        ItemStack bonus = null;
+        for (ItemStack drop : block.getDrops(tool)) {
+            if (drop == null || drop.getType().isAir()) continue;
+            bonus = drop.clone();
+            bonus.setAmount(1);
+            break;
+        }
+        if (bonus == null) bonus = new ItemStack(block.getType());
+        if (paxel) bonus = plugin.paxels().maybeSmelt(bonus);
+        giveOrDrop(player, block, block.getLocation().add(0.5, 0.5, 0.5), bonus, paxel);
     }
 
     private void giveOrDrop(Player player, Block block, Location loc, ItemStack item, boolean paxel) {

@@ -137,9 +137,10 @@ prestige:
   max-level: 10
   # Coin lump on each prestige is base * newLevel.
   base-coin-reward: 50000
-  # Console commands fired on prestige. %player% and %level% are substituted.
+  # Console commands fired on prestige. %player%, %level% and %level_capped%
+  # (capped at max-level, for rewards that only exist up to prestige 10) are substituted.
   reward-commands:
-    - "pets give %player% novablock_prestige_%level%"
+    - "petadmin give %player% novablock_prestige_%level_capped%"
     - "swansonstocks give %player% 10"
 
 # Weekly sprint. Two parallel boards reset Monday 00:00 server-local; the

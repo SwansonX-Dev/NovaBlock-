@@ -114,6 +114,7 @@ public class PrestigeManager {
 
         for (String raw : rewardCommands) {
             String cmd = raw.replace("%player%", player.getName())
+                    .replace("%level_capped%", String.valueOf(Math.min(newLevel, maxLevel)))
                     .replace("%level%", String.valueOf(newLevel));
             try {
                 Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd);
