@@ -46,6 +46,7 @@ public class PrestigeManager {
     private final NovaBlock plugin;
     private double coinMultPerLevel = 0.10;
     private double xpMultPerLevel = 0.05;
+    private double sellBoostPerLevel = 0.10;
     private int maxLevel = 10;
     private long baseCoinReward = 50_000L;
     private List<String> rewardCommands = List.of();
@@ -59,6 +60,7 @@ public class PrestigeManager {
         FileConfiguration cfg = plugin.configs().main();
         this.coinMultPerLevel = cfg.getDouble("prestige.coin-multiplier-per-level", 0.10);
         this.xpMultPerLevel = cfg.getDouble("prestige.xp-multiplier-per-level", 0.05);
+        this.sellBoostPerLevel = cfg.getDouble("prestige.sell-boost-per-level", 0.10);
         this.maxLevel = cfg.getInt("prestige.max-level", 10);
         this.baseCoinReward = cfg.getLong("prestige.base-coin-reward", 50_000L);
         this.rewardCommands = cfg.getStringList("prestige.reward-commands");
@@ -153,6 +155,22 @@ public class PrestigeManager {
 
     public double xpMultiplier(Island island) {
         return 1.0 + xpMultPerLevel * cappedLevel(island);
+    }
+
+    /**
+     * xEconomy sell-price multiplier for a player, derived from their island's
+     * prestige level (capped at max-level). Registered as a sell-boost provider
+     * with xEconomy on enable — applies to /sell, the sell menu, shop selling,
+     * and sell chests (by chest owner). Works for offline players (sell chests
+     * tick while the owner is away).
+     */
+    public double sellMultiplierFor(java.util.UUID playerId) {
+        Island island = plugin.islands().ofPlayer(playerId);
+        return 1.0 + sellBoostPerLevel * cappedLevel(island);
+    }
+
+    public double sellMultiplierAtLevel(int level) {
+        return 1.0 + sellBoostPerLevel * Math.min(Math.max(0, level), maxLevel);
     }
 
     public double coinMultiplierAtLevel(int level) {

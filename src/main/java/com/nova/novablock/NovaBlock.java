@@ -191,6 +191,17 @@ public final class NovaBlock extends JavaPlugin {
             communityHubManager.placeIfNeeded();
         }
 
+        // Prestige sell boost — every xEconomy sell payout (/sell, sell menu,
+        // shop, sell chests) is multiplied by the seller's prestige bonus.
+        // Guarded: SellBoosts is null when the live xEconomy predates 0.4.0.
+        var sellBoosts = dev.xsuite.economy.api.XEconomy.sellBoosts();
+        if (sellBoosts != null) {
+            sellBoosts.register("novablock-prestige", prestigeManager::sellMultiplierFor);
+        } else {
+            getLogger().warning("xEconomy sell-boost API not available (needs xEconomy 0.4.0+) — "
+                    + "prestige sell boost is disabled.");
+        }
+
         // Plug NovaBlock into the /help index so players can discover commands without leaving chat.
         HelpRegistrar.register(this);
 
@@ -210,6 +221,14 @@ public final class NovaBlock extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        // Unhook the prestige sell boost so a reloaded NovaBlock re-registers cleanly.
+        try {
+            var sellBoosts = dev.xsuite.economy.api.XEconomy.sellBoosts();
+            if (sellBoosts != null) sellBoosts.unregister("novablock-prestige");
+        } catch (Throwable ignored) {
+            // xEconomy may already be disabled during shutdown ordering.
+        }
+
         // Stop tickers first so they don't fire against objects we're about to tear down.
         if (antiAfkManager != null) antiAfkManager.shutdown();
         if (islandFlagsManager != null) islandFlagsManager.shutdown();

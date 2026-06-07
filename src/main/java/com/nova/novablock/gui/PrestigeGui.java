@@ -23,11 +23,13 @@ public class PrestigeGui extends ChestGui {
         int next = current + 1;
         double nextCoinMult = plugin.prestige().coinMultiplierAtLevel(next);
         double nextXpMult = plugin.prestige().xpMultiplierAtLevel(next);
+        double nextSellMult = plugin.prestige().sellMultiplierAtLevel(next);
 
         set(2, ItemBuilder.of(Material.BOOK)
                 .name("<gold>Prestige " + next + " Rewards")
                 .lore("<gray>• Permanent <yellow>+" + Math.round(nextCoinMult * 100 - 100) + "% <gray>coin gain",
                         "<gray>• Permanent <yellow>+" + Math.round(nextXpMult * 100 - 100) + "% <gray>skill XP",
+                        "<gray>• Permanent <yellow>+" + Math.round(nextSellMult * 100 - 100) + "% <gray>sell prices",
                         "<gray>• A lump-sum coin payout",
                         "<gray>• A new pet",
                         "<gray>• 10 swansonx stocks",

@@ -133,6 +133,10 @@ prestige:
   coin-multiplier-per-level: 0.10
   # Each prestige adds this fraction to the skill XP multiplier.
   xp-multiplier-per-level: 0.05
+  # Each prestige adds this fraction to xEconomy sell prices (/sell, sell menu,
+  # shop selling, and sell chests — boosted by the chest owner's prestige).
+  # Capped at max-level like the other multipliers. Requires xEconomy 0.4.0+.
+  sell-boost-per-level: 0.10
   # Multiplier stops scaling above this level; players can still prestige past it for the title.
   max-level: 10
   # Coin lump on each prestige is base * newLevel.
