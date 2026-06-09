@@ -368,11 +368,40 @@ public class PaxelManager implements Listener {
 
         // Capture the XP value the event would have dropped, then suppress it.
         int xp = event.getExpToDrop();
+
+        // Containers (furnace, chest, barrel, hopper, brewing stand, dispenser, …)
+        // normally spill their CONTENTS as vanilla drops when broken. Because we
+        // disable vanilla drops below to do telekinesis, those contents would be
+        // destroyed unless we relocate them ourselves.
+        //  - Shulker boxes are excluded: their contents ride inside the dropped box
+        //    item, so collecting them here too would duplicate the stack.
+        //  - For a (double) chest we take only THIS half via getBlockInventory(),
+        //    matching vanilla — breaking one half leaves the other intact.
+        java.util.List<ItemStack> containerContents = new java.util.ArrayList<>();
+        org.bukkit.block.BlockState state = block.getState();
+        org.bukkit.inventory.Inventory container = null;
+        if (state instanceof org.bukkit.block.Chest chest) {
+            container = chest.getBlockInventory();
+        } else if (state instanceof org.bukkit.inventory.InventoryHolder holder) {
+            container = holder.getInventory();
+        }
+        if (container != null && !Tag.SHULKER_BOXES.isTagged(block.getType())) {
+            for (ItemStack content : container.getContents()) {
+                if (content != null && !content.getType().isAir()) {
+                    containerContents.add(content.clone());
+                }
+            }
+            container.clear();
+        }
+
         event.setDropItems(false);
         event.setExpToDrop(0);
 
-        // Telekinesis the primary drop + XP.
+        // Telekinesis the primary drop + XP, then the relocated container contents.
         collectDrops(p, tool, block, dropsForPaxel(block, tool));
+        for (ItemStack content : containerContents) {
+            giveOrDrop(p, block, content);   // not smelted — stored items keep their type
+        }
         if (xp > 0) p.giveExp(xp);
 
         // Vein-mine: if the broken block was an ore, chain to connected same-type ores.
@@ -432,10 +461,17 @@ public class PaxelManager implements Listener {
     }
 
     private void collectDrops(Player p, ItemStack tool, org.bukkit.block.Block block, java.util.Collection<ItemStack> drops) {
-        org.bukkit.Location dropLoc = block.getLocation().add(0.5, 0.5, 0.5);
         for (ItemStack drop : drops) {
-            ItemStack item = maybeSmelt(drop);
-            var overflow = p.getInventory().addItem(item);
+            giveOrDrop(p, block, maybeSmelt(drop));
+        }
+    }
+
+    /** Add an item to the player's inventory, dropping any overflow at the block. */
+    private void giveOrDrop(Player p, org.bukkit.block.Block block, ItemStack item) {
+        if (item == null || item.getType().isAir()) return;
+        var overflow = p.getInventory().addItem(item);
+        if (!overflow.isEmpty()) {
+            org.bukkit.Location dropLoc = block.getLocation().add(0.5, 0.5, 0.5);
             for (ItemStack leftover : overflow.values()) {
                 block.getWorld().dropItemNaturally(dropLoc, leftover);
             }
