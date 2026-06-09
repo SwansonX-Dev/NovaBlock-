@@ -121,8 +121,8 @@ public class MainMenuGui extends ChestGui {
                         .name("<#7FFFE0>Island Team")
                         .lore("<gray>Roster, roles, and the shared island bank.",
                                 "<gray>Bank: <yellow>" + plugin.economy().format(bankCoins) + " coins",
-                                "<dark_gray>/ob team · /ob bank · /ob promote").build(),
-                e -> { p.closeInventory(); p.performCommand("ob team"); });
+                                "<dark_gray>/ob team · /ob bank").build(),
+                e -> new RosterGui(plugin).open(p));
 
         set(29, ItemBuilder.of(Material.ANVIL)
                         .name("<gold>Island Upgrades")

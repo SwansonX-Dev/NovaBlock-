@@ -43,6 +43,14 @@ public final class ItemBuilder {
         return lore(lines.toArray(new String[0]));
     }
 
+    /** Set a PLAYER_HEAD's texture to the given player's skin. No-op on non-skull items. */
+    public ItemBuilder skull(org.bukkit.OfflinePlayer owner) {
+        if (meta instanceof org.bukkit.inventory.meta.SkullMeta sm) {
+            sm.setOwningPlayer(owner);
+        }
+        return this;
+    }
+
     public ItemBuilder glow() {
         meta.addEnchant(Enchantment.UNBREAKING, 1, true);
         meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
