@@ -429,4 +429,10 @@ public class CommunityBlock {
                 .getDouble("community.oneblocks.phase-required-multiplier", 10.0));
         return Math.max(1, (int) Math.ceil(phase.getRequiredBlocks() * mult));
     }
+
+    /** Scaled block requirement for the community block's current phase (for UI/scoreboard). */
+    public int requiredForCurrentPhase() {
+        Phase phase = plugin.phases().getOrLast(phaseIndex);
+        return phase == null ? Integer.MAX_VALUE : scaledRequiredBlocks(phase);
+    }
 }

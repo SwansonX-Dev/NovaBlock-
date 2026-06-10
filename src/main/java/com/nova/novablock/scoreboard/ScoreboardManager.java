@@ -69,15 +69,23 @@ public class ScoreboardManager {
                 return;
             }
         }
+        // In the shared community OneBlock world, render a community-themed board
+        // (shared phase/pool/weekly goal) instead of the player's personal-island stats.
+        boolean inCommunity = plugin.community() != null
+                && plugin.community().isEnabled()
+                && p.getWorld().getName().equals(plugin.community().communityWorldName());
+
         Scoreboard board = boards.computeIfAbsent(p.getUniqueId(),
                 u -> Bukkit.getScoreboardManager().getNewScoreboard());
         Objective obj = board.getObjective("nb");
         if (obj != null) obj.unregister();
         obj = board.registerNewObjective("nb", Criteria.DUMMY,
-                Msg.mm("<gradient:#7B61FF:#4FC3F7><bold>NovaBlock"));
+                Msg.mm(inCommunity
+                        ? "<gradient:#FFB347:#FFD700><bold>Community"
+                        : "<gradient:#7B61FF:#4FC3F7><bold>NovaBlock"));
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
 
-        List<String> lines = buildLines(p);
+        List<String> lines = inCommunity ? buildCommunityLines(p) : buildLines(p);
         // Render top-to-bottom: highest score on top
         int score = lines.size();
         // Reuse a stable set of team names so we don't churn entities
@@ -166,6 +174,64 @@ public class ScoreboardManager {
                 lines.add("<gray>Ends: <yellow>" + formatGoalTime(remaining / 1000));
             }
         }
+        return lines;
+    }
+
+    /**
+     * Lines for the shared community OneBlock world. Everyone in this world sees the same
+     * community-wide stats (phase, pool, weekly goal) plus their own stake in the next
+     * payout / weekly contribution — not their personal-island progression.
+     */
+    private List<String> buildCommunityLines(Player p) {
+        var hub = plugin.community();
+        var block = hub.block();
+        var goal = hub.goal();
+        UUID id = p.getUniqueId();
+        List<String> lines = new ArrayList<>();
+
+        Phase phase = plugin.phases().getOrLast(block.phaseIndex());
+        String color = phase == null ? "white" : phase.getThemeColor();
+        String name = phase == null ? "?" : phase.getDisplayName();
+        lines.add("<gray>Phase: <" + color + ">" + name);
+
+        int prog = block.phaseProgress();
+        int req = block.requiredForCurrentPhase();
+        int remaining = Math.max(0, req - prog);
+        if (remaining > 0 && remaining <= 200) {
+            lines.add("<gold><bold>" + remaining + "</bold> to next phase!");
+        } else {
+            lines.add("<gray>" + prog + " / " + req + " blocks");
+        }
+        lines.add("<gray>Total: <white>" + block.blocksBroken());
+        lines.add(" ");
+
+        // Shared coin pool + your stake in the next payout.
+        lines.add("<gold>Pool: <yellow>" + block.pool());
+        long yourPool = block.contributionByPlayer().getOrDefault(id, 0L);
+        if (yourPool > 0) lines.add("<gray>Your share: <yellow>" + yourPool);
+        lines.add("  ");
+
+        // Weekly community goal — always shown here; it's the point of the place.
+        if (plugin.getConfig().getBoolean("community.weekly-goal.enabled", true)) {
+            long gp = goal.progress();
+            long gt = goal.target();
+            int pct = (int) Math.min(100, gp * 100 / Math.max(1, gt));
+            lines.add("<aqua>Weekly: <white>" + gp + "/" + gt + " <gray>(" + pct + "%)");
+            long yourWeek = goal.contributionByPlayer().getOrDefault(id, 0L);
+            if (yourWeek > 0) lines.add("<gray>You: <white>" + yourWeek + " blocks");
+            long endsIn = goal.windowEnd() - System.currentTimeMillis();
+            if (endsIn > 0) lines.add("<gray>Resets: <yellow>" + formatGoalTime(endsIn / 1000));
+            lines.add("   ");
+        }
+
+        // Top weekly contributor.
+        var top = goal.topContributors(1);
+        if (!top.isEmpty()) {
+            var e = top.get(0);
+            String n = Bukkit.getOfflinePlayer(e.getKey()).getName();
+            lines.add("<gold>Top: <white>" + (n == null ? "?" : n) + " <yellow>" + e.getValue());
+        }
+        lines.add("<gray>Online: <green>" + Bukkit.getOnlinePlayers().size());
         return lines;
     }
 
