@@ -21,6 +21,10 @@ commands:
     description: Toggle the NovaBlock sidebar scoreboard
     usage: /<command>
     aliases: [scoreboard, sidebar]
+  backpack:
+    description: Open your personal backpack, or 'toggle' the hotbar item + auto-grab
+    usage: /<command> [toggle]
+    aliases: [bp]
   novahelp:
     description: Open the NovaBlock help GUI
     usage: /<command>
@@ -88,6 +92,9 @@ permissions:
   novablock.storage:
     description: Allows opening the island's shared virtual storage
     default: op
+  novablock.backpack:
+    description: Allows opening your personal backpack (/backpack)
+    default: true
   novablock.minions.use:
     description: Allows using NovaBlock minions. Dynamic limit nodes use novablock.minions.limit.<number>.
     default: true

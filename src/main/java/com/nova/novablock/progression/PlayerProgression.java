@@ -19,6 +19,9 @@ public class PlayerProgression {
     private int loginStreak;
     private boolean menuItemEnabled = true;
     private boolean scoreboardEnabled = true;
+    private boolean autoSellEnabled = false;
+    private boolean backpackItemEnabled = false;
+    private String backpackBase64 = "";
     private int atlasScore;
     private String seasonalPathKey = "";
     private int seasonalPathPoints;
@@ -63,6 +66,18 @@ public class PlayerProgression {
 
     public boolean isScoreboardEnabled() { return scoreboardEnabled; }
     public void setScoreboardEnabled(boolean v) { this.scoreboardEnabled = v; }
+
+    /** When enabled, common drops mined on the Community OneBlock are auto-sold for coins. */
+    public boolean isAutoSellEnabled() { return autoSellEnabled; }
+    public void setAutoSellEnabled(boolean v) { this.autoSellEnabled = v; }
+
+    /** When enabled, the backpack hotbar item is shown and picked-up items auto-grab into the backpack. */
+    public boolean isBackpackItemEnabled() { return backpackItemEnabled; }
+    public void setBackpackItemEnabled(boolean v) { this.backpackItemEnabled = v; }
+
+    /** Base64-serialised contents of this player's personal backpack ("" when empty). */
+    public String getBackpackBase64() { return backpackBase64 == null ? "" : backpackBase64; }
+    public void setBackpackBase64(String v) { this.backpackBase64 = v == null ? "" : v; }
 
     public int getAtlasScore() { return atlasScore; }
     public void addAtlasScore(int amount) { this.atlasScore = Math.max(0, this.atlasScore + amount); }

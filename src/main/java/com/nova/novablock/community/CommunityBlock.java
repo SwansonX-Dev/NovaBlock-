@@ -3,6 +3,7 @@ package com.nova.novablock.community;
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.phase.Phase;
 import com.nova.novablock.phase.PhaseBlock;
+import com.nova.novablock.season.SeasonManager;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -11,6 +12,7 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -279,17 +281,55 @@ public class CommunityBlock {
         // Drop natural drops to breaker, no perk-stacking — community block is intentionally
         // independent of personal-island progression so it can't be used to power-level.
         var loc = center.clone().add(0.5, 0.5, 0.5);
-        // If the community block was a chest (or other container), drop its contents
-        // explicitly — block.getDrops() only returns the chest item, not the inventory.
+        // Distribution: paxel holders get telekinesis + auto-smelt (parity with island
+        // mining); with auto-sell on, priced drops convert straight to coins instead of
+        // filling the inventory. Anything unpriced still reaches the player so rares are
+        // never lost. Non-paxel players keep the classic ground-drop behaviour.
+        var prog = plugin.progression().get(player);
+        ItemStack hand = player.getInventory().getItemInMainHand();
+        boolean paxel = plugin.paxels().isOwner(hand, player);
+        boolean autoSell = cfg.getBoolean("community.autosell.enabled", true) && prog.isAutoSellEnabled();
+        boolean coinRush = plugin.seasons().active() == SeasonManager.ServerEvent.DOUBLE_COINS;
+
+        List<ItemStack> drops = new ArrayList<>();
+        // Container contents (chest etc.) drop un-smelted, matching the island path.
         if (event.getBlock().getState() instanceof org.bukkit.block.Container container) {
             for (var content : container.getInventory().getContents()) {
                 if (content == null || content.getType().isAir()) continue;
-                center.getWorld().dropItemNaturally(loc, content);
+                drops.add(content.clone());
             }
             container.getInventory().clear();
         }
-        for (var drop : event.getBlock().getDrops(player.getInventory().getItemInMainHand())) {
-            center.getWorld().dropItemNaturally(loc, drop);
+        for (var drop : event.getBlock().getDrops(hand)) {
+            if (drop == null || drop.getType().isAir()) continue;
+            drops.add(paxel ? plugin.paxels().maybeSmelt(drop) : drop);
+        }
+
+        long autoSellEarned = 0;
+        List<ItemStack> toGive = new ArrayList<>();
+        for (ItemStack drop : drops) {
+            long unit = autoSell ? sellPrice(drop.getType()) : -1L;
+            if (unit >= 0) autoSellEarned += unit * drop.getAmount();
+            else toGive.add(drop);
+        }
+        if (coinRush) autoSellEarned *= 2;
+        if (autoSellEarned > 0) {
+            plugin.economy().deposit(player, autoSellEarned);
+            // Shown on the action bar below (folded into the pool line so it isn't clobbered).
+        }
+        if (paxel) {
+            plugin.paxels().deliver(player, event.getBlock(), toGive, false); // already smelted above
+        } else {
+            for (ItemStack drop : toGive) center.getWorld().dropItemNaturally(loc, drop);
+        }
+
+        // Diamond Hour: ~1/5 chance to also yield a bonus diamond (mirrors the island path).
+        if (plugin.seasons().active() == SeasonManager.ServerEvent.DIAMOND_HOUR
+                && ThreadLocalRandom.current().nextInt(5) == 0) {
+            ItemStack dia = new ItemStack(Material.DIAMOND);
+            if (paxel) plugin.paxels().deliver(player, event.getBlock(), java.util.List.of(dia), false);
+            else center.getWorld().dropItemNaturally(loc, dia);
+            Msg.actionBar(player, "<aqua>★ Diamond Hour bonus!");
         }
 
         // Pick the next block from upcoming queue or roll fresh from the community pool
@@ -297,6 +337,13 @@ public class CommunityBlock {
         Phase phase = plugin.phases().getOrLast(phaseIndex);
         Material next = upcoming.pollFirst();
         if (next == null) next = rollCommunityBlock(ThreadLocalRandom.current());
+        // Lush Bloom: ~1/6 chance the next block is a lush block (mirrors the island path).
+        if (plugin.seasons().active() == SeasonManager.ServerEvent.LUSH_BLOOM
+                && ThreadLocalRandom.current().nextInt(6) == 0) {
+            Material[] lush = {Material.MOSS_BLOCK, Material.AZALEA, Material.FLOWERING_AZALEA,
+                    Material.BIG_DRIPLEAF, Material.SMALL_DRIPLEAF};
+            next = lush[ThreadLocalRandom.current().nextInt(lush.length)];
+        }
         center.getBlock().setType(next, false);
         if (next == Material.CHEST && phase != null && plugin.blockListener() != null) {
             // Reuse the island chest-fill (phase-themed loot, dedup mark, tile-init race fallback)
@@ -316,6 +363,7 @@ public class CommunityBlock {
         long bonus = Math.max(0, cfg.getLong("community.block.bonus-coins-per-break", 1));
         double taxFraction = Math.max(0.0, Math.min(1.0, cfg.getDouble("community.block.coin-tax-fraction", 0.20)));
         long contributionThisBreak = bonus + Math.round(bonusForRareBlock(broken) * taxFraction);
+        if (coinRush) contributionThisBreak *= 2; // Coin Rush boosts the shared pool too.
         if (contributionThisBreak > 0) {
             contributionByPlayer.merge(player.getUniqueId(), contributionThisBreak, Long::sum);
         }
@@ -334,6 +382,9 @@ public class CommunityBlock {
                 phaseIndex = nextIdx;
                 phaseProgress = 0;
                 upcoming.clear();
+                // Shared phase advanced — bump every online player's paxel tier (community
+                // phase folds into PaxelManager.tierFor via max()).
+                plugin.paxels().refreshAllTiers();
                 if (cfg.getBoolean("community.block.broadcast.phase-advance", true)) {
                     Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Community OneBlock <gray>advanced to <"
                             + nextPhase.getThemeColor() + ">" + nextPhase.getDisplayName() + "<gray>!"));
@@ -347,8 +398,9 @@ public class CommunityBlock {
                     + " <gray>mined the <gold>" + blocksBroken + "th <gray>community block!"));
             player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1.1f);
         }
+        String sold = autoSellEarned > 0 ? " · <gold>+" + autoSellEarned + "<gray> sold" : "";
         Msg.actionBar(player, "<gray>+<gold>" + contributionThisBreak + "<gray> to pool · <yellow>"
-                + pool() + "<gray> total");
+                + pool() + "<gray> total" + sold);
     }
 
     /**
@@ -434,5 +486,18 @@ public class CommunityBlock {
     public int requiredForCurrentPhase() {
         Phase phase = plugin.phases().getOrLast(phaseIndex);
         return phase == null ? Integer.MAX_VALUE : scaledRequiredBlocks(phase);
+    }
+
+    /**
+     * Auto-sell coin value for a material: an explicit {@code community.autosell.prices.<MAT>}
+     * entry wins, otherwise {@code community.autosell.default} (which is {@code -1} by default,
+     * meaning "don't sell — keep the item"). A non-negative result sells the item for that many
+     * coins each; a negative result keeps it. Unpriced rares therefore always reach the player.
+     */
+    private long sellPrice(Material m) {
+        var cfg = plugin.getConfig();
+        String path = "community.autosell.prices." + m.name();
+        if (cfg.contains(path)) return Math.max(0L, cfg.getLong(path));
+        return cfg.getLong("community.autosell.default", -1L);
     }
 }

@@ -32,7 +32,8 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
             "visit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
             "setspawn", "friend", "friends", "sprint", "minion", "minions", "hub", "community",
-            "team", "members", "roster", "promote", "demote", "kick", "bank", "help");
+            "team", "members", "roster", "promote", "demote", "kick", "bank", "autosell",
+            "backpack", "help");
     private static final List<String> FRIEND_SUBS = List.of("add", "accept", "deny", "remove", "list");
     private static final List<String> BANK_SUBS = List.of("deposit", "withdraw", "balance");
     private static final long DELETE_CONFIRM_WINDOW_MS = 30_000L;
@@ -132,6 +133,19 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "friend", "friends", "f" -> handleFriend(p, args);
             case "sprint" -> new com.nova.novablock.gui.SprintGui(plugin).open(p);
             case "hub", "community" -> openHub(p, args);
+            case "autosell", "sell" -> {
+                var prog = plugin.progression().get(p);
+                boolean enabled = !prog.isAutoSellEnabled();
+                prog.setAutoSellEnabled(enabled);
+                plugin.progression().save(p.getUniqueId());
+                Msg.send(p, enabled
+                        ? "<green>Auto-sell <bold>ON</bold><green>. Common blocks mined on the Community OneBlock now sell for coins."
+                        : "<gray>Auto-sell <bold>OFF</bold><gray>. Community drops go to your inventory again.");
+            }
+            case "backpack", "bp" -> {
+                if (args.length >= 2 && args[1].equalsIgnoreCase("toggle")) plugin.backpacks().toggleItem(p);
+                else com.nova.novablock.backpack.BackpackManager.tryOpen(plugin, p);
+            }
             case "toggle" -> {
                 if (!p.hasPermission("novablock.toggle")) { denied(p); return true; }
                 plugin.hotbar().toggle(p);

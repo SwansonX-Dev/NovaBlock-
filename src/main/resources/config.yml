@@ -96,6 +96,86 @@ community:
       every-nth-break: 500
       phase-advance: true
 
+  # Auto-sell: players opt in with /ob autosell. While mining the Community OneBlock,
+  # drops with a price below are converted straight to coins (compresses inventory).
+  # `default: -1` means "items not listed are NOT sold" — so anything unpriced (diamonds,
+  # netherite, beacons, …) still reaches the player. Set default to >= 0 to blanket-sell.
+  # Prices are coins per item, and apply AFTER paxel auto-smelt (raw ore -> ingot, etc.).
+  autosell:
+    enabled: true
+    default: -1
+    prices:
+      # stones / earth
+      STONE: 1
+      COBBLESTONE: 1
+      DEEPSLATE: 1
+      COBBLED_DEEPSLATE: 1
+      ANDESITE: 1
+      DIORITE: 1
+      GRANITE: 1
+      TUFF: 1
+      CALCITE: 1
+      DRIPSTONE_BLOCK: 1
+      BASALT: 1
+      BLACKSTONE: 1
+      NETHERRACK: 1
+      END_STONE: 1
+      DIRT: 1
+      GRASS_BLOCK: 1
+      COARSE_DIRT: 1
+      PODZOL: 1
+      MYCELIUM: 1
+      ROOTED_DIRT: 1
+      MUD: 1
+      CLAY_BALL: 1
+      MOSS_BLOCK: 2
+      # sands / gravel / snow
+      SAND: 1
+      RED_SAND: 1
+      GRAVEL: 1
+      FLINT: 1
+      SOUL_SAND: 1
+      SOUL_SOIL: 1
+      SNOWBALL: 1
+      ICE: 1
+      PACKED_ICE: 2
+      # logs
+      OAK_LOG: 2
+      BIRCH_LOG: 2
+      SPRUCE_LOG: 2
+      JUNGLE_LOG: 2
+      ACACIA_LOG: 2
+      DARK_OAK_LOG: 2
+      MANGROVE_LOG: 2
+      CHERRY_LOG: 2
+      PALE_OAK_LOG: 2
+      CRIMSON_STEM: 2
+      WARPED_STEM: 2
+      BAMBOO: 1
+      # smelted ore products (paxel auto-smelt feeds these)
+      COAL: 2
+      RAW_IRON: 4
+      IRON_INGOT: 8
+      RAW_COPPER: 2
+      COPPER_INGOT: 3
+      RAW_GOLD: 6
+      GOLD_INGOT: 10
+      REDSTONE: 2
+      LAPIS_LAZULI: 3
+      QUARTZ: 2
+      GLOWSTONE_DUST: 2
+      # building blocks / misc
+      SANDSTONE: 1
+      RED_SANDSTONE: 1
+      SMOOTH_STONE: 1
+      STONE_BRICKS: 1
+      NETHER_BRICKS: 2
+      TERRACOTTA: 1
+      HAY_BLOCK: 2
+      SUGAR_CANE: 1
+      CACTUS: 1
+      KELP: 1
+
   weekly-goal:
     enabled: true
     target-blocks: 100000

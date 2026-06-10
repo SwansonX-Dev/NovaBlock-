@@ -143,6 +143,16 @@ public class MainMenuGui extends ChestGui {
                     com.nova.novablock.island.IslandStorageManager.tryOpen(plugin, p);
                 });
 
+        set(34, ItemBuilder.of(Material.BUNDLE)
+                        .name("<#FFB347>Backpack")
+                        .lore("<gray>Your personal 54-slot storage.",
+                                "<gray>Handy for offloading Community OneBlock drops.",
+                                "<dark_gray>/backpack").build(),
+                e -> {
+                    p.closeInventory();
+                    com.nova.novablock.backpack.BackpackManager.tryOpen(plugin, p);
+                });
+
         set(31, ItemBuilder.of(Material.ALLAY_SPAWN_EGG)
                         .name("<light_purple>Pets")
                         .lore("<gray>Open xPets to summon and manage pets.", "<dark_gray>/pets").build(),

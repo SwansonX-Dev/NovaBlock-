@@ -129,10 +129,13 @@ public class PlayerListener implements Listener {
 
     @EventHandler
     public void onTeleport(PlayerTeleportEvent event) {
-        // Update scoreboard a tick later
+        // Update scoreboard a tick later, and re-tier the paxel — entering the community
+        // world can raise the earned tier (community phase folds into PaxelManager.tierFor).
         org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!event.getPlayer().isOnline()) return;
             plugin.scoreboards().update(event.getPlayer());
             plugin.rankNameplates().refreshAll();
+            plugin.paxels().refreshTier(event.getPlayer());
         });
     }
 }

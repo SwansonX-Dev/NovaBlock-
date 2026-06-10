@@ -127,12 +127,35 @@ public class PaxelManager implements Listener {
 
     // ---------------- tiering ----------------
 
-    /** Tier this player has earned based on their island's current phase index. */
+    /**
+     * Tier this player has earned. Driven by their island's phase index, but the shared
+     * Community OneBlock counts too: its phase folds in via {@code max(...)} so playing
+     * the community block advances the paxel even if the player's island is behind.
+     */
     public int tierFor(Player p) {
         Island island = plugin.islands().ofPlayer(p);
-        if (island == null) return 0;
-        int phase = island.data().getPhaseIndex();
+        int phase = island == null ? 0 : island.data().getPhaseIndex();
+        if (plugin.community() != null && plugin.community().isEnabled()) {
+            phase = Math.max(phase, plugin.community().block().phaseIndex());
+        }
         return Math.max(0, Math.min(TIER_MATERIALS.length - 1, phase));
+    }
+
+    /** Refresh every online player's paxel tier — used when the shared community phase advances. */
+    public void refreshAllTiers() {
+        for (Player p : Bukkit.getOnlinePlayers()) refreshTier(p);
+    }
+
+    /**
+     * Telekinesis a collection of drops into the player's inventory (overflow falls at the
+     * block). When {@code smelt} is true each drop is auto-smelted first. Lets the Community
+     * OneBlock break path reuse the paxel pipeline, since that break is cancelled upstream
+     * and never reaches {@link #onPaxelBreak}.
+     */
+    public void deliver(Player p, org.bukkit.block.Block block, java.util.Collection<ItemStack> drops, boolean smelt) {
+        for (ItemStack drop : drops) {
+            giveOrDrop(p, block, smelt ? maybeSmelt(drop) : drop);
+        }
     }
 
     /** Build a fresh paxel item for the given player at the given tier. */
@@ -324,7 +347,19 @@ public class PaxelManager implements Listener {
 
                 Island island = plugin.islands().ofPlayer(p);
                 String hud;
-                if (island == null) {
+                boolean inCommunity = plugin.community() != null && plugin.community().isEnabled()
+                        && p.getWorld().getName().equals(plugin.community().communityWorldName());
+                if (inCommunity) {
+                    var block = plugin.community().block();
+                    Phase phase = plugin.phases().getOrLast(block.phaseIndex());
+                    int prog = block.phaseProgress();
+                    int req = block.requiredForCurrentPhase();
+                    String phaseName = phase == null ? "?" : phase.getDisplayName();
+                    String phaseColor = phase == null ? "white" : phase.getThemeColor();
+                    hud = "<" + TIER_COLORS[tier] + ">" + TIER_NAMES[tier]
+                            + " <gray>· <gold>Community <" + phaseColor + ">" + phaseName
+                            + " <white>" + prog + "<gray>/<white>" + req;
+                } else if (island == null) {
                     hud = "<" + TIER_COLORS[tier] + ">" + TIER_NAMES[tier]
                             + " <gray>· <yellow>No island";
                 } else {

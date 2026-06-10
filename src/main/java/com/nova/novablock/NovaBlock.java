@@ -8,6 +8,7 @@ import com.nova.novablock.island.IslandFlagsManager;
 import com.nova.novablock.island.IslandStorageManager;
 import com.nova.novablock.boss.BossManager;
 import com.nova.novablock.command.AdminCommand;
+import com.nova.novablock.command.BackpackCommand;
 import com.nova.novablock.command.HelpCommand;
 import com.nova.novablock.command.MinionCommand;
 import com.nova.novablock.command.OneBlockCommand;
@@ -79,6 +80,7 @@ public final class NovaBlock extends JavaPlugin {
     private AntiAfkManager antiAfkManager;
     private IslandFlagsManager islandFlagsManager;
     private IslandStorageManager islandStorageManager;
+    private com.nova.novablock.backpack.BackpackManager backpackManager;
     private MainMenuConfig menuConfig;
     private OneBlockRepairService oneBlockRepairService;
     private PreviewHologramManager previewHologramManager;
@@ -137,6 +139,7 @@ public final class NovaBlock extends JavaPlugin {
         this.antiAfkManager = new AntiAfkManager(this);
         this.islandFlagsManager = new IslandFlagsManager(this);
         this.islandStorageManager = new IslandStorageManager(this);
+        this.backpackManager = new com.nova.novablock.backpack.BackpackManager(this);
         this.menuConfig = new MainMenuConfig(this);
         this.oneBlockRepairService = new OneBlockRepairService(this);
         this.previewHologramManager = new PreviewHologramManager(this);
@@ -167,6 +170,7 @@ public final class NovaBlock extends JavaPlugin {
         getCommand("obadmin").setExecutor(adminCmd);
         getCommand("obadmin").setTabCompleter(adminCmd);
         getCommand("sb").setExecutor(new ScoreboardCommand(this));
+        getCommand("backpack").setExecutor(new BackpackCommand(this));
         getCommand("novahelp").setExecutor(new HelpCommand(this));
         getCommand("spawn").setExecutor(new SpawnCommand(this));
         MinionCommand minionCmd = new MinionCommand(this);
@@ -233,6 +237,7 @@ public final class NovaBlock extends JavaPlugin {
         if (antiAfkManager != null) antiAfkManager.shutdown();
         if (islandFlagsManager != null) islandFlagsManager.shutdown();
         if (islandStorageManager != null) islandStorageManager.shutdown();
+        if (backpackManager != null) backpackManager.shutdown();
         if (eventManager != null) eventManager.shutdown();
         if (seasonManager != null) seasonManager.shutdown();
         if (seasonalPathManager != null) seasonalPathManager.save();
@@ -284,6 +289,7 @@ public final class NovaBlock extends JavaPlugin {
     public AntiAfkManager antiAfk() { return antiAfkManager; }
     public IslandFlagsManager islandFlags() { return islandFlagsManager; }
     public IslandStorageManager islandStorage() { return islandStorageManager; }
+    public com.nova.novablock.backpack.BackpackManager backpacks() { return backpackManager; }
     public MainMenuConfig menuConfig() { return menuConfig; }
     public OneBlockRepairService repairs() { return oneBlockRepairService; }
     public SpawnManager spawn() { return spawnManager; }
