@@ -31,11 +31,66 @@ public class ScoreboardManager {
     private final Map<UUID, Scoreboard> boards = new HashMap<>();
     private BukkitTask ticker;
 
+    /** Scoreboard sidebars are capped at 15 score lines by the vanilla client. */
+    private static final int MAX_LINES = 15;
+
+    // Config-driven overrides, cached and refreshed by reload(). Empty = use the
+    // built-in dynamic board, so an unconfigured server is unchanged.
+    private String customTitle = "";
+    private String customCommunityTitle = "";
+    private List<String> customLines = List.of();
+    private List<String> customCommunityLines = List.of();
+    private boolean papiPresent;
+
     public ScoreboardManager(NovaBlock plugin) { this.plugin = plugin; }
 
     public void startTicker() {
+        reload();
         if (ticker != null) ticker.cancel();
         ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
+    }
+
+    /** Re-read the configurable scoreboard title/lines from config. Called on /obadmin reload. */
+    public void reload() {
+        var cfg = plugin.getConfig();
+        customTitle = cfg.getString("scoreboard.title", "");
+        customCommunityTitle = cfg.getString("scoreboard.community-title", "");
+        customLines = cfg.getStringList("scoreboard.lines");
+        customCommunityLines = cfg.getStringList("scoreboard.community-lines");
+        papiPresent = Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI");
+    }
+
+    /** Resolve PlaceholderAPI placeholders (if installed) before MiniMessage parsing. */
+    private String resolve(Player p, String text) {
+        if (text == null) return "";
+        if (papiPresent) {
+            try {
+                text = me.clip.placeholderapi.PlaceholderAPI.setPlaceholders(p, text);
+            } catch (Throwable ignored) {
+                // A misbehaving expansion shouldn't blank the whole board.
+            }
+        }
+        return text;
+    }
+
+    /**
+     * The lines to render for this player: a configured override (placeholders
+     * resolved, fully-empty lines dropped so they can act as conditionals) when
+     * set, otherwise the built-in dynamic board.
+     */
+    private List<String> resolveLines(Player p, boolean inCommunity) {
+        List<String> custom = inCommunity ? customCommunityLines : customLines;
+        if (custom == null || custom.isEmpty()) {
+            return inCommunity ? buildCommunityLines(p) : buildLines(p);
+        }
+        List<String> out = new ArrayList<>();
+        for (String raw : custom) {
+            String resolved = resolve(p, raw);
+            if (resolved.isEmpty()) continue; // empty after resolve = hide (conditional line)
+            out.add(resolved);
+            if (out.size() >= MAX_LINES) break;
+        }
+        return out;
     }
 
     private void tick() {
@@ -79,13 +134,16 @@ public class ScoreboardManager {
                 u -> Bukkit.getScoreboardManager().getNewScoreboard());
         Objective obj = board.getObjective("nb");
         if (obj != null) obj.unregister();
-        obj = board.registerNewObjective("nb", Criteria.DUMMY,
-                Msg.mm(inCommunity
+        String titleOverride = inCommunity ? customCommunityTitle : customTitle;
+        var title = (titleOverride != null && !titleOverride.isBlank())
+                ? Msg.mm(resolve(p, titleOverride))
+                : Msg.mm(inCommunity
                         ? "<gradient:#FFB347:#FFD700><bold>Community"
-                        : "<gradient:#7B61FF:#4FC3F7><bold>NovaBlock"));
+                        : "<gradient:#7B61FF:#4FC3F7><bold>NovaBlock");
+        obj = board.registerNewObjective("nb", Criteria.DUMMY, title);
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
 
-        List<String> lines = inCommunity ? buildCommunityLines(p) : buildLines(p);
+        List<String> lines = resolveLines(p, inCommunity);
         // Render top-to-bottom: highest score on top
         int score = lines.size();
         // Reuse a stable set of team names so we don't churn entities

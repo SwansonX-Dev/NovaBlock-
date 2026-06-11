@@ -173,6 +173,24 @@ public class BackpackManager implements Listener {
 
     private boolean isAir(ItemStack s) { return s == null || s.getType() == Material.AIR; }
 
+    /**
+     * Route an item into the player's backpack when auto-grab is enabled. Used by the
+     * paxel telekinesis path: paxel-mined drops never become ground items (the break
+     * handler delivers them straight to the player), so they bypass {@link #onPickup}.
+     * Sending them through here lands them in the backpack just like a walked-over pickup.
+     *
+     * @return {@code null} if the whole stack was stored (or the item was air); the
+     *         leftover stack if the backpack is off or full (caller handles the remainder).
+     */
+    public ItemStack routeToBackpack(Player p, ItemStack item) {
+        if (isAir(item)) return null;
+        if (!plugin.progression().get(p).isBackpackItemEnabled()) return item;
+        Inventory bp = inventory(p.getUniqueId());
+        Map<Integer, ItemStack> overflow = bp.addItem(item.clone());
+        persistObject(p.getUniqueId());
+        return overflow.isEmpty() ? null : overflow.values().iterator().next();
+    }
+
     // ---------------- listeners ----------------
 
     @EventHandler

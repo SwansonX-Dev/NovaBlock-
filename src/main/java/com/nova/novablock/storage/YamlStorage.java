@@ -225,7 +225,7 @@ public class YamlStorage implements DataStorage {
         p.setMenuItemEnabled(y.getBoolean("ui.menuItem", true));
         p.setScoreboardEnabled(y.getBoolean("ui.scoreboard", true));
         p.setAutoSellEnabled(y.getBoolean("ui.autoSell", false));
-        p.setBackpackItemEnabled(y.getBoolean("ui.backpackItem", false));
+        p.setBackpackItemEnabled(y.getBoolean("ui.backpackItem", true));
         p.setBackpackBase64(y.getString("backpack.data", ""));
         p.setAtlasScore(y.getInt("atlas.score", 0));
         p.setSeasonalPathKey(y.getString("seasonal.pathKey", ""));

@@ -162,6 +162,8 @@ public final class NovaBlock extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.listener.NetherPortalListener(this), this);
         getServer().getPluginManager().registerEvents(guiManager, this);
+        getServer().getPluginManager().registerEvents(
+                new com.nova.novablock.scoreboard.IslandBadgeMessageFilter(), this);
 
         OneBlockCommand obCmd = new OneBlockCommand(this);
         getCommand("oneblock").setExecutor(obCmd);

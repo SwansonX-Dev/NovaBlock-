@@ -103,7 +103,9 @@ public class RankNameplateManager {
         }
         String islandBadge = islandRoleBadgeFor(subject);
         if (!islandBadge.isBlank()) {
-            out = out.append(Msg.mm(islandBadge)).append(Component.text(" "));
+            // Trailing space baked into the same component so IslandBadgeMessageFilter
+            // can strip the whole "[Owner] " token from broadcasts without leaving a gap.
+            out = out.append(Msg.mm(islandBadge + " "));
         }
         return out;
     }

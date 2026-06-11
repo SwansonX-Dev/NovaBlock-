@@ -20,7 +20,7 @@ public class PlayerProgression {
     private boolean menuItemEnabled = true;
     private boolean scoreboardEnabled = true;
     private boolean autoSellEnabled = false;
-    private boolean backpackItemEnabled = false;
+    private boolean backpackItemEnabled = true;
     private String backpackBase64 = "";
     private int atlasScore;
     private String seasonalPathKey = "";

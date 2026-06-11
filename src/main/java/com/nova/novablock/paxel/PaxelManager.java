@@ -501,8 +501,15 @@ public class PaxelManager implements Listener {
         }
     }
 
-    /** Add an item to the player's inventory, dropping any overflow at the block. */
+    /**
+     * Deliver a paxel drop. When the player's backpack auto-grab is on, the item routes
+     * into the backpack first (telekinesis bypasses the normal pickup event, so without
+     * this it would never reach the backpack); whatever doesn't fit falls to the main
+     * inventory, and any remaining overflow drops at the block.
+     */
     private void giveOrDrop(Player p, org.bukkit.block.Block block, ItemStack item) {
+        if (item == null || item.getType().isAir()) return;
+        item = plugin.backpacks().routeToBackpack(p, item);
         if (item == null || item.getType().isAir()) return;
         var overflow = p.getInventory().addItem(item);
         if (!overflow.isEmpty()) {

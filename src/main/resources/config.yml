@@ -299,3 +299,50 @@ minions:
       - { material: ENDER_PEARL, weight: 45, min: 1, max: 2 }
       - { material: OBSIDIAN, weight: 35, min: 1, max: 2 }
       - { material: NETHERITE_SCRAP, weight: 2, min: 1, max: 1, rareChance: 0.01 }
+
+# ------------------------------------------------------------------
+# Sidebar scoreboard (/sb)
+# ------------------------------------------------------------------
+# Leave 'lines' empty to keep the built-in dynamic board (phase, skills,
+# coins, streak, rifts, community goal, etc.). Fill it in to override with
+# your own layout. Apply changes live with /obadmin reload.
+#
+# Formatting:  MiniMessage  ->  <gold>, <gradient:#7B61FF:#4FC3F7>, <bold>, <white>
+# Placeholders: any PlaceholderAPI placeholder (PlaceholderAPI is installed):
+#   %player_name%               the player's name
+#   %server_online%             online player count
+#   %novablock_coins%           island coins
+#   %novablock_phase_name%      current phase name
+#   %novablock_phase_progress%  blocks into current phase
+#   %novablock_phase_required%  blocks needed for the phase
+#   %novablock_blocks%          total blocks broken
+#   %novablock_prestige_title%  prestige title (blank if none)
+#   %novablock_login_streak%    daily login streak
+#   %novablock_path_tier%       seasonal path tier
+#   %novablock_skill_mining_level%  (also combat / magic / luck)
+#   ...plus any other plugin's placeholders, e.g. %vault_eco_balance%.
+#
+# A line that resolves to an EMPTY string is skipped — handy for conditional
+# rows (e.g. a placeholder that returns "" when not applicable). A line of one
+# or more spaces is kept as a blank spacer. Max 15 lines.
+scoreboard:
+  # Top title. Empty = built-in gradient title.
+  title: ""
+  community-title: ""
+  # Personal-island board. Empty list = built-in dynamic board.
+  lines: []
+  # Shared Community OneBlock world board. Empty list = built-in board.
+  community-lines: []
+  # Example starting point — uncomment 'lines:' above-style and tweak:
+  # lines:
+  #   - "<gray>Phase: <aqua>%novablock_phase_name%"
+  #   - "<gray>%novablock_phase_progress% / %novablock_phase_required% blocks"
+  #   - "<gray>Total: <white>%novablock_blocks%"
+  #   - "<gold>Coins: <yellow>%novablock_coins%"
+  #   - " "
+  #   - "<#7CFC00>Mining <white>Lv %novablock_skill_mining_level%"
+  #   - "<#FF6B6B>Combat <white>Lv %novablock_skill_combat_level%"
+  #   - "<#9C66FF>Magic <white>Lv %novablock_skill_magic_level%"
+  #   - "<#FFD24D>Luck <white>Lv %novablock_skill_luck_level%"
+  #   - "  "
+  #   - "<gray>Online: <green>%server_online%"

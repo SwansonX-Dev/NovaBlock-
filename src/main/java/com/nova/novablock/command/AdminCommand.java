@@ -54,6 +54,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 plugin.seasonalPaths().load();
                 plugin.seasonalPaths().ensureTags();
                 if (plugin.minions() != null) plugin.minions().reloadSettings();
+                plugin.scoreboards().reload();
                 Msg.send(sender, "<green>Reloaded.");
             }
             case "setphase" -> {
