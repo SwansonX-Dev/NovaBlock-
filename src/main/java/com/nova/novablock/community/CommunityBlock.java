@@ -190,8 +190,7 @@ public class CommunityBlock {
             new PhaseBlock(Material.SCULK_CATALYST, 1),
             new PhaseBlock(Material.BEACON, 1),
             new PhaseBlock(Material.CONDUIT, 1),
-            new PhaseBlock(Material.SHULKER_BOX, 1),
-            new PhaseBlock(Material.NETHERITE_BLOCK, 1)
+            new PhaseBlock(Material.SHULKER_BOX, 1)
     );
     private static final int COMMUNITY_TOTAL_WEIGHT;
     static {

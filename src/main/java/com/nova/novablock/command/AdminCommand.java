@@ -12,6 +12,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;
@@ -22,7 +23,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
             "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
-            "flags", "storage", "menu", "path", "sprint", "hub", "freshstart", "fix", "setspawn");
+            "giveoneblock", "flags", "storage", "menu", "path", "sprint", "hub", "freshstart", "fix", "setspawn");
     private static final List<String> EVENTS = List.of(
             "diamond_hour", "double_coins", "blood_moon", "lush_bloom", "rift_storm", "stop");
 
@@ -125,6 +126,22 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 if (target == null) { Msg.send(sender, "<red>Player not online."); return true; }
                 plugin.paxels().replace(target);
                 Msg.send(sender, "<green>Re-issued paxel to " + target.getName() + ".");
+            }
+            case "giveoneblock" -> {
+                if (args.length < 2) { Msg.send(sender, "<red>/obadmin giveoneblock <player> [amount]"); return true; }
+                Player target = Bukkit.getPlayerExact(args[1]);
+                if (target == null) { Msg.send(sender, "<red>Player not online."); return true; }
+                int amount = 1;
+                if (args.length >= 3) {
+                    try { amount = Math.max(1, Math.min(64, Integer.parseInt(args[2]))); }
+                    catch (NumberFormatException ex) { Msg.send(sender, "<red>Amount must be a number."); return true; }
+                }
+                ItemStack item = com.nova.novablock.listener.OneBlockGrantListener.create(plugin, amount);
+                var leftover = target.getInventory().addItem(item);
+                for (ItemStack drop : leftover.values()) target.getWorld().dropItemNaturally(target.getLocation(), drop);
+                Msg.send(sender, "<green>Gave " + amount + "x Personal OneBlock to " + target.getName() + ".");
+                Msg.send(target, "<green>You received a <#7B61FF>Personal OneBlock<green>! "
+                        + "Place it in the Community OneBlock world to claim your island.");
             }
             case "flags" -> {
                 if (!(sender instanceof Player viewer)) { Msg.send(sender, "<red>Players only."); return true; }

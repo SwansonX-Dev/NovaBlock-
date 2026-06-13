@@ -167,6 +167,8 @@ public final class NovaBlock extends JavaPlugin {
                 new com.nova.novablock.listener.CropGrowthListener(this), this);
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.listener.IslandQuestlineListener(this), this);
+        getServer().getPluginManager().registerEvents(
+                new com.nova.novablock.listener.OneBlockGrantListener(this), this);
         getServer().getPluginManager().registerEvents(guiManager, this);
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.scoreboard.IslandBadgeMessageFilter(), this);

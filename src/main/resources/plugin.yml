@@ -181,6 +181,7 @@ permissions:
       novablock.admin.event: true
       novablock.admin.wipe: true
       novablock.admin.givepaxel: true
+      novablock.admin.giveoneblock: true
       novablock.admin.flags: true
       novablock.admin.storage: true
       novablock.admin.menu: true
