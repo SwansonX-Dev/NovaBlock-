@@ -13,7 +13,10 @@ import java.util.UUID;
 
 public class MinionData {
     private final UUID id;
+    /** Owning island, or null for a community-claim (owner-based) minion. */
     private final UUID islandId;
+    /** Owning player for community minions (null for island minions). */
+    private UUID ownerId;
     private final MinionType type;
     private String worldName;
     private double x;
@@ -40,6 +43,10 @@ public class MinionData {
 
     public UUID id() { return id; }
     public UUID islandId() { return islandId; }
+    public UUID ownerId() { return ownerId; }
+    public void setOwnerId(UUID ownerId) { this.ownerId = ownerId; }
+    /** True for a community-claim minion (owner-based, not tied to an island). */
+    public boolean isCommunity() { return islandId == null; }
     public MinionType type() { return type; }
     public String worldName() { return worldName; }
     public double x() { return x; }

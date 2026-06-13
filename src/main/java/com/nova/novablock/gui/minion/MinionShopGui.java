@@ -20,9 +20,10 @@ public class MinionShopGui extends ChestGui {
         int phase = island == null ? -1 : island.data().getPhaseIndex();
         set(4, ItemBuilder.of(Material.NETHER_STAR).name("<gold>Minion Shop").lore("<gray>Buy phase-unlocked minions.").build(), null);
         int[] slots = {10,11,12,13,14,15,16,19,20,21,22,23};
-        MinionType[] types = MinionType.values();
-        for (int i = 0; i < types.length; i++) {
-            MinionType type = types[i];
+        List<MinionType> types = new ArrayList<>();
+        for (MinionType t : MinionType.values()) if (!t.community()) types.add(t);
+        for (int i = 0; i < types.size() && i < slots.length; i++) {
+            MinionType type = types.get(i);
             boolean unlocked = island != null && type.unlocked(phase);
             boolean enabled = plugin.minions().isShopEnabled(type);
             long price = type.shopPrice(plugin);

@@ -270,6 +270,9 @@ minions:
   default-island-limit: 6
   limit-per-prestige: 1
   max-prestige-limit-bonus: 6
+  # Max community-claim minions per player (placed in the community world on an
+  # xGuard claim you own). Per-player perm override: novablock.minions.community-limit.<n>.
+  community-limit: 5
   discard-leftovers: false
   fuel:
     default-speed-multiplier: 1.35

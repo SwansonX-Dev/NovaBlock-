@@ -15,9 +15,10 @@ public class MinionOutputAdminGui extends ChestGui {
         fill(Material.GRAY_STAINED_GLASS_PANE, " ");
         set(4, ItemBuilder.of(Material.WRITABLE_BOOK).name("<gold>Minion Output Tables").build(), null);
         int[] slots = {10,11,12,13,14,15,16,19,20,21,22,23};
-        MinionType[] types = MinionType.values();
-        for (int i = 0; i < types.length; i++) {
-            MinionType type = types[i];
+        java.util.List<MinionType> types = new java.util.ArrayList<>();
+        for (MinionType t : MinionType.values()) if (!t.community()) types.add(t);
+        for (int i = 0; i < types.size() && i < slots.length; i++) {
+            MinionType type = types.get(i);
             set(slots[i], ItemBuilder.of(type.displayMaterial()).name("<yellow>" + type.displayName()).lore("<gray>Outputs: <white>" + plugin.minions().drops(type).size()).hideFlags().build(), e -> new MinionOutputEditorGui(plugin, type).open(player));
         }
         set(31, ItemBuilder.of(Material.COMPARATOR).name("<aqua>Reload Output Tables").build(), e -> { plugin.minions().reloadOutputTables(); Msg.send(player, "<green>Reloaded minion output tables."); open(player); });

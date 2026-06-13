@@ -93,11 +93,42 @@ public class MinionManager implements Listener {
 
     public List<MinionData> ofIsland(UUID islandId) {
         List<MinionData> out = new ArrayList<>();
-        for (MinionData data : minions.values()) if (data.islandId().equals(islandId)) out.add(data);
+        for (MinionData data : minions.values()) if (islandId.equals(data.islandId())) out.add(data);
         return out;
     }
 
     public int count(UUID islandId) { return ofIsland(islandId).size(); }
+
+    /** Community (owner-based) minions belonging to a player. */
+    public List<MinionData> ofOwner(UUID ownerId) {
+        List<MinionData> out = new ArrayList<>();
+        for (MinionData data : minions.values()) {
+            if (data.isCommunity() && ownerId.equals(data.ownerId())) out.add(data);
+        }
+        return out;
+    }
+
+    public int communityCount(UUID ownerId) { return ofOwner(ownerId).size(); }
+
+    /** Per-player community minion cap (config; admins unlimited; limit perms still apply). */
+    public int communityLimit(Player player) {
+        if (player.hasPermission("novablock.minions.admin") || player.hasPermission("novablock.admin")) return Integer.MAX_VALUE;
+        int limit = Math.max(1, plugin.getConfig().getInt("minions.community-limit", 5));
+        for (var info : player.getEffectivePermissions()) {
+            if (!info.getValue()) continue;
+            String perm = info.getPermission().toLowerCase(Locale.ROOT);
+            if (!perm.startsWith("novablock.minions.community-limit.")) continue;
+            try { limit = Math.max(limit, Integer.parseInt(perm.substring("novablock.minions.community-limit.".length()))); }
+            catch (NumberFormatException ignored) {}
+        }
+        return limit;
+    }
+
+    /** True if {@code world} is the Community OneBlock world. */
+    private boolean isCommunityWorld(org.bukkit.World world) {
+        if (world == null || plugin.community() == null) return false;
+        return world.getName().equals(plugin.community().communityWorldName());
+    }
 
     public int limit(Player player) { return limit(player, plugin.islands().ofPlayer(player)); }
 
@@ -155,8 +186,11 @@ public class MinionManager implements Listener {
         int current = data.upgrade(upgrade);
         if (current >= upgrade.maxLevel()) { Msg.send(player, "<gray>That upgrade is already maxed."); return false; }
         long cost = upgradeCost(upgrade, current + 1);
-        if (!plugin.economy().spend(plugin.islands().get(data.islandId()), cost)) {
-            Msg.send(player, "<red>Not enough island-owner coins. Need <yellow>" + cost + "<red>.");
+        boolean paid = data.isCommunity()
+                ? plugin.economy().spend(player, cost)
+                : plugin.economy().spend(plugin.islands().get(data.islandId()), cost);
+        if (!paid) {
+            Msg.send(player, "<red>Not enough coins. Need <yellow>" + cost + "<red>.");
             return false;
         }
         data.setUpgrade(upgrade, current + 1);
@@ -306,7 +340,7 @@ public class MinionManager implements Listener {
 
     public void removeIsland(UUID islandId) {
         for (MinionData data : new ArrayList<>(minions.values())) {
-            if (data.islandId().equals(islandId)) { minions.remove(data.id()); removeDisplay(data.id()); dirty = true; }
+            if (islandId.equals(data.islandId())) { minions.remove(data.id()); removeDisplay(data.id()); dirty = true; }
         }
         if (dirty) save();
     }
@@ -326,6 +360,11 @@ public class MinionManager implements Listener {
 
     public boolean canManage(Player player, MinionData data) {
         if (player.hasPermission("novablock.minions.admin") || player.hasPermission("novablock.admin")) return true;
+        if (data.isCommunity()) {
+            if (player.getUniqueId().equals(data.ownerId())) return true;
+            Msg.send(player, "<red>This minion belongs to another player.");
+            return false;
+        }
         Island island = plugin.islands().get(data.islandId());
         if (island != null && island.isMember(player)) return true;
         Msg.send(player, "<red>This minion belongs to another island.");
@@ -341,10 +380,18 @@ public class MinionManager implements Listener {
         MinionData data = minions.get(minionId);
         if (data == null || !canManage(event.getPlayer(), data)) { pendingMoves.remove(event.getPlayer().getUniqueId()); return; }
         Block target = event.getClickedBlock().getRelative(event.getBlockFace());
-        Island island = plugin.islands().atLocation(target.getLocation());
-        if (island == null || !island.data().getId().equals(data.islandId()) || !island.isMember(event.getPlayer())) {
-            Msg.send(event.getPlayer(), "<red>Move the minion inside its own island.");
-            return;
+        if (data.isCommunity()) {
+            if (!isCommunityWorld(target.getWorld())
+                    || !com.nova.novablock.compat.ClaimBridge.ownsClaimAt(event.getPlayer(), target.getLocation())) {
+                Msg.send(event.getPlayer(), "<red>Move the minion inside your own community claim.");
+                return;
+            }
+        } else {
+            Island island = plugin.islands().atLocation(target.getLocation());
+            if (island == null || !island.data().getId().equals(data.islandId()) || !island.isMember(event.getPlayer())) {
+                Msg.send(event.getPlayer(), "<red>Move the minion inside its own island.");
+                return;
+            }
         }
         data.setLocation(target.getLocation().add(0.5, 0.05, 0.5));
         pendingMoves.remove(event.getPlayer().getUniqueId());
@@ -362,11 +409,30 @@ public class MinionManager implements Listener {
         event.setCancelled(true);
         Player player = event.getPlayer();
         if (!player.hasPermission("novablock.minions.use")) { Msg.send(player, "<red>You don't have permission to use minions."); return; }
-        Island island = plugin.islands().atLocation(event.getClickedBlock().getRelative(event.getBlockFace()).getLocation());
-        if (island == null || !island.isMember(player)) { Msg.send(player, "<red>Place minions on your own island."); return; }
-        if (!type.unlocked(island.data().getPhaseIndex()) && !player.hasPermission("novablock.minions.admin")) { Msg.send(player, "<red>Your island has not unlocked this minion."); return; }
-        if (count(island.data().getId()) >= limit(player, island)) { Msg.send(player, "<red>Your island minion limit is reached."); return; }
-        MinionData data = new MinionData(UUID.randomUUID(), island.data().getId(), type, event.getClickedBlock().getRelative(event.getBlockFace()).getLocation().add(0.5, 0.05, 0.5));
+        Location place = event.getClickedBlock().getRelative(event.getBlockFace()).getLocation();
+        Island island = plugin.islands().atLocation(place);
+
+        MinionData data;
+        if (island != null) {
+            if (!island.isMember(player)) { Msg.send(player, "<red>Place minions on your own island."); return; }
+            if (!type.unlocked(island.data().getPhaseIndex()) && !player.hasPermission("novablock.minions.admin")) { Msg.send(player, "<red>Your island has not unlocked this minion."); return; }
+            if (count(island.data().getId()) >= limit(player, island)) { Msg.send(player, "<red>Your island minion limit is reached."); return; }
+            data = new MinionData(UUID.randomUUID(), island.data().getId(), type, place.clone().add(0.5, 0.05, 0.5));
+        } else if (isCommunityWorld(place.getWorld())) {
+            if (!com.nova.novablock.compat.ClaimBridge.ownsClaimAt(player, place)) {
+                Msg.send(player, "<red>Place community minions on your own claim. <gray>Claim the land here first.");
+                return;
+            }
+            if (communityCount(player.getUniqueId()) >= communityLimit(player)) {
+                Msg.send(player, "<red>You've reached your community minion limit (" + communityLimit(player) + ").");
+                return;
+            }
+            data = new MinionData(UUID.randomUUID(), null, type, place.clone().add(0.5, 0.05, 0.5));
+            data.setOwnerId(player.getUniqueId());
+        } else {
+            Msg.send(player, "<red>Place minions on your island or your Community OneBlock claim.");
+            return;
+        }
         minions.put(data.id(), data);
         spawnDisplay(data);
         player.playSound(player.getLocation(), Sound.ENTITY_ARMOR_STAND_PLACE, 0.8f, 1.1f);
@@ -384,9 +450,16 @@ public class MinionManager implements Listener {
         if (block == null || !isOutputContainer(block.getType())) { Msg.send(event.getPlayer(), "<red>That is not a chest or barrel."); return; }
         MinionData data = minions.get(minionId);
         if (data == null) { pendingLinks.remove(event.getPlayer().getUniqueId()); return; }
-        Island own = plugin.islands().get(data.islandId());
-        Island linked = plugin.islands().atLocation(block.getLocation());
-        if (own == null || linked == null || !own.data().getId().equals(linked.data().getId())) { Msg.send(event.getPlayer(), "<red>Link a chest on the same island."); return; }
+        if (data.isCommunity()) {
+            if (!isCommunityWorld(block.getWorld())
+                    || !com.nova.novablock.compat.ClaimBridge.ownsClaimAt(event.getPlayer(), block.getLocation())) {
+                Msg.send(event.getPlayer(), "<red>Link a chest on your own community claim."); return;
+            }
+        } else {
+            Island own = plugin.islands().get(data.islandId());
+            Island linked = plugin.islands().atLocation(block.getLocation());
+            if (own == null || linked == null || !own.data().getId().equals(linked.data().getId())) { Msg.send(event.getPlayer(), "<red>Link a chest on the same island."); return; }
+        }
         data.setLinked(block.getLocation());
         data.setStatus(MinionStatus.READY);
         pendingLinks.remove(event.getPlayer().getUniqueId());
@@ -419,9 +492,13 @@ public class MinionManager implements Listener {
     }
 
     private void tick(MinionData data) {
-        Island island = plugin.islands().get(data.islandId());
-        if (island == null) return;
-        if (!hasOnlineMember(island)) { setStatus(data, MinionStatus.NO_ONLINE_MEMBER); return; }
+        if (data.isCommunity()) {
+            if (data.ownerId() == null || Bukkit.getPlayer(data.ownerId()) == null) { setStatus(data, MinionStatus.NO_ONLINE_MEMBER); return; }
+        } else {
+            Island island = plugin.islands().get(data.islandId());
+            if (island == null) return;
+            if (!hasOnlineMember(island)) { setStatus(data, MinionStatus.NO_ONLINE_MEMBER); return; }
+        }
         if (!data.hasLinkedChest()) { setStatus(data, MinionStatus.UNLINKED); return; }
         Inventory inventory = linkedInventory(data);
         if (inventory == null) { refreshDisplay(data); return; }
@@ -448,9 +525,11 @@ public class MinionManager implements Listener {
         if (!world.isChunkLoaded(loc.getBlockX() >> 4, loc.getBlockZ() >> 4)) { data.setStatus(MinionStatus.CHUNK_UNLOADED); return null; }
         Block block = loc.getBlock();
         if (!isOutputContainer(block.getType()) || !(block.getState() instanceof Container container)) { data.setStatus(MinionStatus.MISSING_CHEST); return null; }
-        Island own = plugin.islands().get(data.islandId());
-        Island linked = plugin.islands().atLocation(loc);
-        if (own == null || linked == null || !own.data().getId().equals(linked.data().getId())) { data.setStatus(MinionStatus.CHEST_OUTSIDE_ISLAND); return null; }
+        if (!data.isCommunity()) {
+            Island own = plugin.islands().get(data.islandId());
+            Island linked = plugin.islands().atLocation(loc);
+            if (own == null || linked == null || !own.data().getId().equals(linked.data().getId())) { data.setStatus(MinionStatus.CHEST_OUTSIDE_ISLAND); return null; }
+        }
         return container.getInventory();
     }
 
@@ -556,34 +635,56 @@ public class MinionManager implements Listener {
         minions.clear();
         if (!file.exists()) return;
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+
         ConfigurationSection islands = yaml.getConfigurationSection("islands");
-        if (islands == null) return;
-        for (String islandKey : islands.getKeys(false)) {
-            try {
-                UUID islandId = UUID.fromString(islandKey);
-                ConfigurationSection islandSec = islands.getConfigurationSection(islandKey);
-                if (islandSec == null) continue;
-                for (String minionKey : islandSec.getKeys(false)) {
-                    ConfigurationSection sec = islandSec.getConfigurationSection(minionKey);
-                    if (sec == null) continue;
-                    MinionType type = MinionType.byId(sec.getString("type"));
-                    World world = Bukkit.getWorld(sec.getString("world", ""));
-                    if (type == null || world == null) continue;
-                    MinionData data = new MinionData(UUID.fromString(minionKey), islandId, type, new Location(world, sec.getDouble("x"), sec.getDouble("y"), sec.getDouble("z")));
-                    String linkedWorld = sec.getString("linked.world");
-                    if (linkedWorld != null && !linkedWorld.isBlank()) data.setLinked(new Location(Bukkit.getWorld(linkedWorld), sec.getInt("linked.x"), sec.getInt("linked.y"), sec.getInt("linked.z")));
-                    data.setSkin(sec.getString("skin", "default"));
-                    data.setFuelTicksRemaining(sec.getLong("fuel-ticks"));
-                    data.setAccumulatedTicks(sec.getLong("accumulated-ticks"));
-                    data.loadProductionLog(sec.getStringList("production-log"));
-                    ConfigurationSection upgrades = sec.getConfigurationSection("upgrades");
-                    if (upgrades != null) for (MinionUpgrade upgrade : MinionUpgrade.values()) data.setUpgrade(upgrade, upgrades.getInt(upgrade.name().toLowerCase(Locale.ROOT).replace('_', '-')));
-                    minions.put(data.id(), data);
+        if (islands != null) {
+            for (String islandKey : islands.getKeys(false)) {
+                try {
+                    UUID islandId = UUID.fromString(islandKey);
+                    ConfigurationSection islandSec = islands.getConfigurationSection(islandKey);
+                    if (islandSec == null) continue;
+                    for (String minionKey : islandSec.getKeys(false)) {
+                        loadMinion(islandSec.getConfigurationSection(minionKey), minionKey, islandId, null);
+                    }
+                } catch (RuntimeException ex) {
+                    plugin.getLogger().warning("Skipping invalid minion data: " + ex.getMessage());
                 }
-            } catch (RuntimeException ex) {
-                plugin.getLogger().warning("Skipping invalid minion data: " + ex.getMessage());
             }
         }
+
+        ConfigurationSection community = yaml.getConfigurationSection("community");
+        if (community != null) {
+            for (String ownerKey : community.getKeys(false)) {
+                try {
+                    UUID ownerId = UUID.fromString(ownerKey);
+                    ConfigurationSection ownerSec = community.getConfigurationSection(ownerKey);
+                    if (ownerSec == null) continue;
+                    for (String minionKey : ownerSec.getKeys(false)) {
+                        loadMinion(ownerSec.getConfigurationSection(minionKey), minionKey, null, ownerId);
+                    }
+                } catch (RuntimeException ex) {
+                    plugin.getLogger().warning("Skipping invalid community minion data: " + ex.getMessage());
+                }
+            }
+        }
+    }
+
+    private void loadMinion(ConfigurationSection sec, String minionKey, UUID islandId, UUID ownerId) {
+        if (sec == null) return;
+        MinionType type = MinionType.byId(sec.getString("type"));
+        World world = Bukkit.getWorld(sec.getString("world", ""));
+        if (type == null || world == null) return;
+        MinionData data = new MinionData(UUID.fromString(minionKey), islandId, type, new Location(world, sec.getDouble("x"), sec.getDouble("y"), sec.getDouble("z")));
+        if (ownerId != null) data.setOwnerId(ownerId);
+        String linkedWorld = sec.getString("linked.world");
+        if (linkedWorld != null && !linkedWorld.isBlank()) data.setLinked(new Location(Bukkit.getWorld(linkedWorld), sec.getInt("linked.x"), sec.getInt("linked.y"), sec.getInt("linked.z")));
+        data.setSkin(sec.getString("skin", "default"));
+        data.setFuelTicksRemaining(sec.getLong("fuel-ticks"));
+        data.setAccumulatedTicks(sec.getLong("accumulated-ticks"));
+        data.loadProductionLog(sec.getStringList("production-log"));
+        ConfigurationSection upgrades = sec.getConfigurationSection("upgrades");
+        if (upgrades != null) for (MinionUpgrade upgrade : MinionUpgrade.values()) data.setUpgrade(upgrade, upgrades.getInt(upgrade.name().toLowerCase(Locale.ROOT).replace('_', '-')));
+        minions.put(data.id(), data);
     }
 
     private void loadOutputTables() {
@@ -634,7 +735,9 @@ public class MinionManager implements Listener {
         if (file == null) return;
         YamlConfiguration yaml = new YamlConfiguration();
         for (MinionData data : minions.values()) {
-            String path = "islands." + data.islandId() + "." + data.id() + ".";
+            String path = data.isCommunity()
+                    ? "community." + data.ownerId() + "." + data.id() + "."
+                    : "islands." + data.islandId() + "." + data.id() + ".";
             yaml.set(path + "type", data.type().id());
             yaml.set(path + "world", data.worldName());
             yaml.set(path + "x", data.x()); yaml.set(path + "y", data.y()); yaml.set(path + "z", data.z());

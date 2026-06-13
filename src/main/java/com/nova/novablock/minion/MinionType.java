@@ -25,19 +25,40 @@ public enum MinionType {
     STRONGHOLD_SCHOLAR("Stronghold Scholar", 8, Material.BOOKSHELF, 62, Material.STONE_BRICKS, Material.BOOK, Material.ENDER_PEARL, Material.IRON_INGOT, Material.OBSIDIAN),
     END_SALVAGER("End Salvager", 9, Material.ENDER_PEARL, 68, Material.END_STONE, Material.CHORUS_FRUIT, Material.PURPUR_BLOCK, Material.ENDER_PEARL, Material.OBSIDIAN),
     CELESTIAL_COLLECTOR("Celestial Collector", 10, Material.AMETHYST_CLUSTER, 74, Material.AMETHYST_SHARD, Material.GLOWSTONE_DUST, Material.EXPERIENCE_BOTTLE, Material.DIAMOND, Material.CRYING_OBSIDIAN),
-    VOID_SCAVENGER("Void Scavenger", 11, Material.ECHO_SHARD, 84, Material.SCULK, Material.ECHO_SHARD, Material.ENDER_PEARL, Material.OBSIDIAN, Material.NETHERITE_SCRAP);
+    VOID_SCAVENGER("Void Scavenger", 11, Material.ECHO_SHARD, 84, Material.SCULK, Material.ECHO_SHARD, Material.ENDER_PEARL, Material.OBSIDIAN, Material.NETHERITE_SCRAP),
+
+    // --- Community single-resource minions (placed on a Community OneBlock claim) ---
+    COMMUNITY_COBBLESTONE("Cobblestone", 0, Material.COBBLESTONE, 28, true, Material.COBBLESTONE),
+    COMMUNITY_COAL("Coal", 0, Material.COAL_ORE, 32, true, Material.COAL),
+    COMMUNITY_IRON("Iron", 0, Material.IRON_ORE, 38, true, Material.RAW_IRON),
+    COMMUNITY_GOLD("Gold", 0, Material.GOLD_ORE, 42, true, Material.RAW_GOLD),
+    COMMUNITY_REDSTONE("Redstone", 0, Material.REDSTONE_ORE, 36, true, Material.REDSTONE),
+    COMMUNITY_LAPIS("Lapis", 0, Material.LAPIS_ORE, 40, true, Material.LAPIS_LAZULI),
+    COMMUNITY_DIAMOND("Diamond", 0, Material.DIAMOND_ORE, 60, true, Material.DIAMOND),
+    COMMUNITY_EMERALD("Emerald", 0, Material.EMERALD_ORE, 64, true, Material.EMERALD),
+    COMMUNITY_WOOD("Lumber", 0, Material.OAK_LOG, 30, true, Material.OAK_LOG),
+    COMMUNITY_WHEAT("Wheat", 0, Material.WHEAT, 30, true, Material.WHEAT),
+    COMMUNITY_SAND("Sand", 0, Material.SAND, 28, true, Material.SAND),
+    COMMUNITY_QUARTZ("Quartz", 0, Material.QUARTZ, 46, true, Material.QUARTZ);
 
     private final String displayName;
     private final int requiredPhaseIndex;
     private final Material displayMaterial;
     private final int baseIntervalSeconds;
+    /** True for community-claim minions (placed in the community world, owner-based). */
+    private final boolean community;
     private final List<MinionDrop> defaultDrops = new ArrayList<>();
 
     MinionType(String displayName, int requiredPhaseIndex, Material displayMaterial, int baseIntervalSeconds, Material... outputs) {
+        this(displayName, requiredPhaseIndex, displayMaterial, baseIntervalSeconds, false, outputs);
+    }
+
+    MinionType(String displayName, int requiredPhaseIndex, Material displayMaterial, int baseIntervalSeconds, boolean community, Material... outputs) {
         this.displayName = displayName;
         this.requiredPhaseIndex = requiredPhaseIndex;
         this.displayMaterial = displayMaterial;
         this.baseIntervalSeconds = baseIntervalSeconds;
+        this.community = community;
         int weight = 70;
         for (Material output : outputs) {
             double rare = output == Material.NETHERITE_SCRAP ? 0.01 : 0.0;
@@ -45,6 +66,8 @@ public enum MinionType {
             weight -= 12;
         }
     }
+
+    public boolean community() { return community; }
 
     public String id() { return name().toLowerCase(Locale.ROOT); }
     public String displayName() { return displayName; }
@@ -64,14 +87,20 @@ public enum MinionType {
     public boolean unlocked(int phaseIndex) { return phaseIndex >= requiredPhaseIndex; }
 
     public ItemStack createItem(NovaBlock plugin, int amount) {
-        return ItemBuilder.of(displayMaterial, amount)
-                .name("<gold>" + displayName + " Minion")
-                .lore("<gray>Place on your island.",
-                        "<gray>Requires phase <yellow>" + (requiredPhaseIndex + 1) + "</yellow>.",
-                        "<dark_gray>NovaBlock Minion")
-                .tag(new NamespacedKey(plugin, "minion_type"), id())
-                .hideFlags()
-                .build();
+        ItemBuilder builder = ItemBuilder.of(displayMaterial, amount)
+                .name("<gold>" + displayName + " Minion");
+        if (community) {
+            String resource = defaultDrops.isEmpty() ? "resources"
+                    : defaultDrops.get(0).material().name().toLowerCase(Locale.ROOT).replace('_', ' ');
+            builder.lore("<gray>Place on your <aqua>Community OneBlock<gray> claim.",
+                    "<gray>Produces <yellow>" + resource + "<gray>.",
+                    "<dark_gray>NovaBlock Community Minion");
+        } else {
+            builder.lore("<gray>Place on your island.",
+                    "<gray>Requires phase <yellow>" + (requiredPhaseIndex + 1) + "</yellow>.",
+                    "<dark_gray>NovaBlock Minion");
+        }
+        return builder.tag(new NamespacedKey(plugin, "minion_type"), id()).hideFlags().build();
     }
 
     public ItemStack rollOutput(Random random, int yieldLevel, int compactorLevel, List<MinionDrop> drops) {

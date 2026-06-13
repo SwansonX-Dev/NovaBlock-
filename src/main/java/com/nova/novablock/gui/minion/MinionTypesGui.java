@@ -23,9 +23,10 @@ public class MinionTypesGui extends ChestGui {
         fill(Material.GRAY_STAINED_GLASS_PANE, " ");
         set(4, ItemBuilder.of(Material.BOOK).name("<gold>Minion Types").lore("<gray>Unlocks, prices, and configured drops.").build(), null);
         int[] slots = {10,11,12,13,14,15,16,19,20,21,22,23};
-        MinionType[] types = MinionType.values();
-        for (int i = 0; i < types.length; i++) {
-            MinionType type = types[i];
+        List<MinionType> types = new ArrayList<>();
+        for (MinionType t : MinionType.values()) if (!t.community()) types.add(t);
+        for (int i = 0; i < types.size() && i < slots.length; i++) {
+            MinionType type = types.get(i);
             List<String> lore = new ArrayList<>();
             lore.add("<gray>Unlock: <yellow>" + type.phaseName(plugin));
             lore.add("<gray>Price: <yellow>" + type.shopPrice(plugin) + " coins");
