@@ -146,6 +146,12 @@ public class ProphecyManager {
         return prog.getLastRerollDay() != today;
     }
 
+    /** How many blocks ahead a rare can be while still worth a heads-up. */
+    private static final int ALERT_LOOKAHEAD = 3;
+    /** Per-island throttle so the "rare incoming" nudge can't spam chat. */
+    private static final long ALERT_COOLDOWN_MS = 60_000L;
+    private final Map<UUID, Long> lastAlert = new HashMap<>();
+
     /** Called when an island advances by one block — shifts the queue and recomputes picks. */
     public void onAdvance(Island island, Material consumed) {
         for (Map.Entry<UUID, Set<Integer>> entry : picks.entrySet()) {
@@ -164,10 +170,47 @@ public class ProphecyManager {
             entry.setValue(shifted);
         }
         picks.entrySet().removeIf(en -> en.getValue() == null || en.getValue().isEmpty());
+        maybeAlertRare(island);
+    }
+
+    /**
+     * Nudge online island members when a rare block is a few blocks out, so the
+     * prophecy lock is discoverable without anyone having to open the menu first.
+     * Skips members who already have a pick locked (they know the system) and is
+     * throttled per island so it never spams.
+     */
+    private void maybeAlertRare(Island island) {
+        Material soon = null;
+        for (int slot = 1; slot <= ALERT_LOOKAHEAD; slot++) {
+            Material m = upcoming(island, slot);
+            if (isRare(m)) { soon = m; break; }
+        }
+        if (soon == null) return;
+        long now = System.currentTimeMillis();
+        Long last = lastAlert.get(island.data().getId());
+        if (last != null && now - last < ALERT_COOLDOWN_MS) return;
+        lastAlert.put(island.data().getId(), now);
+
+        String pretty = prettyName(soon);
+        for (UUID id : island.data().getMembers()) {
+            Player p = plugin.getServer().getPlayer(id);
+            if (p == null || !picks(p).isEmpty()) continue;
+            p.sendActionBar(com.nova.novablock.util.Msg.mm(
+                    "<gold>✦ <yellow>" + pretty + " <gold>incoming! <gray>Open <white>/prophecy<gray> to lock it for bonus coins."));
+        }
+    }
+
+    private static String prettyName(Material m) {
+        StringBuilder out = new StringBuilder();
+        for (String word : m.name().toLowerCase().split("_")) {
+            if (out.length() > 0) out.append(' ');
+            out.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return out.toString();
     }
 
     private void award(Player p, Island island, Material m) {
-        long bonus = 250L + (long) island.data().getPhaseIndex() * 75L;
+        long bonus = 600L + (long) island.data().getPhaseIndex() * 150L;
         // JACKPOT (Luck 10): +25% coin from rare events — prophecies count.
         if (Perk.hasPerk(plugin.progression().get(p), Perk.JACKPOT)) {
             bonus = Math.round(bonus * 1.25);
@@ -176,6 +219,8 @@ public class ProphecyManager {
         // Prophecy fulfillment rewards MAGIC and LUCK XP.
         plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.MAGIC, 25L);
         plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.LUCK, 15L);
+        plugin.quests().onProphecyFulfilled(p);
+        plugin.islandQuestline().record(p, com.nova.novablock.questline.IslandObjective.FULFILL_PROPHECIES, 1);
         p.sendActionBar(com.nova.novablock.util.Msg.mm(
                 "<gold>★ Prophecy fulfilled! +" + bonus + " coins (" + m.name() + ")"));
         p.playSound(p.getLocation(), org.bukkit.Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1.2f);

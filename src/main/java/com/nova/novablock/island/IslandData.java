@@ -42,6 +42,12 @@ public class IslandData {
     /** Base64-encoded ItemStack[] for the island's shared virtual storage. */
     private String storageBase64 = "";
 
+    // --- Endless island questline (shared across all members) ----------------
+    /** Current questline stage (1-based, endless). */
+    private int questlineStage = 1;
+    /** Progress toward the current stage's objective. */
+    private int questlineProgress;
+
     // --- Nether dimension (added in v0.5.0) ----------------------------------
     private long netherBlocksBroken;
     private int netherPhaseIndex;
@@ -135,6 +141,12 @@ public class IslandData {
 
     public int getLevel() { return level; }
     public void setLevel(int v) { this.level = v; }
+
+    public int getQuestlineStage() { return questlineStage; }
+    public void setQuestlineStage(int v) { this.questlineStage = Math.max(1, v); }
+
+    public int getQuestlineProgress() { return questlineProgress; }
+    public void setQuestlineProgress(int v) { this.questlineProgress = Math.max(0, v); }
 
     public long getLastBossAt() { return lastBossAt; }
     public void setLastBossAt(long v) { this.lastBossAt = v; }

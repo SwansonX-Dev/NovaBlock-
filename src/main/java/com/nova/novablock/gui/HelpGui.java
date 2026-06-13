@@ -106,7 +106,8 @@ public class HelpGui extends ChestGui {
         set(22, ItemBuilder.of(Material.WRITTEN_BOOK)
                         .name("<yellow>Daily Quests")
                         .lore("<gray>Complete daily goals for rewards.",
-                                "<gray>Check back each day for a new task.",
+                                "<gray>Three new challenges across OneBlock,",
+                                "<gray>the community hub, OG mode and pets each day.",
                                 "<dark_gray>/ob quest")
                         .build(),
                 e -> new QuestGui(plugin).open(p));

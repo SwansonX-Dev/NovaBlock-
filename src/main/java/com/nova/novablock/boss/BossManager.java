@@ -226,9 +226,6 @@ public class BossManager implements Listener {
 
         Island island = plugin.islands().get(fight.islandId());
         if (island != null) {
-            // BOSS_LOOT upgrade: +20% coin per level.
-            int lvl = island.data().getUpgradeLevel(com.nova.novablock.island.IslandUpgrade.BOSS_LOOT);
-            if (lvl > 0) coins = Math.round(coins * (1.0 + 0.20 * lvl));
             plugin.economy().award(island, coins);
         }
         for (UUID id : fight.participants()) {

@@ -40,6 +40,25 @@ anti-afk:
   challenge-interval-seconds: 1800
   challenge-timeout-seconds: 10
 
+# Endless island questline. Every island shares one ever-advancing chain of
+# objectives (break blocks, defeat bosses, clear loot rooms, fulfil prophecies).
+# Clearing a stage pays scaling coins into the island bank; every Nth "milestone"
+# stage adds a bonus and runs the reward commands below.
+questline:
+  # Reward = coins-base + (stage * coins-per-stage), plus the milestone bonus on
+  # milestone stages.
+  coins-base: 750
+  coins-per-stage: 250
+  milestone-interval: 10
+  milestone-bonus-coins: 5000
+  # Console commands run for each ONLINE island member when a milestone stage is
+  # cleared. Placeholders: %player% (member name), %stage% (stage number).
+  # Empty by default (coins-only milestones). Example:
+  #   milestone-commands:
+  #     - "crate give %player% questline 1"
+  #     - "broadcast %player%'s island reached questline stage %stage%!"
+  milestone-commands: []
+
 # Claim block earning for xGuard. Rewards are tracked per player and paid in
 # batches so we don't dispatch a command on every OneBlock break.
 claim-block-rewards:

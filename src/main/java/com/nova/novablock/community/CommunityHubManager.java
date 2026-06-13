@@ -129,6 +129,7 @@ public class CommunityHubManager {
         if (!isCommunityBlock(at)) return;
         block.onBreak(player, event.getBlock().getType(), event, at);
         goal.recordBreak(player, 1L);
+        plugin.quests().onCommunityBreak(player);
         block.tickPayoutIfDue();
         markDirty();
     }

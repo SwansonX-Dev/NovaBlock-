@@ -18,7 +18,7 @@ public enum IslandUpgrade {
             3, new long[]{2_500L, 7_500L, 20_000L},
             Material.EXPERIENCE_BOTTLE,
             "XP Boost",
-            "Bonus Mining XP every time the OneBlock is broken."),
+            "More Mining XP from every OneBlock break."),
 
     PROPHECY_SLOTS(
             3, new long[]{4_000L, 12_000L, 30_000L},
@@ -26,11 +26,11 @@ public enum IslandUpgrade {
             "Prophecy Slots",
             "More prophecy picks members can lock at once."),
 
-    BOSS_LOOT(
+    CROP_GROWTH(
             3, new long[]{6_000L, 18_000L, 45_000L},
-            Material.NETHERITE_INGOT,
-            "Boss Loot",
-            "Larger coin reward from every defeated boss."),
+            Material.WHEAT,
+            "Crop Growth",
+            "Crops planted on your island ripen faster."),
 
     LOOT_ROOM_RATE(
             3, new long[]{6_000L, 18_000L, 45_000L},
@@ -65,11 +65,11 @@ public enum IslandUpgrade {
         return switch (this) {
             case XP_BOOST -> level == 0
                     ? "Base Mining XP per break"
-                    : "+" + level + " Mining XP per break";
+                    : "+" + (15 * level) + "% Mining XP from breaks";
             case PROPHECY_SLOTS -> "+" + level + " prophecy slot" + (level == 1 ? "" : "s");
-            case BOSS_LOOT -> level == 0
-                    ? "Base boss coin reward"
-                    : "+" + (20 * level) + "% boss coin reward";
+            case CROP_GROWTH -> level == 0
+                    ? "Normal crop growth"
+                    : "+" + (25 * level) + "% crop growth speed";
             case LOOT_ROOM_RATE -> level == 0
                     ? "Base loot-room rate"
                     : "+" + (10 * level) + "% loot-room rate";

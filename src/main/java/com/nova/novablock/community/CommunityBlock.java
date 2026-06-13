@@ -441,8 +441,13 @@ public class CommunityBlock {
             contributionByPlayer.remove(e.getKey());
         }
         lastPayoutAt = System.currentTimeMillis();
-        Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Community pool paid out <white>" + distributed
-                + " <yellow>coins <gray>to " + qualifying.size() + " contributors."));
+        // Only announce server-wide when it's an actual community event (2+ winners).
+        // A lone contributor getting their own coins back already gets the personal
+        // message above; broadcasting it spammed global chat.
+        if (qualifying.size() >= 2) {
+            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Community pool paid out <white>" + distributed
+                    + " <yellow>coins <gray>to " + qualifying.size() + " contributors."));
+        }
         return distributed;
     }
 
@@ -452,14 +457,24 @@ public class CommunityBlock {
         long blockThreshold = Math.max(1, cfg.getLong("community.block.payout.block-threshold", 500));
         long intervalMs = Math.max(60_000L,
                 cfg.getLong("community.block.payout.interval-minutes", 60) * 60_000L);
+        long floor = Math.max(0, cfg.getLong("community.block.payout.min-contribution-coins", 25));
+
+        // Trigger on the QUALIFYING pool only — coins from contributors at or above
+        // the floor, i.e. what would actually be paid this tick. Sub-floor coins stay
+        // parked in the map indefinitely; counting them (as the old pool() check did)
+        // kept the threshold permanently satisfied and fired a tiny payout every few
+        // breaks, spamming chat.
+        long qualifyingPool = 0;
+        for (long v : contributionByPlayer.values()) if (v >= floor) qualifyingPool += v;
+
         long sinceLast = System.currentTimeMillis() - lastPayoutAt;
-        // We don't track blocks-since-last-payout separately; use pool size + interval.
-        // Block threshold maps to "pool has at least N coins" (close enough given tax/bonus rates).
-        if (sinceLast >= intervalMs || pool() >= blockThreshold) {
-            payout();
-            return true;
-        }
-        return false;
+        if (sinceLast < intervalMs && qualifyingPool < blockThreshold) return false;
+
+        long distributed = payout();
+        // Reset the timer whenever a payout was due — even if nothing qualified — so
+        // the interval branch can't re-fire on every subsequent break.
+        lastPayoutAt = System.currentTimeMillis();
+        return distributed > 0;
     }
 
     /** Coin value of "rare" community blocks. Mirrors BlockListener.handleBlockEvents subset. */

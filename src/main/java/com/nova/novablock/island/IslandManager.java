@@ -42,6 +42,35 @@ public class IslandManager {
         for (Island i : byId.values()) plugin.storage().saveIsland(i.data());
     }
 
+    /** Current computed island level (always accurate; derived from progress). */
+    public int levelOf(Island island) {
+        return island == null ? 1 : IslandLevel.levelOf(island.data());
+    }
+
+    /**
+     * Recompute the island level and, if it has risen since we last announced,
+     * notify every online member and persist the new level. Cheap to call often
+     * — only does I/O on an actual level-up.
+     */
+    public void checkLevelUp(Island island) {
+        if (island == null) return;
+        IslandData d = island.data();
+        int computed = IslandLevel.levelOf(d);
+        int known = Math.max(1, d.getLevel());
+        if (computed <= known) return;
+        d.setLevel(computed);
+        plugin.storage().saveIsland(d);
+        for (UUID id : d.getMembers()) {
+            Player m = org.bukkit.Bukkit.getPlayer(id);
+            if (m == null) continue;
+            com.nova.novablock.util.Msg.title(m, "<gold>★ Island Level " + computed,
+                    "<yellow>Your island grew stronger!");
+            com.nova.novablock.util.Msg.send(m,
+                    "<gold>Island Level Up <gray>— your island is now <yellow>Level " + computed + "<gray>.");
+            m.playSound(m.getLocation(), org.bukkit.Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1.1f);
+        }
+    }
+
     private void register(Island island) {
         byId.put(island.data().getId(), island);
         for (UUID m : island.data().getMembers()) playerToIsland.put(m, island.data().getId());

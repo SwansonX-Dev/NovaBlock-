@@ -92,6 +92,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "flags" -> { if (perm(p, "novablock.flags")) new com.nova.novablock.gui.IslandFlagsGui(plugin).open(p); }
             case "storage", "vault" -> com.nova.novablock.island.IslandStorageManager.tryOpen(plugin, p);
             case "quests", "quest" -> new QuestGui(plugin).open(p);
+            case "questline", "chronicle" -> new com.nova.novablock.gui.IslandQuestlineGui(plugin).open(p);
             case "leaderboard", "lb", "top" -> { if (perm(p, "novablock.leaderboard")) new LeaderboardGui(plugin).open(p); }
             case "phase" -> {
                 Island island = plugin.islands().ofPlayer(p);

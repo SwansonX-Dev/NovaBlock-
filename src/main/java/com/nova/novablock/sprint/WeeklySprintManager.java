@@ -38,7 +38,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class WeeklySprintManager {
 
-    private static final int CASUAL_MAX = 7;
+    // One full week of clearing every daily quest. Tied to the daily quest count
+    // so raising DAILY_COUNT keeps the weekly casual goal coherent.
+    private static final int CASUAL_MAX = com.nova.novablock.quest.QuestManager.DAILY_COUNT * 7;
+    public static int casualMax() { return CASUAL_MAX; }
     /** Sunday 20:00 = day 6 + 20h after the weekStart marker. */
     private static final long PODIUM_OFFSET_MILLIS = (6L * 24 + 20) * 60 * 60 * 1000;
     private static final long WEEK_MILLIS = 7L * 24 * 60 * 60 * 1000;
@@ -260,7 +263,7 @@ public class WeeklySprintManager {
                 String name = op.getName() == null ? "Unknown" : op.getName();
                 long coins = at(caCoins, i);
                 Bukkit.broadcast(Msg.mm("  " + medal(i) + " <yellow>" + name
-                        + " <gray>– <white>" + row.quests() + "/7"
+                        + " <gray>– <white>" + row.quests() + "/" + CASUAL_MAX
                         + (coins > 0 ? " <dark_gray>(<gold>+" + coins + "<dark_gray>)" : "")));
                 winners.add(new WinnerRow("casual", i + 1, name, row.quests(), coins));
                 if (reward) dispatchCasualReward(row.playerUuid(), name, i + 1, coins);

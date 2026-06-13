@@ -133,6 +133,8 @@ public class YamlStorage implements DataStorage {
                     }
                 }
                 data.setStorageBase64(y.getString("storage", ""));
+                data.setQuestlineStage(y.getInt("questline.stage", 1));
+                data.setQuestlineProgress(y.getInt("questline.progress", 0));
                 data.getReceivedPrestigeTemplates().addAll(y.getStringList("prestige.receivedTemplates"));
                 result.add(data);
             } catch (Exception ex) {
@@ -187,6 +189,8 @@ public class YamlStorage implements DataStorage {
         if (data.getStorageBase64() != null && !data.getStorageBase64().isEmpty()) {
             y.set("storage", data.getStorageBase64());
         }
+        y.set("questline.stage", data.getQuestlineStage());
+        if (data.getQuestlineProgress() > 0) y.set("questline.progress", data.getQuestlineProgress());
         if (!data.getReceivedPrestigeTemplates().isEmpty()) {
             y.set("prestige.receivedTemplates",
                     data.getReceivedPrestigeTemplates().stream().sorted().toList());
@@ -217,7 +221,12 @@ public class YamlStorage implements DataStorage {
                 } catch (IllegalArgumentException ignored) {}
             }
         }
-        p.setQuestProgress(y.getInt("quest.progress", 0));
+        ConfigurationSection questProgress = y.getConfigurationSection("quest.progress");
+        if (questProgress != null) {
+            java.util.Map<String, Integer> m = new java.util.HashMap<>();
+            for (String key : questProgress.getKeys(false)) m.put(key, questProgress.getInt(key));
+            p.setQuestProgressMap(m);
+        }
         p.setQuestDayStamp(y.getLong("quest.day", 0));
         p.setLastRerollDay(y.getLong("prophecy.lastRerollDay", 0));
         p.setLastLoginDay(y.getLong("login.lastDay", 0));
@@ -246,8 +255,12 @@ public class YamlStorage implements DataStorage {
             y.set(key + ".xp", p.getXp(type));
             y.set(key + ".level", p.getLevel(type));
         }
-        y.set("quest.progress", p.getQuestProgress());
         y.set("quest.day", p.getQuestDayStamp());
+        for (var e : p.getQuestProgressMap().entrySet()) {
+            if (e.getValue() != null && e.getValue() > 0) {
+                y.set("quest.progress." + e.getKey(), e.getValue());
+            }
+        }
         y.set("prophecy.lastRerollDay", p.getLastRerollDay());
         y.set("login.lastDay", p.getLastLoginDay());
         y.set("login.streak", p.getLoginStreak());

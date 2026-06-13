@@ -261,14 +261,18 @@ public class BlockListener implements Listener {
                     + " <gray>has mined their <gold>1,000th block<gray>!"));
         }
         double xpMult = plugin.prestige().xpMultiplier(island);
+        // XP_BOOST island upgrade: +15% Mining XP from OneBlock breaks per level.
+        // Applied to both the base break XP and the combo bonus so it's actually felt.
+        int xpBoost = island.data().getUpgradeLevel(com.nova.novablock.island.IslandUpgrade.XP_BOOST);
+        double breakXpMult = xpMult * (1.0 + 0.15 * xpBoost);
         if (island.getComboCount() >= 5) {
             int combo = island.getComboCount();
-            long xp = Math.max(1L, Math.round(combo * 2L * xpMult));
+            long xp = Math.max(1L, Math.round(combo * 2L * breakXpMult));
             Msg.actionBar(player, "<aqua>Combo x" + combo + "! <gray>+" + xp + " XP");
             plugin.progression().addXp(player, SkillType.MINING, xp);
         }
-        int xpBoost = island.data().getUpgradeLevel(com.nova.novablock.island.IslandUpgrade.XP_BOOST);
-        plugin.progression().addXp(player, SkillType.MINING, (1.0 + xpBoost) * xpMult);
+        plugin.progression().addXp(player, SkillType.MINING, breakXpMult);
+        plugin.quests().onComboReached(player, island.getComboCount());
         if (!nether) {
             plugin.prophecies().onAdvance(island, broken);
             island.refillUpcoming(phase, com.nova.novablock.prophecy.ProphecyManager.QUEUE_SIZE);
@@ -276,6 +280,11 @@ public class BlockListener implements Listener {
 
         // Quest tick (dimension-agnostic)
         plugin.quests().onBlockBroken(player, broken);
+        plugin.islandQuestline().record(player, com.nova.novablock.questline.IslandObjective.MINE_ONEBLOCKS, 1);
+        // Surface island level-ups promptly without checking on literally every break.
+        if ((island.data().getBlocksBroken() + island.data().getNetherBlocksBroken()) % 50 == 0) {
+            plugin.islands().checkLevelUp(island);
+        }
         plugin.seasonalPaths().award(player, com.nova.novablock.season.SeasonalPathManager.PathSource.MINING, 1);
 
         // Paxel XP — progresses tool tier as the player levels Mining

@@ -358,6 +358,7 @@ public class LootRoomManager implements Listener {
         Msg.actionBar(p, "<gray>Check your inventory for loot.");
         p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
         plugin.quests().onLootRoomCompleted(p);
+        plugin.islandQuestline().record(p, com.nova.novablock.questline.IslandObjective.CLEAR_LOOT_ROOMS, 1);
         plugin.seasonalPaths().award(p, com.nova.novablock.season.SeasonalPathManager.PathSource.LOOT_ROOM, 90);
     }
 

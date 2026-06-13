@@ -38,8 +38,8 @@ public class MainMenuGui extends ChestGui {
                 e -> new SkillsGui(plugin).open(p));
 
         set(14, ItemBuilder.of(Material.WRITTEN_BOOK)
-                        .name("<yellow>Daily Quest")
-                        .lore("<gray>Check today's challenge.").build(),
+                        .name("<yellow>Daily Quests")
+                        .lore("<gray>Three fresh challenges every day.").build(),
                 e -> new QuestGui(plugin).open(p));
 
         set(15, ItemBuilder.of(Material.PAPER)
@@ -76,6 +76,20 @@ public class MainMenuGui extends ChestGui {
                     p.closeInventory();
                     p.performCommand("ob fix");
                 });
+
+        var qlIsland = plugin.islands().ofPlayer(p);
+        var qlLore = new java.util.ArrayList<String>();
+        qlLore.add("<gray>An endless chain of shared island goals.");
+        if (qlIsland != null) {
+            var qlStage = plugin.islandQuestline().stageOf(qlIsland);
+            qlLore.add("<gray>Stage <yellow>" + qlStage.stage() + "<gray>: <white>" + qlStage.describe());
+            qlLore.add("<aqua>" + plugin.islandQuestline().progressOf(qlIsland) + "<gray>/<white>" + qlStage.required());
+        }
+        qlLore.add("<dark_gray>/ob questline");
+        set(17, ItemBuilder.of(Material.FILLED_MAP)
+                        .name("<gold>Island Questline")
+                        .lore(qlLore.toArray(new String[0])).glow().build(),
+                e -> new IslandQuestlineGui(plugin).open(p));
 
         var path = plugin.seasonalPaths().activePath();
         var prog = plugin.progression().get(p);
@@ -120,6 +134,7 @@ public class MainMenuGui extends ChestGui {
         set(28, ItemBuilder.of(Material.PLAYER_HEAD)
                         .name("<#7FFFE0>Island Team")
                         .lore("<gray>Roster, roles, and the shared island bank.",
+                                "<gray>Island Level: <yellow>" + plugin.islands().levelOf(islandForTeam),
                                 "<gray>Bank: <yellow>" + plugin.economy().format(bankCoins) + " coins",
                                 "<dark_gray>/ob team · /ob bank").build(),
                 e -> new RosterGui(plugin).open(p));

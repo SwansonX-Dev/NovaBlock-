@@ -6,7 +6,7 @@ authors: [Nova]
 description: A reimagined OneBlock experience with phases, bosses, loot rooms, skill trees, prophecies and more.
 load: POSTWORLD
 depend: [xEconomy]
-softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, LuckPerms, xPets, xTags]
+softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, LuckPerms, xPets, xTags, OGOneBlock]
 
 commands:
   oneblock:

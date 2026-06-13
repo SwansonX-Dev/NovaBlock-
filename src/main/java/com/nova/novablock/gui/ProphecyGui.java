@@ -31,6 +31,7 @@ public class ProphecyGui extends ChestGui {
         Set<Integer> picks = plugin.prophecies().picks(p);
         int visible = plugin.prophecies().visibleCount(p);
         int[] slots = visible == 12 ? SLOTS_12 : SLOTS_10;
+        long bonus = 600L + (long) island.data().getPhaseIndex() * 150L;
 
         for (int i = 0; i < slots.length; i++) {
             Material mat = plugin.prophecies().upcoming(island, i);
@@ -39,9 +40,11 @@ public class ProphecyGui extends ChestGui {
             int idx = i;
             String name = (rare ? "<gold>★ " : "<gray>") + (i + 1) + ". " + prettyName(mat);
             ItemBuilder ib = ItemBuilder.of(displayItem(mat)).name(name);
-            if (locked) ib.lore("<green>(locked) <gray>— tap to unlock").glow();
-            else if (rare) ib.lore("<yellow>Tap to lock as your prophecy.", "<gray>Bonus coins when reached.");
-            else ib.lore("<dark_gray>Not a rare block.");
+            if (locked) ib.lore("<green>✔ Locked. <gray>Mine it to earn <gold>+" + bonus + " coins<gray>.",
+                    "<dark_gray>Tap to unlock.").glow();
+            else if (rare) ib.lore("<yellow>Tap to lock this block as your prophecy.",
+                    "<gray>When you mine it you'll earn <gold>+" + bonus + " coins<gray>.");
+            else ib.lore("<dark_gray>Only rare blocks (★) can be locked.");
             set(slots[i], ib.build(), e -> handleClick(p, island, idx));
         }
 
@@ -50,10 +53,25 @@ public class ProphecyGui extends ChestGui {
                         .name("<gray>← Back to menu").build(),
                 e -> new MainMenuGui(plugin).open(p));
 
+        set(35, ItemBuilder.of(Material.WRITTEN_BOOK)
+                        .name("<aqua>How prophecy works")
+                        .lore("<gray>These are the next blocks your OneBlock",
+                                "<gray>will turn into as you mine.",
+                                " ",
+                                "<yellow>★ <gray>marks a rare block. <yellow>Tap one to",
+                                "<gray>lock it as your prophecy.",
+                                " ",
+                                "<gray>Mine a locked block and your island",
+                                "<gray>earns <gold>+" + bonus + " coins<gray> (plus Magic XP).",
+                                " ",
+                                "<dark_gray>The queue scrolls up as you mine.").glow().build(), null);
+
         int maxPicks = plugin.prophecies().maxPicks(p);
         set(29, ItemBuilder.of(Material.PAPER)
                         .name("<gray>Picks: <white>" + picks.size() + "/" + maxPicks)
-                        .lore("<dark_gray>PROPHET (Mining 30) unlocks a second pick slot.").build(), null);
+                        .lore("<gray>How many blocks you can lock at once.",
+                                "<dark_gray>PROPHET (Mining 30) and the Prophecy Slots",
+                                "<dark_gray>island upgrade grant more picks.").build(), null);
 
         set(31, ItemBuilder.of(Material.BARRIER)
                         .name("<red>Clear all picks")

@@ -127,12 +127,13 @@ public class SprintGui extends ChestGui {
             OfflinePlayer op = Bukkit.getOfflinePlayer(row.playerUuid());
             String name = op.getName() == null ? "Unknown" : op.getName();
             List<String> lore = new ArrayList<>();
-            lore.add("<gray>Quests this week: <white>" + row.quests() + "<gray>/7");
+            int casualMax = com.nova.novablock.sprint.WeeklySprintManager.casualMax();
+            lore.add("<gray>Quests this week: <white>" + row.quests() + "<gray>/" + casualMax);
             if (row.firstSevenAt() > 0L) {
-                lore.add("<gray>Hit 7/7: <#FFC940>" + fmt.format(new Date(row.firstSevenAt())));
-            } else if (row.quests() == 7) {
+                lore.add("<gray>Maxed: <#FFC940>" + fmt.format(new Date(row.firstSevenAt())));
+            } else if (row.quests() == casualMax) {
                 // Edge case after a restart that lost the timestamp.
-                lore.add("<gray>Hit 7/7: <#FFC940>this week");
+                lore.add("<gray>Maxed: <#FFC940>this week");
             }
             String medal = rankPrefix(i);
             set(slots[i], decorate(head(op), "<aqua>" + medal + " " + name, lore), null);

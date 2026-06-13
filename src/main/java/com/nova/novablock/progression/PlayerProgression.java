@@ -1,6 +1,7 @@
 package com.nova.novablock.progression;
 
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -12,7 +13,8 @@ public class PlayerProgression {
     private final Map<SkillType, Long> xp = new EnumMap<>(SkillType.class);
     private final Map<SkillType, Integer> level = new EnumMap<>(SkillType.class);
 
-    private int questProgress;
+    /** Per-quest progress for the current quest day, keyed by quest id. */
+    private final Map<String, Integer> questProgress = new HashMap<>();
     private long questDayStamp;
     private long lastRerollDay;
     private long lastLoginDay;
@@ -45,9 +47,14 @@ public class PlayerProgression {
     public int getLevel(SkillType t) { return level.getOrDefault(t, 1); }
     public void setLevel(SkillType t, int v) { level.put(t, v); }
 
-    public int getQuestProgress() { return questProgress; }
-    public void setQuestProgress(int v) { this.questProgress = v; }
-    public void addQuestProgress(int v) { this.questProgress += v; }
+    public int getQuestProgress(String questId) { return questProgress.getOrDefault(questId, 0); }
+    public void setQuestProgress(String questId, int v) { questProgress.put(questId, Math.max(0, v)); }
+    public Map<String, Integer> getQuestProgressMap() { return questProgress; }
+    public void setQuestProgressMap(Map<String, Integer> m) {
+        questProgress.clear();
+        if (m != null) questProgress.putAll(m);
+    }
+    public void clearQuestProgress() { questProgress.clear(); }
 
     public long getQuestDayStamp() { return questDayStamp; }
     public void setQuestDayStamp(long v) { this.questDayStamp = v; }

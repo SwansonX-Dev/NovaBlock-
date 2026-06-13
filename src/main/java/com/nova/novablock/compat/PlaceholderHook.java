@@ -16,6 +16,7 @@ import org.bukkit.OfflinePlayer;
  * Available placeholders (all prefixed with %novablock_…%):
  *   phase, phase_name, phase_progress, phase_required
  *   blocks, coins
+ *   island_level, island_points, island_level_progress, island_level_required
  *   skill_mining_level, skill_combat_level, skill_magic_level, skill_luck_level
  *   quest_name, quest_progress, quest_required
  *   event_name, event_seconds_left
@@ -64,6 +65,19 @@ public class PlaceholderHook extends PlaceholderExpansion {
             }
             case "blocks" -> { return island == null ? "0" : String.valueOf(island.data().getBlocksBroken()); }
             case "coins" -> { return island == null ? "0" : String.valueOf(plugin.economy().balance(island)); }
+            case "island_level" -> { return island == null ? "1" : String.valueOf(plugin.islands().levelOf(island)); }
+            case "island_points" -> {
+                return island == null ? "0"
+                        : String.valueOf(com.nova.novablock.island.IslandLevel.points(island.data()));
+            }
+            case "island_level_progress" -> {
+                return island == null ? "0"
+                        : String.valueOf(com.nova.novablock.island.IslandLevel.progressInLevel(island.data()));
+            }
+            case "island_level_required" -> {
+                return island == null ? "0"
+                        : String.valueOf(com.nova.novablock.island.IslandLevel.pointsThisLevel(island.data()));
+            }
             case "prestige_level" -> { return island == null ? "0" : String.valueOf(island.data().getPrestigeLevel()); }
             case "prestige_title" -> {
                 int lvl = island == null ? 0 : island.data().getPrestigeLevel();

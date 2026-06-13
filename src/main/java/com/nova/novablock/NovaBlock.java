@@ -67,6 +67,7 @@ public final class NovaBlock extends JavaPlugin {
     private PrestigeManager prestigeManager;
     private LoginStreakManager loginStreakManager;
     private QuestManager questManager;
+    private com.nova.novablock.questline.IslandQuestlineManager islandQuestlineManager;
     private PaxelManager paxelManager;
     private BlockListener blockListener;
     private HotbarMenuManager hotbarManager;
@@ -127,6 +128,7 @@ public final class NovaBlock extends JavaPlugin {
 
         this.questManager = new QuestManager(this);
         this.questManager.loadDailyQuests();
+        this.islandQuestlineManager = new com.nova.novablock.questline.IslandQuestlineManager(this);
         this.paxelManager = new PaxelManager(this);
         this.hotbarManager = new HotbarMenuManager(this);
         this.guiManager = new GuiManager(this);
@@ -161,6 +163,10 @@ public final class NovaBlock extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ActionBarNudger(this), this);
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.listener.NetherPortalListener(this), this);
+        getServer().getPluginManager().registerEvents(
+                new com.nova.novablock.listener.CropGrowthListener(this), this);
+        getServer().getPluginManager().registerEvents(
+                new com.nova.novablock.listener.IslandQuestlineListener(this), this);
         getServer().getPluginManager().registerEvents(guiManager, this);
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.scoreboard.IslandBadgeMessageFilter(), this);
@@ -272,12 +278,25 @@ public final class NovaBlock extends JavaPlugin {
     public InviteManager invites() { return inviteManager; }
     public PhaseManager phases() { return phaseManager; }
     public ProphecyManager prophecies() { return prophecyManager; }
+
+    /**
+     * Public bridge for sibling plugins (OG OneBlock, xPets) to report player
+     * activity toward NovaBlock daily quests. Called reflectively so those
+     * plugins need no compile-time dependency on NovaBlock. {@code key} is a
+     * stable activity id (e.g. {@code "og_break"}, {@code "pet_gather"}).
+     */
+    public void onExternalActivity(org.bukkit.entity.Player player, String key, int amount) {
+        if (player == null || questManager == null) return;
+        questManager.onExternalActivity(player, key, amount);
+    }
     public BossManager bosses() { return bossManager; }
     public LootRoomManager lootRooms() { return lootRoomManager; }
     public ProgressionManager progression() { return progressionManager; }
     public PrestigeManager prestige() { return prestigeManager; }
     public LoginStreakManager loginStreaks() { return loginStreakManager; }
     public QuestManager quests() { return questManager; }
+
+    public com.nova.novablock.questline.IslandQuestlineManager islandQuestline() { return islandQuestlineManager; }
     public PaxelManager paxels() { return paxelManager; }
     public BlockListener blockListener() { return blockListener; }
     public HotbarMenuManager hotbar() { return hotbarManager; }
