@@ -1,7 +1,6 @@
 package com.nova.novablock.listener;
 
 import com.nova.novablock.NovaBlock;
-import com.nova.novablock.island.Island;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -18,10 +17,11 @@ import org.bukkit.persistence.PersistentDataType;
 import java.util.List;
 
 /**
- * The "Personal OneBlock" grant item — a tagged bedrock that, when placed in the
- * Community OneBlock world, creates the placer's own personal OneBlock island
- * (one-time use). Distributed via {@code /obadmin giveoneblock} so it can be
- * handed out by crates, shops, or rewards.
+ * The "Personal OneBlock" grant item — a tagged bedrock that, when placed on the
+ * player's own Community OneBlock claim, drops a regenerating personal resource
+ * OneBlock node (works with or without a personal island; great for donor
+ * perks). One-time use. Distributed via {@code /obadmin giveoneblock} so it can
+ * be handed out by crates, shops, or rewards.
  */
 public final class OneBlockGrantListener implements Listener {
 
@@ -40,11 +40,11 @@ public final class OneBlockGrantListener implements Listener {
         if (meta != null) {
             meta.displayName(Msg.mm("<!italic><gradient:#7B61FF:#4FC3F7><bold>Personal OneBlock"));
             meta.lore(List.of(
-                    Msg.mm("<!italic><gray>Place this in the <white>Community OneBlock"),
-                    Msg.mm("<!italic><gray>world to claim your own personal"),
-                    Msg.mm("<!italic><gray>OneBlock island."),
+                    Msg.mm("<!italic><gray>Place on your <white>Community OneBlock<gray> claim"),
+                    Msg.mm("<!italic><gray>to drop your own regenerating resource"),
+                    Msg.mm("<!italic><gray>OneBlock — mine it for blocks & coins."),
                     Msg.mm("<!italic> "),
-                    Msg.mm("<!italic><dark_gray>One-time use.")));
+                    Msg.mm("<!italic><dark_gray>Sneak-break to reclaim · one-time use.")));
             meta.getPersistentDataContainer().set(key(plugin), PersistentDataType.BYTE, (byte) 1);
             item.setItemMeta(meta);
         }
@@ -72,31 +72,25 @@ public final class OneBlockGrantListener implements Listener {
             Msg.send(p, "<red>The Personal OneBlock can only be used in the <white>Community OneBlock<red> world.");
             return;
         }
-        if (plugin.islands().ofPlayer(p) != null) {
-            Msg.send(p, "<red>You already have a personal OneBlock. Use <yellow>/ob home<red>.");
-            return;
-        }
-        if (!p.hasPermission("novablock.create")) {
-            Msg.send(p, "<red>You don't have permission to create an island.");
-            return;
-        }
 
-        // Consume one now (the item is guaranteed in hand during the place event);
-        // creation + teleport run next tick to avoid teleporting mid-event.
+        // Drop a personal resource OneBlock node on the player's own claim — works
+        // whether or not they have a personal island (great for donor perks).
+        org.bukkit.block.Block placed = event.getBlockPlaced();
+        if (!com.nova.novablock.compat.ClaimBridge.ownsClaimAt(p, placed.getLocation())) {
+            Msg.send(p, "<red>Place your Personal OneBlock on your own community claim. <gray>Claim the land here first.");
+            return;
+        }
+        int limit = plugin.communityNodes().limit(p);
+        if (plugin.communityNodes().count(p.getUniqueId()) >= limit) {
+            Msg.send(p, "<red>You've reached your Personal OneBlock limit (" + limit + ").");
+            return;
+        }
         consumeOne(p, event.getHand());
+        org.bukkit.Location nodeLoc = placed.getLocation();
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            if (plugin.islands().ofPlayer(p) != null) { refund(p); return; }
-            Island island;
-            try {
-                island = plugin.islands().create(p);
-            } catch (Exception ex) {
-                plugin.getLogger().warning("Personal OneBlock grant failed for " + p.getName() + ": " + ex.getMessage());
-                refund(p);
-                Msg.send(p, "<red>Couldn't create your OneBlock right now — your item was returned.");
-                return;
-            }
-            Msg.send(p, "<green>Your personal OneBlock has been created! Teleporting...");
-            island.teleportHome(p);
+            plugin.communityNodes().place(p, nodeLoc.getBlock());
+            Msg.send(p, "<green>Personal OneBlock placed! <gray>Mine it for resources — it regenerates.");
+            p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_AMETHYST_BLOCK_PLACE, 0.8f, 1.0f);
         });
     }
 
@@ -113,8 +107,4 @@ public final class OneBlockGrantListener implements Listener {
         }
     }
 
-    private void refund(Player p) {
-        var leftover = p.getInventory().addItem(create(plugin, 1));
-        for (ItemStack drop : leftover.values()) p.getWorld().dropItemNaturally(p.getLocation(), drop);
-    }
 }

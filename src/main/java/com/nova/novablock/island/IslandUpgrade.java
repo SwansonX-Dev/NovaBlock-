@@ -69,7 +69,7 @@ public enum IslandUpgrade {
             case PROPHECY_SLOTS -> "+" + level + " prophecy slot" + (level == 1 ? "" : "s");
             case CROP_GROWTH -> level == 0
                     ? "Normal crop growth"
-                    : "+" + (25 * level) + "% crop growth speed";
+                    : "+" + (50 * level) + "% crop growth speed";
             case LOOT_ROOM_RATE -> level == 0
                     ? "Base loot-room rate"
                     : "+" + (10 * level) + "% loot-room rate";

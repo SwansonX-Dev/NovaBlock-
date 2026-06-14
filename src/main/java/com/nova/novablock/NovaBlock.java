@@ -91,6 +91,7 @@ public final class NovaBlock extends JavaPlugin {
     private WeeklySprintManager sprintManager;
     private MinionManager minionManager;
     private CommunityHubManager communityHubManager;
+    private com.nova.novablock.community.CommunityNodeManager communityNodeManager;
     private ClaimBlockRewardService claimBlockRewardService;
     private IslandVisitService islandVisitService;
 
@@ -154,6 +155,7 @@ public final class NovaBlock extends JavaPlugin {
         this.sprintManager = new WeeklySprintManager(this);
         this.minionManager = new MinionManager(this);
         this.communityHubManager = new CommunityHubManager(this);
+        this.communityNodeManager = new com.nova.novablock.community.CommunityNodeManager(this);
         this.claimBlockRewardService = new ClaimBlockRewardService(this);
         this.islandVisitService = new IslandVisitService(this);
 
@@ -169,6 +171,7 @@ public final class NovaBlock extends JavaPlugin {
                 new com.nova.novablock.listener.IslandQuestlineListener(this), this);
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.listener.OneBlockGrantListener(this), this);
+        getServer().getPluginManager().registerEvents(communityNodeManager, this);
         getServer().getPluginManager().registerEvents(guiManager, this);
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.scoreboard.IslandBadgeMessageFilter(), this);
@@ -321,6 +324,7 @@ public final class NovaBlock extends JavaPlugin {
     public WeeklySprintManager sprint() { return sprintManager; }
     public MinionManager minions() { return minionManager; }
     public CommunityHubManager community() { return communityHubManager; }
+    public com.nova.novablock.community.CommunityNodeManager communityNodes() { return communityNodeManager; }
     public ClaimBlockRewardService claimBlockRewards() { return claimBlockRewardService; }
     public IslandVisitService visits() { return islandVisitService; }
 }
