@@ -1,14 +1,14 @@
 package com.nova.novablock.antiafk;
 
 import com.nova.novablock.NovaBlock;
+import com.nova.novablock.gui.AfkCheckGui;
+import com.nova.novablock.gui.ChestGui;
 import com.nova.novablock.util.Msg;
-import io.papermc.paper.event.player.AsyncChatEvent;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.scheduler.BukkitTask;
@@ -16,23 +16,27 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Anti-AFK chat challenge. After the configured interval of mining activity,
- * the player is prompted to type a random letter in chat. If they don't respond
- * within the configured timeout they're warped to spawn (via `/warp spawn`).
+ * Anti-auto-mine check. A player who mines their OneBlock <em>continuously</em>
+ * for the configured interval is shown a {@link AfkCheckGui} and must click the
+ * green wool to prove a human is present. Failing to (timeout, wrong click, or
+ * trying to close the GUI) warps them to spawn — interrupting the auto-mine loop.
  *
- * <p>"Activity" is bumped from {@link com.nova.novablock.listener.BlockListener}
- * each time the player breaks their OneBlock — that's the loop we care about
- * preventing AFK farming on. Other movement / chat / interactions don't reset
- * the clock by themselves, but a successful challenge response does.
+ * <p>This targets AFK auto-mining with hacked/modded clients specifically: the
+ * clock only advances while the player keeps breaking blocks (driven by
+ * {@link com.nova.novablock.listener.BlockListener#recordMineActivity}). A player
+ * who simply stands AFK without mining is never challenged — once they stop
+ * mining for {@code active-window-seconds}, the session resets.
  */
 public class AntiAfkManager implements Listener {
 
     private static final long DEFAULT_CHALLENGE_INTERVAL_MS = 30L * 60L * 1000L;   // 30 min
-    private static final long DEFAULT_CHALLENGE_TIMEOUT_MS  = 10L * 1000L;          // 10s
+    private static final long DEFAULT_CHALLENGE_TIMEOUT_MS  = 30L * 1000L;          // 30s to react
+    private static final long DEFAULT_ACTIVE_WINDOW_MS      = 30L * 1000L;          // gap that ends a session
     private static final long TICK_PERIOD_TICKS     = 20L;                          // every 1s
+
+    private static final double DEFAULT_MOVE_THRESHOLD = 1.5;   // blocks from the mining spot
 
     private final NovaBlock plugin;
     private final Map<UUID, State> states = new HashMap<>();
@@ -40,6 +44,8 @@ public class AntiAfkManager implements Listener {
     private boolean enabled;
     private long challengeIntervalMs;
     private long challengeTimeoutMs;
+    private long activeWindowMs;
+    private double moveThresholdSq;
 
     public AntiAfkManager(NovaBlock plugin) {
         this.plugin = plugin;
@@ -50,23 +56,16 @@ public class AntiAfkManager implements Listener {
 
     public void reload() {
         var cfg = plugin.configs().main();
-        boolean wasEnabled = enabled;
         enabled = cfg.getBoolean("anti-afk.enabled", false);
         challengeIntervalMs = Math.max(60_000L,
                 cfg.getLong("anti-afk.challenge-interval-seconds", DEFAULT_CHALLENGE_INTERVAL_MS / 1000L) * 1000L);
-        challengeTimeoutMs = Math.max(10_000L,
+        challengeTimeoutMs = Math.max(5_000L,
                 cfg.getLong("anti-afk.challenge-timeout-seconds", DEFAULT_CHALLENGE_TIMEOUT_MS / 1000L) * 1000L);
-        if (!enabled) {
-            states.clear();
-            return;
-        }
-        // Keep existing pending challenges so /obadmin reload doesn't silently
-        // give a free pass to anyone who was about to be caught.
-        if (!wasEnabled) {
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                states.putIfAbsent(player.getUniqueId(), new State(Long.MAX_VALUE));
-            }
-        }
+        activeWindowMs = Math.max(5_000L,
+                cfg.getLong("anti-afk.active-window-seconds", DEFAULT_ACTIVE_WINDOW_MS / 1000L) * 1000L);
+        double moveThreshold = Math.max(0.5, cfg.getDouble("anti-afk.move-threshold-blocks", DEFAULT_MOVE_THRESHOLD));
+        moveThresholdSq = moveThreshold * moveThreshold;
+        if (!enabled) states.clear();
     }
 
     public void shutdown() {
@@ -77,13 +76,30 @@ public class AntiAfkManager implements Listener {
     /** Called by BlockListener after a successful OneBlock break. */
     public void recordMineActivity(Player p) {
         if (!enabled) return;
-        State s = states.computeIfAbsent(p.getUniqueId(), id -> new State(Long.MAX_VALUE));
-        if (s.activeChallenge != 0) return;
-        // Arm the challenge clock on first mining activity since clearance — that way
-        // a player who just chats in the lobby is never challenged, only active miners.
-        if (s.nextCheckAt == Long.MAX_VALUE) {
-            s.nextCheckAt = System.currentTimeMillis() + challengeIntervalMs;
-        }
+        State s = states.computeIfAbsent(p.getUniqueId(), id -> new State());
+        if (s.challengePending) return;
+        long now = System.currentTimeMillis();
+        // A gap longer than the active window ends the previous session — start a fresh one,
+        // anchored at the current spot so leaving it later resets the clock.
+        if (now - s.lastMineAt > activeWindowMs) startSession(s, p, now);
+        s.lastMineAt = now;
+    }
+
+    private void startSession(State s, Player p, long now) {
+        s.sessionStartAt = now;
+        var loc = p.getLocation();
+        s.world = loc.getWorld().getUID();
+        s.ax = loc.getX();
+        s.ay = loc.getY();
+        s.az = loc.getZ();
+    }
+
+    /** True if the player has moved away from their anchored mining spot (or changed world). */
+    private boolean movedAway(State s, Player p) {
+        var loc = p.getLocation();
+        if (loc.getWorld() == null || !loc.getWorld().getUID().equals(s.world)) return true;
+        double dx = loc.getX() - s.ax, dy = loc.getY() - s.ay, dz = loc.getZ() - s.az;
+        return dx * dx + dy * dy + dz * dz > moveThresholdSq;
     }
 
     private void tickAll() {
@@ -92,62 +108,84 @@ public class AntiAfkManager implements Listener {
         for (Player p : Bukkit.getOnlinePlayers()) {
             State s = states.get(p.getUniqueId());
             if (s == null) continue;
-            if (s.activeChallenge != 0) {
-                // Pending challenge — warp to spawn on timeout.
-                if (now - s.challengeIssuedAt > challengeTimeoutMs) {
-                    failChallenge(p, s);
-                }
+            if (s.challengePending) {
+                if (now - s.challengeIssuedAt > challengeTimeoutMs) failChallenge(p, s);
                 continue;
             }
-            if (now >= s.nextCheckAt) {
+            if (s.sessionStartAt == 0) continue;                 // not mining
+            if (now - s.lastMineAt > activeWindowMs) {           // stopped mining — disarm (AFK is fine)
+                s.sessionStartAt = 0;
+                continue;
+            }
+            if (movedAway(s, p)) {                               // moved around — actually playing, reset the clock
+                startSession(s, p, now);
+                continue;
+            }
+            if (now - s.sessionStartAt >= challengeIntervalMs) { // standing still, mining non-stop past the interval
                 issueChallenge(p, s, now);
             }
         }
     }
 
     private void issueChallenge(Player p, State s, long now) {
-        char letter = (char) ('A' + ThreadLocalRandom.current().nextInt(26));
-        s.activeChallenge = letter;
+        s.challengePending = true;
         s.challengeIssuedAt = now;
-        Msg.send(p, "<gold>★ Anti-AFK check: <yellow>type the letter <white><bold>" + letter
-                + " <yellow>in chat within " + (challengeTimeoutMs / 1000L) + "s.");
+        Msg.send(p, "<gold>★ Auto-mine check: <yellow>click the <green>green wool<yellow> within "
+                + (challengeTimeoutMs / 1000L) + "s.");
         p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1.2f);
+        new AfkCheckGui(plugin).open(p);
+    }
+
+    /** Green wool clicked — verified human. */
+    public void guiPass(Player p) {
+        State s = states.get(p.getUniqueId());
+        if (s == null || !s.challengePending) return;
+        s.challengePending = false;
+        s.challengeIssuedAt = 0;
+        long now = System.currentTimeMillis();
+        // Keep the session running (re-anchored here) so a non-stop miner is re-checked next interval.
+        startSession(s, p, now);
+        s.lastMineAt = now;
+        p.closeInventory();
+        Msg.send(p, "<green>✓ Verified — back to mining.");
+    }
+
+    /** Wrong wool clicked — treat as a failed check. */
+    public void guiWrong(Player p) {
+        State s = states.get(p.getUniqueId());
+        if (s == null || !s.challengePending) return;
+        Msg.send(p, "<red>Wrong block.");
+        failChallenge(p, s);
     }
 
     private void failChallenge(Player p, State s) {
-        s.activeChallenge = 0;
+        s.challengePending = false;
         s.challengeIssuedAt = 0;
-        s.nextCheckAt = Long.MAX_VALUE;
-        Msg.send(p, "<red>AFK check failed — sending you to spawn.");
+        s.sessionStartAt = 0;
+        p.closeInventory();
+        Msg.send(p, "<red>Auto-mine check failed — sending you to spawn.");
         // performCommand runs as the player so warp permissions/cooldowns apply.
         p.performCommand("warp spawn");
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onChat(AsyncChatEvent event) {
-        UUID id = event.getPlayer().getUniqueId();
-        if (!enabled) return;
-        State s = states.get(id);
-        if (s == null || s.activeChallenge == 0) return;
-        String body = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
-        if (body.isEmpty()) return;
-        // Accept either the bare letter or it being the first non-whitespace character.
-        char first = Character.toUpperCase(body.charAt(0));
-        if (first == s.activeChallenge) {
-            s.activeChallenge = 0;
-            s.challengeIssuedAt = 0;
-            // Disarm until they start mining again; next mine-activity sets the new deadline.
-            s.nextCheckAt = Long.MAX_VALUE;
-            Bukkit.getScheduler().runTask(plugin, () ->
-                    Msg.send(event.getPlayer(), "<green>✓ Verified — see you in "
-                            + (challengeIntervalMs / 60_000L) + " minutes."));
-        }
+    /** Reopen the check if the player tries to escape it by closing the GUI. */
+    @EventHandler
+    public void onClose(InventoryCloseEvent event) {
+        if (!enabled || !(event.getPlayer() instanceof Player p)) return;
+        State s = states.get(p.getUniqueId());
+        if (s == null || !s.challengePending) return;
+        if (!(event.getInventory().getHolder() instanceof ChestGui.Holder h) || !(h.gui instanceof AfkCheckGui)) return;
+        // Can't open an inventory from within the close event — do it next tick.
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            State cur = states.get(p.getUniqueId());
+            if (enabled && p.isOnline() && cur != null && cur.challengePending) new AfkCheckGui(plugin).open(p);
+        });
     }
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         if (!enabled) return;
-        states.put(event.getPlayer().getUniqueId(), new State(Long.MAX_VALUE));
+        states.put(event.getPlayer().getUniqueId(), new State());
     }
 
     @EventHandler
@@ -156,10 +194,11 @@ public class AntiAfkManager implements Listener {
     }
 
     private static final class State {
-        long nextCheckAt;
-        char activeChallenge;   // 0 = no challenge pending
+        long sessionStartAt;    // when the current standing-still mining session began (0 = not mining)
+        long lastMineAt;        // last OneBlock break
+        UUID world;             // anchored mining spot (resets the clock if the player leaves it)
+        double ax, ay, az;
+        boolean challengePending;
         long challengeIssuedAt;
-
-        State(long nextCheckAt) { this.nextCheckAt = nextCheckAt; }
     }
 }

@@ -35,10 +35,23 @@ cooldowns:
   netherBossMinBlocks: 300
   netherLootRoomMinBlocks: 400
 
+# Anti auto-mine check. A player who STANDS STILL and mines their OneBlock
+# non-stop for challenge-interval-seconds is shown a GUI and must click the
+# green wool to prove a human is present; failing (timeout, wrong click, or
+# closing the GUI) warps them to spawn. This targets AFK auto-mining only:
+#  - a player who isn't mining (just AFK) never arms the check, and
+#  - a player who's actually playing moves around, which resets the clock.
 anti-afk:
   enabled: true
+  # How long of non-stop, stationary mining before a check is issued.
   challenge-interval-seconds: 1800
-  challenge-timeout-seconds: 10
+  # How long the player has to click the green wool before it fails.
+  challenge-timeout-seconds: 30
+  # A mining gap longer than this ends the session (clock resets).
+  active-window-seconds: 30
+  # Moving more than this many blocks from the mining spot resets the clock —
+  # so normal play (walking around while mining) is never flagged.
+  move-threshold-blocks: 1.5
 
 # Endless island questline. Every island shares one ever-advancing chain of
 # objectives (break blocks, defeat bosses, clear loot rooms, fulfil prophecies).
