@@ -122,6 +122,12 @@ community:
   personal-oneblock:
     limit: 3
     coins-per-break: 2
+    # Surplus stack size dropped per break (random between min and max, inclusive),
+    # so players build up a stock of the node's resource quickly. Set both to 1 for
+    # vanilla single-drop behaviour. Block pools per type are editable in-game with
+    # /obadmin nodepool (persisted to node-pools.yml).
+    drops-min: 2
+    drops-max: 4
 
   # Auto-sell: players opt in with /ob autosell. While mining the Community OneBlock,
   # drops with a price below are converted straight to coins (compresses inventory).

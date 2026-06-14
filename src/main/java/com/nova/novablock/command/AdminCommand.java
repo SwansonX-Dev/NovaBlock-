@@ -23,7 +23,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
             "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
-            "giveoneblock", "giveminion", "flags", "storage", "menu", "path", "sprint", "hub", "freshstart", "fix", "setspawn");
+            "giveoneblock", "giveminion", "nodepool", "flags", "storage", "menu", "path", "sprint", "hub", "freshstart", "fix", "setspawn");
     private static final List<String> EVENTS = List.of(
             "diamond_hour", "double_coins", "blood_moon", "lush_bloom", "rift_storm", "stop");
 
@@ -145,7 +145,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 Msg.send(target, "<green>You received a <gold>" + type.displayName() + " Minion<green>!");
             }
             case "giveoneblock" -> {
-                if (args.length < 2) { Msg.send(sender, "<red>/obadmin giveoneblock <player> [type] [amount] <gray>(types: mining, stone, building, nature, nether, sand, ocean, colorful)"); return true; }
+                if (args.length < 2) { Msg.send(sender, "<red>/obadmin giveoneblock <player> [type] [amount] <gray>(types: " + com.nova.novablock.community.CommunityNodeType.idList() + ")"); return true; }
                 Player target = Bukkit.getPlayerExact(args[1]);
                 if (target == null) { Msg.send(sender, "<red>Player not online."); return true; }
                 com.nova.novablock.community.CommunityNodeType nodeType = com.nova.novablock.community.CommunityNodeType.MINING;
@@ -165,6 +165,16 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 Msg.send(sender, "<green>Gave " + amount + "x Personal " + nodeType.displayName() + " OneBlock to " + target.getName() + ".");
                 Msg.send(target, "<green>You received a <#7B61FF>Personal " + nodeType.displayName() + " OneBlock<green>! "
                         + "Place it on your Community OneBlock claim.");
+            }
+            case "nodepool" -> {
+                if (!(sender instanceof Player viewer)) { Msg.send(sender, "<red>Players only."); return true; }
+                if (args.length >= 2) {
+                    com.nova.novablock.community.CommunityNodeType t = com.nova.novablock.community.CommunityNodeType.byId(args[1]);
+                    if (t == null) { Msg.send(sender, "<red>Unknown type. <gray>(" + com.nova.novablock.community.CommunityNodeType.idList() + ")"); return true; }
+                    new com.nova.novablock.gui.NodePoolGui(plugin, t, 0).open(viewer);
+                } else {
+                    new com.nova.novablock.gui.NodePoolGui(plugin).open(viewer);
+                }
             }
             case "flags" -> {
                 if (!(sender instanceof Player viewer)) { Msg.send(sender, "<red>Players only."); return true; }
@@ -565,7 +575,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
-                case "setphase", "givecoins", "wipe", "freshstart" -> Bukkit.getOnlinePlayers().stream()
+                case "setphase", "givecoins", "wipe", "freshstart", "giveoneblock", "giveminion" -> Bukkit.getOnlinePlayers().stream()
                         .map(Player::getName)
                         .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
@@ -592,11 +602,19 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                         .sorted()
                         .collect(Collectors.toList());
                 case "event" -> EVENTS.stream().filter(e -> e.startsWith(args[1].toLowerCase())).collect(Collectors.toList());
+                case "nodepool" -> com.nova.novablock.community.CommunityNodeType.ids().stream()
+                        .filter(n -> n.startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
                 default -> Collections.emptyList();
             };
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("freshstart")) {
             return "confirm".startsWith(args[2].toLowerCase()) ? List.of("confirm") : Collections.emptyList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("giveoneblock")) {
+            return com.nova.novablock.community.CommunityNodeType.ids().stream()
+                    .filter(n -> n.startsWith(args[2].toLowerCase()))
+                    .collect(Collectors.toList());
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("path")
                 && (args[1].equalsIgnoreCase("points") || args[1].equalsIgnoreCase("resetplayer"))) {

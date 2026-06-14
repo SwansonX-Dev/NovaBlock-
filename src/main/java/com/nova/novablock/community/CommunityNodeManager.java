@@ -64,7 +64,7 @@ public final class CommunityNodeManager implements Listener {
 
     /** Turn {@code block} into a regenerating node of {@code type} owned by {@code owner}. */
     public void place(Player owner, Block block, CommunityNodeType type) {
-        block.setType(type.roll(ThreadLocalRandom.current()), false);
+        block.setType(plugin.nodePools().roll(type, ThreadLocalRandom.current()), false);
         nodes.put(key(block.getLocation()), new Node(owner.getUniqueId(), type));
         save();
     }
@@ -91,12 +91,15 @@ public final class CommunityNodeManager implements Listener {
 
         // Reward: either the block's natural drops (mining) or the block itself
         // (building/decoration types). Suppress the vanilla drop in both cases.
+        // Each break yields a configurable surplus quantity so stock builds fast.
         event.setDropItems(false);
+        int qty = surplusQuantity();
         Collection<ItemStack> reward;
         if (node.type().dropMode() == CommunityNodeType.DropMode.BLOCK && block.getType().isItem()) {
-            reward = List.of(new ItemStack(block.getType(), 1));
+            reward = List.of(new ItemStack(block.getType(), qty));
         } else {
             reward = block.getDrops(p.getInventory().getItemInMainHand(), p);
+            if (qty > 1) for (ItemStack drop : reward) drop.setAmount(drop.getAmount() * qty);
         }
         for (ItemStack drop : reward) {
             for (ItemStack leftover : p.getInventory().addItem(drop).values()) {
@@ -113,7 +116,15 @@ public final class CommunityNodeManager implements Listener {
 
         CommunityNodeType type = node.type();
         Location loc = block.getLocation();
-        plugin.getServer().getScheduler().runTask(plugin, () -> loc.getBlock().setType(type.roll(ThreadLocalRandom.current()), false));
+        plugin.getServer().getScheduler().runTask(plugin,
+                () -> loc.getBlock().setType(plugin.nodePools().roll(type, ThreadLocalRandom.current()), false));
+    }
+
+    /** Random surplus stack size per break, from {@code community.personal-oneblock.drops-min/max}. */
+    private int surplusQuantity() {
+        int min = Math.max(1, plugin.getConfig().getInt("community.personal-oneblock.drops-min", 2));
+        int max = Math.max(min, plugin.getConfig().getInt("community.personal-oneblock.drops-max", 4));
+        return min == max ? min : ThreadLocalRandom.current().nextInt(min, max + 1);
     }
 
     public void load() {
