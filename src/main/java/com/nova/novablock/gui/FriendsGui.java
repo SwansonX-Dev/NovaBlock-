@@ -88,13 +88,14 @@ public class FriendsGui extends ChestGui {
         if (friends.isEmpty()) {
             set(31, ItemBuilder.of(Material.BARRIER)
                     .name("<gray>No friends yet")
-                    .lore("<gray>Add some with <yellow>/ob friend add <name></yellow>.",
+                    .lore("<gray>Click the green <green>Add Friend<gray> button below,",
+                            "<gray>or use <yellow>/ob friend add <name></yellow>.",
                             "<gray>You can see when they log in,",
                             "<gray>and visit their islands from this menu.")
                     .build(), null);
         } else {
             for (UUID fid : friends) {
-                if (slot >= 54) break;
+                if (slot >= 45) break;
                 OfflinePlayer op = Bukkit.getOfflinePlayer(fid);
                 Player online = op.getPlayer();
                 String name = op.getName() == null ? "?" : op.getName();
@@ -136,6 +137,13 @@ public class FriendsGui extends ChestGui {
                 set(slot++, head, handler);
             }
         }
+
+        set(45, ItemBuilder.of(Material.LIME_DYE)
+                .name("<green><bold>Add Friend")
+                .lore("<gray>Pick an online player to add —",
+                        "<gray>no need to type their name.",
+                        "<dark_gray>/ob friend add <name>").glow().build(),
+                e -> new AddFriendGui(plugin, 0).open(p));
 
         set(49, ItemBuilder.of(Material.NETHER_STAR)
                 .name("<gradient:#7B61FF:#4FC3F7><bold>Main Menu")
