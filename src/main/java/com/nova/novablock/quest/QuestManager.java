@@ -186,9 +186,30 @@ public class QuestManager {
 
     public void onBlockBroken(Player p, Material broken) {
         for (Quest q : todayQuests()) {
-            if (q.type() == QuestType.BREAK_BLOCK && broken == q.targetMaterial()) advance(p, q, 1);
+            if (q.type() == QuestType.BREAK_BLOCK && matchesTarget(q.targetMaterial(), broken)) advance(p, q, 1);
             else if (q.type() == QuestType.BREAK_ANY) advance(p, q, 1);
         }
+    }
+
+    /** A BREAK_BLOCK target also matches its deepslate ore variant (and vice versa). */
+    private static boolean matchesTarget(Material target, Material broken) {
+        if (target == null) return false;
+        return target == broken || canonicalOre(target) == canonicalOre(broken);
+    }
+
+    /** Collapse a deepslate ore to its stone-ore equivalent so the two count as one. */
+    private static Material canonicalOre(Material m) {
+        return switch (m) {
+            case DEEPSLATE_IRON_ORE -> Material.IRON_ORE;
+            case DEEPSLATE_GOLD_ORE -> Material.GOLD_ORE;
+            case DEEPSLATE_COAL_ORE -> Material.COAL_ORE;
+            case DEEPSLATE_COPPER_ORE -> Material.COPPER_ORE;
+            case DEEPSLATE_REDSTONE_ORE -> Material.REDSTONE_ORE;
+            case DEEPSLATE_LAPIS_ORE -> Material.LAPIS_ORE;
+            case DEEPSLATE_DIAMOND_ORE -> Material.DIAMOND_ORE;
+            case DEEPSLATE_EMERALD_ORE -> Material.EMERALD_ORE;
+            default -> m;
+        };
     }
 
     public void onBossKilled(Player p) { advanceType(p, QuestType.KILL_BOSS, 1); }
