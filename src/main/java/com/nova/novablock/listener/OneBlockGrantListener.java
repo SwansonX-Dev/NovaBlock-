@@ -1,6 +1,7 @@
 package com.nova.novablock.listener;
 
 import com.nova.novablock.NovaBlock;
+import com.nova.novablock.community.CommunityNodeType;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -33,22 +34,37 @@ public final class OneBlockGrantListener implements Listener {
         return new NamespacedKey(plugin, "oneblock_grant");
     }
 
-    /** Build {@code amount} grant items (tagged bedrock). */
-    public static ItemStack create(NovaBlock plugin, int amount) {
+    private static NamespacedKey typeKey(NovaBlock plugin) {
+        return new NamespacedKey(plugin, "oneblock_grant_type");
+    }
+
+    /** Build {@code amount} grant items of the given node type (tagged bedrock). */
+    public static ItemStack create(NovaBlock plugin, CommunityNodeType type, int amount) {
         ItemStack item = new ItemStack(Material.BEDROCK, Math.max(1, Math.min(64, amount)));
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Msg.mm("<!italic><gradient:#7B61FF:#4FC3F7><bold>Personal OneBlock"));
+            meta.displayName(Msg.mm("<!italic>" + type.colorGradient() + "<bold>Personal OneBlock — " + type.displayName()));
+            String reward = type.dropMode() == CommunityNodeType.DropMode.VANILLA ? "ores & coins" : "blocks & coins";
             meta.lore(List.of(
-                    Msg.mm("<!italic><gray>Place on your <white>Community OneBlock<gray> claim"),
-                    Msg.mm("<!italic><gray>to drop your own regenerating resource"),
-                    Msg.mm("<!italic><gray>OneBlock — mine it for blocks & coins."),
+                    Msg.mm("<!italic><gray>Place on land you own (claim or island)"),
+                    Msg.mm("<!italic><gray>to drop a regenerating <white>" + type.displayName() + "<gray> OneBlock."),
+                    Msg.mm("<!italic><gray>Mine it for <white>" + reward + "<gray>."),
                     Msg.mm("<!italic> "),
                     Msg.mm("<!italic><dark_gray>Sneak-break to reclaim · one-time use.")));
-            meta.getPersistentDataContainer().set(key(plugin), PersistentDataType.BYTE, (byte) 1);
+            var pdc = meta.getPersistentDataContainer();
+            pdc.set(key(plugin), PersistentDataType.BYTE, (byte) 1);
+            pdc.set(typeKey(plugin), PersistentDataType.STRING, type.id());
             item.setItemMeta(meta);
         }
         return item;
+    }
+
+    /** Node type carried by the grant item; defaults to MINING (and for legacy items). */
+    public static CommunityNodeType typeOf(NovaBlock plugin, ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return CommunityNodeType.MINING;
+        String id = item.getItemMeta().getPersistentDataContainer().get(typeKey(plugin), PersistentDataType.STRING);
+        CommunityNodeType type = CommunityNodeType.byId(id);
+        return type == null ? CommunityNodeType.MINING : type;
     }
 
     /** True if {@code item} is a Personal OneBlock grant item. */
@@ -67,17 +83,11 @@ public final class OneBlockGrantListener implements Listener {
         event.setCancelled(true);
         Player p = event.getPlayer();
 
-        String communityWorld = plugin.community() == null ? null : plugin.community().communityWorldName();
-        if (communityWorld == null || !p.getWorld().getName().equals(communityWorld)) {
-            Msg.send(p, "<red>The Personal OneBlock can only be used in the <white>Community OneBlock<red> world.");
-            return;
-        }
-
-        // Drop a personal resource OneBlock node on the player's own claim — works
-        // whether or not they have a personal island (great for donor perks).
+        // Drop a personal resource OneBlock node on land the player owns — their
+        // xGuard claim (any world) or their own island. Works in every world.
         org.bukkit.block.Block placed = event.getBlockPlaced();
-        if (!com.nova.novablock.compat.ClaimBridge.ownsClaimAt(p, placed.getLocation())) {
-            Msg.send(p, "<red>Place your Personal OneBlock on your own community claim. <gray>Claim the land here first.");
+        if (!canPlaceAt(p, placed.getLocation())) {
+            Msg.send(p, "<red>Place your Personal OneBlock on land you own — your claim or your island.");
             return;
         }
         int limit = plugin.communityNodes().limit(p);
@@ -85,13 +95,21 @@ public final class OneBlockGrantListener implements Listener {
             Msg.send(p, "<red>You've reached your Personal OneBlock limit (" + limit + ").");
             return;
         }
+        CommunityNodeType type = typeOf(plugin, event.getItemInHand());
         consumeOne(p, event.getHand());
         org.bukkit.Location nodeLoc = placed.getLocation();
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            plugin.communityNodes().place(p, nodeLoc.getBlock());
-            Msg.send(p, "<green>Personal OneBlock placed! <gray>Mine it for resources — it regenerates.");
+            plugin.communityNodes().place(p, nodeLoc.getBlock(), type);
+            Msg.send(p, "<green>Personal " + type.displayName() + " OneBlock placed! <gray>Mine it — it regenerates.");
             p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_AMETHYST_BLOCK_PLACE, 0.8f, 1.0f);
         });
+    }
+
+    /** Can the player drop a node here — i.e. is this land they own (claim or island)? */
+    private boolean canPlaceAt(Player p, org.bukkit.Location loc) {
+        if (com.nova.novablock.compat.ClaimBridge.ownsClaimAt(p, loc)) return true;
+        com.nova.novablock.island.Island island = plugin.islands().atLocation(loc);
+        return island != null && island.isMember(p);
     }
 
     private void consumeOne(Player p, EquipmentSlot hand) {

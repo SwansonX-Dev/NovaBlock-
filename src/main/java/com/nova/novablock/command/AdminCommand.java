@@ -145,20 +145,26 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 Msg.send(target, "<green>You received a <gold>" + type.displayName() + " Minion<green>!");
             }
             case "giveoneblock" -> {
-                if (args.length < 2) { Msg.send(sender, "<red>/obadmin giveoneblock <player> [amount]"); return true; }
+                if (args.length < 2) { Msg.send(sender, "<red>/obadmin giveoneblock <player> [type] [amount] <gray>(types: mining, stone, building, nature, nether, sand, ocean, colorful)"); return true; }
                 Player target = Bukkit.getPlayerExact(args[1]);
                 if (target == null) { Msg.send(sender, "<red>Player not online."); return true; }
+                com.nova.novablock.community.CommunityNodeType nodeType = com.nova.novablock.community.CommunityNodeType.MINING;
                 int amount = 1;
+                int amountArg = 2;
                 if (args.length >= 3) {
-                    try { amount = Math.max(1, Math.min(64, Integer.parseInt(args[2]))); }
+                    com.nova.novablock.community.CommunityNodeType parsed = com.nova.novablock.community.CommunityNodeType.byId(args[2]);
+                    if (parsed != null) { nodeType = parsed; amountArg = 3; }
+                }
+                if (args.length > amountArg) {
+                    try { amount = Math.max(1, Math.min(64, Integer.parseInt(args[amountArg]))); }
                     catch (NumberFormatException ex) { Msg.send(sender, "<red>Amount must be a number."); return true; }
                 }
-                ItemStack item = com.nova.novablock.listener.OneBlockGrantListener.create(plugin, amount);
+                ItemStack item = com.nova.novablock.listener.OneBlockGrantListener.create(plugin, nodeType, amount);
                 var leftover = target.getInventory().addItem(item);
                 for (ItemStack drop : leftover.values()) target.getWorld().dropItemNaturally(target.getLocation(), drop);
-                Msg.send(sender, "<green>Gave " + amount + "x Personal OneBlock to " + target.getName() + ".");
-                Msg.send(target, "<green>You received a <#7B61FF>Personal OneBlock<green>! "
-                        + "Place it in the Community OneBlock world to claim your island.");
+                Msg.send(sender, "<green>Gave " + amount + "x Personal " + nodeType.displayName() + " OneBlock to " + target.getName() + ".");
+                Msg.send(target, "<green>You received a <#7B61FF>Personal " + nodeType.displayName() + " OneBlock<green>! "
+                        + "Place it on your Community OneBlock claim.");
             }
             case "flags" -> {
                 if (!(sender instanceof Player viewer)) { Msg.send(sender, "<red>Players only."); return true; }
