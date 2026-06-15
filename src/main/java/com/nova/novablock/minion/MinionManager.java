@@ -672,8 +672,17 @@ public class MinionManager implements Listener {
     private void loadMinion(ConfigurationSection sec, String minionKey, UUID islandId, UUID ownerId) {
         if (sec == null) return;
         MinionType type = MinionType.byId(sec.getString("type"));
-        World world = Bukkit.getWorld(sec.getString("world", ""));
-        if (type == null || world == null) return;
+        String worldName = sec.getString("world", "");
+        World world = Bukkit.getWorld(worldName);
+        if (type == null || world == null) {
+            // Dropping here also erases the minion on the next save() — warn loudly
+            // so a missing/unloaded world is never a silent data loss.
+            plugin.getLogger().warning("Skipping minion " + minionKey + ": "
+                    + (type == null ? "unknown type '" + sec.getString("type") + "'"
+                                     : "world '" + worldName + "' is not loaded")
+                    + ". Its data will be lost on next save.");
+            return;
+        }
         MinionData data = new MinionData(UUID.fromString(minionKey), islandId, type, new Location(world, sec.getDouble("x"), sec.getDouble("y"), sec.getDouble("z")));
         if (ownerId != null) data.setOwnerId(ownerId);
         String linkedWorld = sec.getString("linked.world");

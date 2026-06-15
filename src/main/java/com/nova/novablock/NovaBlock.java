@@ -200,6 +200,14 @@ public final class NovaBlock extends JavaPlugin {
         rankNameplateManager.startTicker();
         oneBlockRepairService.start();
         previewHologramManager.start();
+        // The community world loads lazily (placeIfNeeded runs later, next tick).
+        // It MUST exist before minionManager.start() loads minions.yml — otherwise
+        // community minions whose world isn't loaded yet are dropped on load and
+        // then permanently erased by the next save(). Island worlds are already
+        // loaded by worldManager.init() above, so only community needs this.
+        if (getConfig().getBoolean("community.enabled", true)) {
+            communityHubManager.ensureCommunityWorld(communityHubManager.communityWorldName());
+        }
         minionManager.start();
 
         // Crash-recovery: clean up orphan bosses and leftover loot-room worlds.
