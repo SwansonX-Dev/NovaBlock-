@@ -230,6 +230,9 @@ community:
       baseline-min-contribution: 250
       top-percent: 10
       top-percent-bonus-coins: 10000
+      # Fixed coin payout for the top contributors (1st, 2nd, 3rd, …) when the
+      # weekly goal completes — stacks on top of the baseline. Set to [] to disable.
+      podium-coins: [100000, 50000, 25000]
     broadcast:
       milestones-percent: [25, 50, 75, 100]
 

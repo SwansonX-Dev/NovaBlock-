@@ -107,6 +107,11 @@ public class WeeklyGoal {
         long baselineMin = cfg.getLong("community.weekly-goal.rewards.baseline-min-contribution", 250);
         int topPct = Math.max(1, cfg.getInt("community.weekly-goal.rewards.top-percent", 10));
         long topBonus = cfg.getLong("community.weekly-goal.rewards.top-percent-bonus-coins", 10_000);
+        // Fixed coin payout for the top placed contributors (1st, 2nd, 3rd, …). Stacks on
+        // top of the baseline. Absent from config -> default podium; set to [] to disable.
+        List<Long> podium = cfg.contains("community.weekly-goal.rewards.podium-coins")
+                ? cfg.getLongList("community.weekly-goal.rewards.podium-coins")
+                : List.of(100_000L, 50_000L, 25_000L);
 
         List<Map.Entry<UUID, Long>> ranked = new ArrayList<>(contributionByPlayer.entrySet());
         ranked.sort(Comparator.comparingLong((Map.Entry<UUID, Long> e) -> e.getValue()).reversed());
@@ -114,11 +119,14 @@ public class WeeklyGoal {
         long qualifyingPlayers = ranked.stream().filter(e -> e.getValue() >= baselineMin).count();
         long topN = Math.max(1, Math.round(qualifyingPlayers * topPct / 100.0));
 
+        List<String> podiumLines = new ArrayList<>();
         int rank = 0;
         for (var e : ranked) {
             if (e.getValue() < baselineMin) continue;
             long coins = baselineCoins;
             if (rank < topN) coins += topBonus;
+            long podiumBonus = rank < podium.size() ? Math.max(0L, podium.get(rank)) : 0L;
+            coins += podiumBonus;
             OfflinePlayer op = Bukkit.getOfflinePlayer(e.getKey());
             plugin.economy().deposit(op, coins);
             Player online = op.getPlayer();
@@ -126,10 +134,19 @@ public class WeeklyGoal {
                 Msg.title(online, "<gold>★ Weekly Goal Reward",
                         "<yellow>+" + coins + " coins <gray>(rank #" + (rank + 1) + ")");
             }
+            if (podiumBonus > 0) {
+                String name = op.getName() != null ? op.getName() : "Unknown";
+                podiumLines.add("<gray>  #" + (rank + 1) + " <yellow>" + name
+                        + " <gray>— <gold>" + podiumBonus + " coins");
+            }
             rank++;
         }
         Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Goal rewards distributed to <white>"
                 + Math.min(qualifyingPlayers, ranked.size()) + "<yellow> contributors."));
+        if (!podiumLines.isEmpty()) {
+            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Weekly community podium:"));
+            for (String line : podiumLines) Bukkit.broadcast(Msg.mm(line));
+        }
     }
 
     private void rolloverIfNeeded() {
