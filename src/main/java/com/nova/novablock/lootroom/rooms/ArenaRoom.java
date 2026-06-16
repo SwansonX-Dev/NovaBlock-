@@ -7,10 +7,12 @@ import com.nova.novablock.lootroom.RoomTheme;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -18,11 +20,14 @@ public class ArenaRoom implements LootRoom {
 
     private final NovaBlock plugin;
     private final RoomTheme theme;
+    /** Tags mobs spawned by this arena so the wave counter ignores pets and other stray entities. */
+    private final NamespacedKey arenaMobKey;
     private static final int RADIUS = 10;
 
     public ArenaRoom(NovaBlock plugin, RoomTheme theme) {
         this.plugin = plugin;
         this.theme = theme;
+        this.arenaMobKey = new NamespacedKey(plugin, "arena_mob");
     }
 
     @Override public String id() { return "arena_" + theme.suffix(); }
@@ -34,6 +39,10 @@ public class ArenaRoom implements LootRoom {
 
     @Override
     public Location build(Location anchor) {
+        // Always night in the arena: the daylight cycle is frozen on the instance
+        // world, so pin it to midnight so undead arena mobs don't burn up and the
+        // fight stays atmospheric.
+        if (anchor.getWorld() != null) anchor.getWorld().setTime(18000L);
         // Solid stone-brick disc floor + 4-block wall
         for (int dx = -RADIUS; dx <= RADIUS; dx++) {
             for (int dz = -RADIUS; dz <= RADIUS; dz++) {
@@ -72,10 +81,15 @@ public class ArenaRoom implements LootRoom {
         int wave = (int) (run.state() >>> 32);
         int remaining = (int) (run.state() & 0xFFFFFFFFL);
 
-        // Count nearby alive mobs spawned for this run
+        // Count nearby alive mobs spawned for THIS run only. We match on our own
+        // arena-mob tag rather than "any non-player LivingEntity" so the player's
+        // xPets companion (which follows them into the rift world) doesn't keep the
+        // count above zero — otherwise the first wave never spawns and waves never
+        // advance.
         int alive = 0;
         for (var e : p.getWorld().getNearbyEntities(run.anchor(), RADIUS + 2, 8, RADIUS + 2)) {
-            if (e instanceof LivingEntity le && !(le instanceof Player) && !le.isDead()) alive++;
+            if (e instanceof LivingEntity le && !(le instanceof Player) && !le.isDead()
+                    && le.getPersistentDataContainer().has(arenaMobKey, PersistentDataType.BYTE)) alive++;
         }
         // If we should spawn this wave
         if (remaining == 0 && alive == 0) {
@@ -92,6 +106,7 @@ public class ArenaRoom implements LootRoom {
                 var ent = p.getWorld().spawnEntity(at, pool.get(rng.nextInt(pool.size())));
                 if (ent instanceof LivingEntity le) {
                     le.setRemoveWhenFarAway(false);
+                    le.getPersistentDataContainer().set(arenaMobKey, PersistentDataType.BYTE, (byte) 1);
                     if (ent instanceof org.bukkit.entity.Mob mob) mob.setTarget(p);
                 }
             }
