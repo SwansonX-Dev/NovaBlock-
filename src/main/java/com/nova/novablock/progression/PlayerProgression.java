@@ -22,8 +22,12 @@ public class PlayerProgression {
     private boolean menuItemEnabled = true;
     private boolean scoreboardEnabled = true;
     private boolean autoSellEnabled = false;
-    private boolean backpackItemEnabled = false;
+    private boolean backpackItemEnabled = true;
     private String backpackBase64 = "";
+    private String depositChestWorld = "";
+    private int depositChestX;
+    private int depositChestY;
+    private int depositChestZ;
     private int atlasScore;
     private String seasonalPathKey = "";
     private int seasonalPathPoints;
@@ -85,6 +89,25 @@ public class PlayerProgression {
     /** Base64-serialised contents of this player's personal backpack ("" when empty). */
     public String getBackpackBase64() { return backpackBase64 == null ? "" : backpackBase64; }
     public void setBackpackBase64(String v) { this.backpackBase64 = v == null ? "" : v; }
+
+    /** Linked Community-OneBlock deposit chest: mined community drops auto-deposit here. */
+    public boolean hasDepositChest() { return depositChestWorld != null && !depositChestWorld.isEmpty(); }
+    public String getDepositChestWorld() { return depositChestWorld == null ? "" : depositChestWorld; }
+    public int getDepositChestX() { return depositChestX; }
+    public int getDepositChestY() { return depositChestY; }
+    public int getDepositChestZ() { return depositChestZ; }
+    public void setDepositChest(String world, int x, int y, int z) {
+        this.depositChestWorld = world == null ? "" : world;
+        this.depositChestX = x;
+        this.depositChestY = y;
+        this.depositChestZ = z;
+    }
+    public void clearDepositChest() {
+        this.depositChestWorld = "";
+        this.depositChestX = 0;
+        this.depositChestY = 0;
+        this.depositChestZ = 0;
+    }
 
     public int getAtlasScore() { return atlasScore; }
     public void addAtlasScore(int amount) { this.atlasScore = Math.max(0, this.atlasScore + amount); }

@@ -234,8 +234,15 @@ public class YamlStorage implements DataStorage {
         p.setMenuItemEnabled(y.getBoolean("ui.menuItem", true));
         p.setScoreboardEnabled(y.getBoolean("ui.scoreboard", true));
         p.setAutoSellEnabled(y.getBoolean("ui.autoSell", false));
-        p.setBackpackItemEnabled(y.getBoolean("ui.backpackItem", false));
+        p.setBackpackItemEnabled(y.getBoolean("ui.backpackItem", true));
         p.setBackpackBase64(y.getString("backpack.data", ""));
+        String dcWorld = y.getString("community.depositChest.world", "");
+        if (dcWorld != null && !dcWorld.isEmpty()) {
+            p.setDepositChest(dcWorld,
+                    y.getInt("community.depositChest.x", 0),
+                    y.getInt("community.depositChest.y", 0),
+                    y.getInt("community.depositChest.z", 0));
+        }
         p.setAtlasScore(y.getInt("atlas.score", 0));
         p.setSeasonalPathKey(y.getString("seasonal.pathKey", ""));
         p.setSeasonalPathPoints(y.getInt("seasonal.points", 0));
@@ -269,6 +276,12 @@ public class YamlStorage implements DataStorage {
         y.set("ui.autoSell", p.isAutoSellEnabled());
         y.set("ui.backpackItem", p.isBackpackItemEnabled());
         if (!p.getBackpackBase64().isEmpty()) y.set("backpack.data", p.getBackpackBase64());
+        if (p.hasDepositChest()) {
+            y.set("community.depositChest.world", p.getDepositChestWorld());
+            y.set("community.depositChest.x", p.getDepositChestX());
+            y.set("community.depositChest.y", p.getDepositChestY());
+            y.set("community.depositChest.z", p.getDepositChestZ());
+        }
         y.set("atlas.score", p.getAtlasScore());
         y.set("seasonal.pathKey", p.getSeasonalPathKey());
         y.set("seasonal.points", p.getSeasonalPathPoints());

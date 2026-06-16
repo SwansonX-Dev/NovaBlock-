@@ -147,6 +147,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 if (args.length >= 2 && args[1].equalsIgnoreCase("toggle")) plugin.backpacks().toggleItem(p);
                 else com.nova.novablock.backpack.BackpackManager.tryOpen(plugin, p);
             }
+            case "depositchest", "dchest" -> plugin.depositChests().giveLinkTool(p);
             case "toggle" -> {
                 if (!p.hasPermission("novablock.toggle")) { denied(p); return true; }
                 plugin.hotbar().toggle(p);

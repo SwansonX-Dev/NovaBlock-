@@ -94,6 +94,7 @@ public final class NovaBlock extends JavaPlugin {
     private CommunityHubManager communityHubManager;
     private com.nova.novablock.community.NodePoolManager nodePoolManager;
     private com.nova.novablock.community.CommunityNodeManager communityNodeManager;
+    private com.nova.novablock.community.DepositChestManager depositChestManager;
     private ClaimBlockRewardService claimBlockRewardService;
     private IslandVisitService islandVisitService;
 
@@ -160,6 +161,7 @@ public final class NovaBlock extends JavaPlugin {
         this.communityHubManager = new CommunityHubManager(this);
         this.nodePoolManager = new com.nova.novablock.community.NodePoolManager(this);
         this.communityNodeManager = new com.nova.novablock.community.CommunityNodeManager(this);
+        this.depositChestManager = new com.nova.novablock.community.DepositChestManager(this);
         this.claimBlockRewardService = new ClaimBlockRewardService(this);
         this.islandVisitService = new IslandVisitService(this);
 
@@ -345,6 +347,7 @@ public final class NovaBlock extends JavaPlugin {
     public MinionManager minions() { return minionManager; }
     public CommunityHubManager community() { return communityHubManager; }
     public com.nova.novablock.community.CommunityNodeManager communityNodes() { return communityNodeManager; }
+    public com.nova.novablock.community.DepositChestManager depositChests() { return depositChestManager; }
     public com.nova.novablock.community.NodePoolManager nodePools() { return nodePoolManager; }
     public ClaimBlockRewardService claimBlockRewards() { return claimBlockRewardService; }
     public IslandVisitService visits() { return islandVisitService; }

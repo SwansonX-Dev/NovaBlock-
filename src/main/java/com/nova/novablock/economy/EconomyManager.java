@@ -79,6 +79,18 @@ public class EconomyManager {
         depositCoins(p.getUniqueId(), amount);
     }
 
+    /**
+     * Deposit a raw <strong>cents</strong> amount (no coin rounding). Used by the
+     * Community OneBlock auto-sell, which quotes xEconomy's live market price in
+     * cents and must credit the exact value (sub-coin prices would otherwise round
+     * away).
+     */
+    public void depositCents(OfflinePlayer p, long cents) {
+        if (p == null || cents <= 0) return;
+        String name = p.getName() != null ? p.getName() : p.getUniqueId().toString();
+        eco.deposit(p.getUniqueId(), name, cents);
+    }
+
     /** Thousands-separated coin amount for display, e.g. 12345 → "12,345". */
     public String format(long coins) {
         return String.format("%,d", coins);

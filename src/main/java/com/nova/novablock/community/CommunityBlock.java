@@ -304,22 +304,37 @@ public class CommunityBlock {
             drops.add(paxel ? plugin.paxels().maybeSmelt(drop) : drop);
         }
 
-        long autoSellEarned = 0;
+        // Auto-sell at xEconomy's LIVE market price (cents, fluctuates with supply/
+        // demand). Sell a drop only when the market returns a price > 0 (sellable and
+        // not sell-blacklisted, e.g. PAPER); anything unsellable — or everything, if
+        // xEconomy/Market is unavailable — is kept and routed to the deposit chest.
+        dev.xsuite.economy.api.Market market = autoSell ? dev.xsuite.economy.api.XEconomy.market() : null;
+        long autoSellCents = 0;
         List<ItemStack> toGive = new ArrayList<>();
         for (ItemStack drop : drops) {
-            long unit = autoSell ? sellPrice(drop.getType()) : -1L;
-            if (unit >= 0) autoSellEarned += unit * drop.getAmount();
+            long cents = market != null ? market.quoteSell(drop.getType(), drop.getAmount()) : 0L;
+            if (cents > 0) autoSellCents += cents;
             else toGive.add(drop);
         }
-        if (coinRush) autoSellEarned *= 2;
-        if (autoSellEarned > 0) {
-            plugin.economy().deposit(player, autoSellEarned);
+        if (coinRush) autoSellCents *= 2;
+        if (autoSellCents > 0) {
+            plugin.economy().depositCents(player, autoSellCents);
             // Shown on the action bar below (folded into the pool line so it isn't clobbered).
         }
+        // Coins earned, rounded for the action-bar display only (the deposit above is exact cents).
+        long autoSellEarned = (autoSellCents + 50) / 100;
+
+        // Route the remaining drops through the player's linked deposit chest first;
+        // whatever it can't take falls back to today's paxel/ground behaviour.
+        List<ItemStack> afterChest = new ArrayList<>();
+        for (ItemStack drop : toGive) {
+            ItemStack left = plugin.depositChests().deposit(player, drop);
+            if (left != null && !left.getType().isAir()) afterChest.add(left);
+        }
         if (paxel) {
-            plugin.paxels().deliver(player, event.getBlock(), toGive, false); // already smelted above
+            plugin.paxels().deliver(player, event.getBlock(), afterChest, false); // already smelted above
         } else {
-            for (ItemStack drop : toGive) center.getWorld().dropItemNaturally(loc, drop);
+            for (ItemStack drop : afterChest) center.getWorld().dropItemNaturally(loc, drop);
         }
 
         // Diamond Hour: ~1/5 chance to also yield a bonus diamond (mirrors the island path).
@@ -502,16 +517,4 @@ public class CommunityBlock {
         return phase == null ? Integer.MAX_VALUE : scaledRequiredBlocks(phase);
     }
 
-    /**
-     * Auto-sell coin value for a material: an explicit {@code community.autosell.prices.<MAT>}
-     * entry wins, otherwise {@code community.autosell.default} (which is {@code -1} by default,
-     * meaning "don't sell — keep the item"). A non-negative result sells the item for that many
-     * coins each; a negative result keeps it. Unpriced rares therefore always reach the player.
-     */
-    private long sellPrice(Material m) {
-        var cfg = plugin.getConfig();
-        String path = "community.autosell.prices." + m.name();
-        if (cfg.contains(path)) return Math.max(0L, cfg.getLong(path));
-        return cfg.getLong("community.autosell.default", -1L);
-    }
 }
