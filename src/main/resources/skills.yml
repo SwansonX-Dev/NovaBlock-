@@ -1,15 +1,56 @@
 # NovaBlock skill-tree tuning.
 # Use /obadmin reload to reapply after editing.
 
+# Hard level cap for every skill (default 100, mcMMO-style long tail).
+max-level: 100
+
 # Linear XP curve: each level requires base + perLevel * level XP.
 # Defaults (200 + 100*level) give:
 #   level 5  ~  1,200 blocks
 #   level 10 ~  4,200 blocks
 #   level 20 ~ 15,000 blocks
-#   level 30 ~ 33,000 blocks (top perks)
+#   level 30 ~ 33,000 blocks
+#   level 100 ~ very long endgame grind
 xp-curve:
   base: 200
   per-level: 100
+
+# ---------------------------------------------------------------------------
+# Per-skill tuning. All values have code-baked defaults, so editing here is
+# optional and a stale/missing file is safe.
+#
+#   passive.per-level  scaling chance gained PER level (chance = per-level * level)
+#   passive.cap        maximum passive chance (e.g. 0.10 = 10%)
+#   xp-per-action      base XP for one qualifying action (gathering skills)
+# ---------------------------------------------------------------------------
+skills:
+  mining:
+    passive: { per-level: 0.0010, cap: 0.10 }   # chance to double ore/stone drops
+    xp-per-action: 3                            # ores broken off the OneBlock
+  excavation:
+    passive: { per-level: 0.0015, cap: 0.15 }   # chance to double dirt/sand drops
+    xp-per-action: 4
+  woodcutting:
+    passive: { per-level: 0.0010, cap: 0.10 }   # chance to double log drops
+    xp-per-action: 6
+  farming:
+    passive: { per-level: 0.0015, cap: 0.15 }   # chance to double harvest
+    xp-per-action: 8
+  fishing:
+    passive: { per-level: 0.0010, cap: 0.10 }   # chance to reel bonus treasure
+    xp-per-action: 12
+  combat:
+    passive: { per-level: 0.0020, cap: 0.20 }   # bonus boss-damage fraction
+
+# Active abilities — right-click the matching tool to ready, then strike.
+# duration = min(duration-max-ticks, duration-base-ticks + duration-per-level-ticks * level)
+# (20 ticks = 1 second)
+abilities:
+  super_breaker:   { duration-base-ticks: 40, duration-per-level-ticks: 4, duration-max-ticks: 240, cooldown-ticks: 4800, drop-multiplier: 3 }
+  giga_drill:      { duration-base-ticks: 40, duration-per-level-ticks: 4, duration-max-ticks: 240, cooldown-ticks: 4800, drop-multiplier: 3 }
+  green_terra:     { duration-base-ticks: 40, duration-per-level-ticks: 4, duration-max-ticks: 240, cooldown-ticks: 4800, drop-multiplier: 2 }
+  tree_feller:     { duration-base-ticks: 20, duration-per-level-ticks: 0, duration-max-ticks: 20,  cooldown-ticks: 4800, drop-multiplier: 1 }
+  berserk:         { duration-base-ticks: 60, duration-per-level-ticks: 6, duration-max-ticks: 300, cooldown-ticks: 4800, drop-multiplier: 1 }
 
 # Perk effects are still wired in code (see com.nova.novablock.progression.Perk).
 # This section is reserved for per-perk numeric tuning in future versions; the

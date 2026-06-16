@@ -123,9 +123,25 @@ public class PlayerProgression {
     private static long xpBase = 200L;
     private static long xpPerLevel = 100L;
 
+    /** Hard level cap, overridden by skills.yml `max-level` (default 100). */
+    private static int maxLevel = 100;
+
     public static void setXpCurve(long base, long perLevel) {
         xpBase = Math.max(1, base);
         xpPerLevel = Math.max(1, perLevel);
+    }
+
+    public static void setMaxLevel(int cap) {
+        maxLevel = Math.max(1, cap);
+    }
+
+    public static int maxLevel() {
+        return maxLevel;
+    }
+
+    /** True when the skill has reached the configured level cap. */
+    public boolean isMaxLevel(SkillType t) {
+        return getLevel(t) >= maxLevel;
     }
 
     /**

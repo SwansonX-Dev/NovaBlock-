@@ -17,7 +17,8 @@ import org.bukkit.OfflinePlayer;
  *   phase, phase_name, phase_progress, phase_required
  *   blocks, coins
  *   island_level, island_points, island_level_progress, island_level_required
- *   skill_mining_level, skill_combat_level, skill_magic_level, skill_luck_level
+ *   skill_<name>_<field> where name = mining|combat|magic|luck|farming|fishing|woodcutting|excavation
+ *                          and field = level|xp|required|max|passive
  *   quest_name, quest_progress, quest_required
  *   event_name, event_seconds_left
  */
@@ -121,6 +122,9 @@ public class PlaceholderHook extends PlaceholderExpansion {
                         case "level" -> String.valueOf(prog.getLevel(type));
                         case "xp" -> String.valueOf(prog.getXp(type));
                         case "required" -> String.valueOf(PlayerProgression.xpForLevel(prog.getLevel(type)));
+                        case "max" -> String.valueOf(PlayerProgression.maxLevel());
+                        case "passive" -> String.format("%.1f",
+                                com.nova.novablock.progression.Passives.chance(prog, type) * 100);
                         default -> "";
                     };
                 } catch (IllegalArgumentException ignored) { return ""; }

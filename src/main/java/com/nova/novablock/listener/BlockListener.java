@@ -179,6 +179,22 @@ public class BlockListener implements Listener {
             if (deepVein) {
                 dropDeepVeinBonus(block, player, player.getInventory().getItemInMainHand());
             }
+            // Mining skill: Super Breaker active ability + level-scaling double-drop passive.
+            // The OneBlock centre is the primary mining surface, so these apply here
+            // (the general SkillActionListener handles ores broken elsewhere).
+            ItemStack pick = player.getInventory().getItemInMainHand();
+            if (pick.getType().name().endsWith("_PICKAXE")) {
+                plugin.abilities().tryActivate(player, com.nova.novablock.ability.ActiveAbility.SUPER_BREAKER);
+                int bonusSets = 0;
+                if (plugin.abilities().isActive(player, com.nova.novablock.ability.ActiveAbility.SUPER_BREAKER)) {
+                    bonusSets += com.nova.novablock.ability.ActiveAbility.SUPER_BREAKER.cfg().dropMultiplier() - 1;
+                }
+                if (com.nova.novablock.progression.Passives.roll(
+                        plugin.progression().get(player), SkillType.MINING)) {
+                    bonusSets += 1;
+                }
+                for (int i = 0; i < bonusSets; i++) dropNaturally(block, player, pick);
+            }
         }
         playBreakSound(block);
 

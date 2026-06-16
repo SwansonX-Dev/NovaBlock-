@@ -83,8 +83,14 @@ public class ProgressionManager {
 
     private void doAddXp(Player player, SkillType skill, long amount) {
         PlayerProgression p = get(player);
+        // At the level cap, stop accumulating XP so it doesn't grow unbounded and the
+        // progress bar reads as full.
+        if (p.isMaxLevel(skill)) {
+            p.setXp(skill, 0L);
+            return;
+        }
         p.setXp(skill, p.getXp(skill) + amount);
-        while (p.getXp(skill) >= PlayerProgression.xpForLevel(p.getLevel(skill))) {
+        while (!p.isMaxLevel(skill) && p.getXp(skill) >= PlayerProgression.xpForLevel(p.getLevel(skill))) {
             p.setXp(skill, p.getXp(skill) - PlayerProgression.xpForLevel(p.getLevel(skill)));
             p.setLevel(skill, p.getLevel(skill) + 1);
             int newLevel = p.getLevel(skill);
@@ -96,6 +102,11 @@ public class ProgressionManager {
                 if (perk.skill == skill && perk.requiredLevel == newLevel) {
                     Msg.send(player, "<gold>Unlocked: <yellow>" + perk.name + " <gray>– " + perk.description);
                 }
+            }
+            if (p.isMaxLevel(skill)) {
+                p.setXp(skill, 0L);
+                Msg.send(player, "<gold>✦ <yellow>" + skill.displayName()
+                        + " <gold>has reached the level cap (<white>" + PlayerProgression.maxLevel() + "</white>)!");
             }
         }
     }

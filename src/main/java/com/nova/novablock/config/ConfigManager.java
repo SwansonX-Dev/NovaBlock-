@@ -32,6 +32,9 @@ public class ConfigManager {
         com.nova.novablock.progression.PlayerProgression.setXpCurve(
                 skills.getLong("xp-curve.base", 200L),
                 skills.getLong("xp-curve.per-level", 100L));
+        com.nova.novablock.progression.PlayerProgression.setMaxLevel(
+                skills.getInt("max-level", 100));
+        com.nova.novablock.progression.SkillEffects.load(skills);
         com.nova.novablock.util.Messages.reload(messages);
     }
 

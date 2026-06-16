@@ -28,7 +28,23 @@ public enum Perk {
     FOUR_LEAF(SkillType.LUCK, 5, "Four-Leaf", "+5% rare block weight"),
     JACKPOT(SkillType.LUCK, 10, "Jackpot", "+25% coin from chests"),
     FATE_THIEF(SkillType.LUCK, 20, "Fate Thief", "1% chance any block becomes diamond"),
-    GAMBLER(SkillType.LUCK, 30, "Gambler", "Daily wheel spin guaranteed top half");
+    GAMBLER(SkillType.LUCK, 30, "Gambler", "Daily wheel spin guaranteed top half"),
+
+    // Farming
+    GREEN_THUMB(SkillType.FARMING, 5, "Green Thumb", "Harvested crops replant automatically"),
+    HARVESTER(SkillType.FARMING, 20, "Harvester", "+1 bonus crop when your double-harvest procs"),
+
+    // Fishing
+    TREASURE_HUNTER(SkillType.FISHING, 10, "Treasure Hunter", "Chance to reel in bonus treasure"),
+    ANGLERS_LUCK(SkillType.FISHING, 30, "Angler's Luck", "Doubles your Fishing treasure chance"),
+
+    // Woodcutting
+    LUMBERJACK(SkillType.WOODCUTTING, 20, "Lumberjack", "+1 bonus log when your double-drop procs"),
+    ARBORIST(SkillType.WOODCUTTING, 30, "Arborist", "Felled trees always drop a sapling"),
+
+    // Excavation
+    ARCHAEOLOGY(SkillType.EXCAVATION, 10, "Archaeology", "Chance to unearth treasure while digging"),
+    EXCAVATOR(SkillType.EXCAVATION, 30, "Excavator", "+1 bonus drop when your double-dig procs");
 
     public final SkillType skill;
     public final int requiredLevel;

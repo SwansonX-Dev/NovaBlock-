@@ -197,6 +197,13 @@ public class BossManager implements Listener {
         var prog = plugin.progression().get(attacker);
         double mult = 1.0;
         if (Perk.hasPerk(prog, Perk.BERSERKER)) mult *= 1.15;
+        // Berserk active ability (sword): the qualifying hit arms+activates it; bonus
+        // damage applies while active. Level-scaling Combat passive stacks on top.
+        if (attacker.getInventory().getItemInMainHand().getType().name().endsWith("_SWORD")) {
+            plugin.abilities().tryActivate(attacker, com.nova.novablock.ability.ActiveAbility.BERSERK);
+        }
+        if (plugin.abilities().isActive(attacker, com.nova.novablock.ability.ActiveAbility.BERSERK)) mult *= 1.5;
+        mult *= (1.0 + com.nova.novablock.progression.Passives.combatBonus(prog));
         if (Perk.hasPerk(prog, Perk.EXECUTIONER)) {
             LivingEntity e = fight.entity();
             if (e != null) {

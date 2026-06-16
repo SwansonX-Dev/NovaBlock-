@@ -64,6 +64,7 @@ public final class NovaBlock extends JavaPlugin {
     private BossManager bossManager;
     private LootRoomManager lootRoomManager;
     private ProgressionManager progressionManager;
+    private com.nova.novablock.ability.AbilityManager abilityManager;
     private PrestigeManager prestigeManager;
     private LoginStreakManager loginStreakManager;
     private QuestManager questManager;
@@ -112,6 +113,7 @@ public final class NovaBlock extends JavaPlugin {
 
         this.economyManager = new EconomyManager(this);
         this.progressionManager = new ProgressionManager(this);
+        this.abilityManager = new com.nova.novablock.ability.AbilityManager(this);
         this.phaseManager = new PhaseManager(this);
         this.phaseManager.loadPhases();
         this.phaseManager.loadNetherPhases();
@@ -170,6 +172,10 @@ public final class NovaBlock extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.listener.CropGrowthListener(this), this);
         getServer().getPluginManager().registerEvents(
+                new com.nova.novablock.listener.SkillActionListener(this), this);
+        getServer().getPluginManager().registerEvents(
+                new com.nova.novablock.ability.AbilityListener(this), this);
+        getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.listener.IslandQuestlineListener(this), this);
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.listener.OneBlockGrantListener(this), this);
@@ -191,6 +197,9 @@ public final class NovaBlock extends JavaPlugin {
         MinionCommand minionCmd = new MinionCommand(this);
         getCommand("obminions").setExecutor(minionCmd);
         getCommand("obminions").setTabCompleter(minionCmd);
+        com.nova.novablock.command.SkillCommand skillCmd = new com.nova.novablock.command.SkillCommand(this);
+        getCommand("skill").setExecutor(skillCmd);
+        getCommand("skill").setTabCompleter(skillCmd);
 
         eventManager.startTimers();
         seasonManager.startSeasonTicker();
@@ -307,6 +316,7 @@ public final class NovaBlock extends JavaPlugin {
     public BossManager bosses() { return bossManager; }
     public LootRoomManager lootRooms() { return lootRoomManager; }
     public ProgressionManager progression() { return progressionManager; }
+    public com.nova.novablock.ability.AbilityManager abilities() { return abilityManager; }
     public PrestigeManager prestige() { return prestigeManager; }
     public LoginStreakManager loginStreaks() { return loginStreakManager; }
     public QuestManager quests() { return questManager; }

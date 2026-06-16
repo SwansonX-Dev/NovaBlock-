@@ -36,6 +36,11 @@ commands:
     description: Open or manage NovaBlock minions
     usage: /<command> [overview|shop|help|types|reload|debug|give|list|removeall|outputs]
     aliases: [minions, minion, obminion]
+  skill:
+    description: Open the skills menu, or view a specific skill
+    usage: /<command> [skill|help]
+    permission: novablock.skills
+    aliases: [skills, mcmmo]
 
 permissions:
   novablock.play:
