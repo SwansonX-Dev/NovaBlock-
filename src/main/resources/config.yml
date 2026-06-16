@@ -17,6 +17,13 @@ unloadVanillaDimensions: true
 vanillaNetherWorld: world_nether
 vanillaEndWorld: world_the_end
 
+# Backpack auto-grab default. This is the starting state for NEW players (and
+# for existing players whose saved data has no backpack toggle yet). Players
+# can always flip their own state with /bp toggle. Set true to opt everyone in
+# by default; false leaves new players with auto-grab off until they enable it.
+backpack:
+  default-auto-grab: false
+
 # Distance in blocks between island slots in the OneBlock world.
 # Default keeps islands well-separated to avoid TNT/projectile crossover.
 slotSize: 256

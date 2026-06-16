@@ -209,6 +209,8 @@ public class YamlStorage implements DataStorage {
     public PlayerProgression loadProgression(UUID playerId) {
         File f = new File(playerDir, playerId + ".yml");
         PlayerProgression p = new PlayerProgression(playerId);
+        boolean backpackDefault = plugin.getConfig().getBoolean("backpack.default-auto-grab", false);
+        p.setBackpackItemEnabled(backpackDefault);
         if (!f.exists()) return p;
         YamlConfiguration y = YamlConfiguration.loadConfiguration(f);
         ConfigurationSection skills = y.getConfigurationSection("skills");
@@ -234,7 +236,7 @@ public class YamlStorage implements DataStorage {
         p.setMenuItemEnabled(y.getBoolean("ui.menuItem", true));
         p.setScoreboardEnabled(y.getBoolean("ui.scoreboard", true));
         p.setAutoSellEnabled(y.getBoolean("ui.autoSell", false));
-        p.setBackpackItemEnabled(y.getBoolean("ui.backpackItem", true));
+        p.setBackpackItemEnabled(y.getBoolean("ui.backpackItem", backpackDefault));
         p.setBackpackBase64(y.getString("backpack.data", ""));
         String dcWorld = y.getString("community.depositChest.world", "");
         if (dcWorld != null && !dcWorld.isEmpty()) {
