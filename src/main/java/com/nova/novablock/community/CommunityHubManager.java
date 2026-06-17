@@ -168,7 +168,65 @@ public class CommunityHubManager {
         double x = plugin.getConfig().getDouble("community.world.spawn.x", 0.0);
         double y = plugin.getConfig().getDouble("community.world.spawn.y", 80.0);
         double z = plugin.getConfig().getDouble("community.world.spawn.z", 0.0);
-        return new Location(world, x, y, z);
+        float yaw = (float) plugin.getConfig().getDouble("community.world.spawn.yaw", 0.0);
+        float pitch = (float) plugin.getConfig().getDouble("community.world.spawn.pitch", 0.0);
+        return new Location(world, x, y, z, yaw, pitch);
+    }
+
+    /**
+     * Set the community world spawn point (position + facing) to {@code loc}.
+     * Deliberately touches ONLY {@code community.world.spawn} — the starter
+     * platform and the OneBlock positions are left exactly as they are.
+     */
+    public void setHubSpawn(Location loc) {
+        plugin.getConfig().set("community.world.spawn.x", loc.getX());
+        plugin.getConfig().set("community.world.spawn.y", loc.getY());
+        plugin.getConfig().set("community.world.spawn.z", loc.getZ());
+        plugin.getConfig().set("community.world.spawn.yaw", (double) loc.getYaw());
+        plugin.getConfig().set("community.world.spawn.pitch", (double) loc.getPitch());
+        plugin.saveConfig();
+    }
+
+    /**
+     * Editable view of the configured community OneBlock positions, in the
+     * community world. Reads the raw {@code community.oneblocks.positions} list
+     * (no spawn+1 fallback) so admin edits operate on exactly what's persisted.
+     */
+    public List<Location> configuredOneblocks() {
+        World world = ensureCommunityWorld(communityWorldName());
+        List<Location> out = new ArrayList<>();
+        if (world == null) return out;
+        for (Map<?, ?> row : plugin.getConfig().getMapList("community.oneblocks.positions")) {
+            out.add(new Location(world,
+                    (int) number(row.get("x"), 0),
+                    (int) number(row.get("y"), 0),
+                    (int) number(row.get("z"), 0)));
+        }
+        return out;
+    }
+
+    /** Persist a new list of OneBlock positions to config (block coords). */
+    public void saveOneblocks(List<Location> locs) {
+        List<Map<String, Object>> positions = new ArrayList<>();
+        for (Location l : locs) {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("x", l.getBlockX());
+            m.put("y", l.getBlockY());
+            m.put("z", l.getBlockZ());
+            positions.add(m);
+        }
+        plugin.getConfig().set("community.oneblocks.positions", positions);
+        plugin.saveConfig();
+    }
+
+    /** Place the OneBlock (and its bedrock anchor) at {@code at} if missing. */
+    public boolean placeOneblock(Location at) {
+        return block.placeInitial(at);
+    }
+
+    /** True if two locations refer to the same block (exposed for admin tooling). */
+    public static boolean sameBlockLoc(Location a, Location b) {
+        return sameBlock(a, b);
     }
 
     public String communityWorldName() {

@@ -6,6 +6,7 @@ import com.nova.novablock.season.SeasonManager;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -326,7 +327,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (args.length < 2) {
-            Msg.send(sender, "<yellow>/obadmin hub <status|create|resetworld|payout|raid|resetweekly|setblock|reload>");
+            Msg.send(sender, "<yellow>/obadmin hub <status|create|resetworld|payout|raid|resetweekly|setblock|setspawn|oneblock|reload>");
             return;
         }
         var hub = plugin.community();
@@ -420,14 +421,138 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 hub.leaderboard().refresh();
                 Msg.send(sender, "<green>Community platform centered at <white>" + formatLocation(at) + "<green>.");
             }
+            case "setspawn" -> {
+                if (!(sender instanceof Player p)) {
+                    Msg.send(sender, "<red>Players only.");
+                    return;
+                }
+                if (!p.getWorld().getName().equals(hub.communityWorldName())) {
+                    Msg.send(sender, "<red>Stand in the community world (<white>"
+                            + hub.communityWorldName() + "<red>) to set its spawn.");
+                    return;
+                }
+                hub.setHubSpawn(p.getLocation());
+                Msg.send(sender, "<green>Community world spawn set to <white>"
+                        + formatLocation(p.getLocation())
+                        + "<green>. Platform and OneBlocks left untouched.");
+            }
+            case "oneblock", "oneblocks" -> handleHubOneblock(sender, args, hub);
             case "reload" -> {
                 plugin.configs().loadAll();
                 hub.placeIfNeeded();
                 hub.leaderboard().refresh();
                 Msg.send(sender, "<green>Reloaded community config and refreshed hub displays.");
             }
-            default -> Msg.send(sender, "<yellow>/obadmin hub <status|create|resetworld|payout|raid|resetweekly|setblock|reload>");
+            default -> Msg.send(sender, "<yellow>/obadmin hub <status|create|resetworld|payout|raid|resetweekly|setblock|setspawn|oneblock|reload>");
         }
+    }
+
+    private void handleHubOneblock(CommandSender sender, String[] args,
+                                   com.nova.novablock.community.CommunityHubManager hub) {
+        if (args.length < 3) {
+            Msg.send(sender, "<yellow>/obadmin hub oneblock <list|add|delete #|move #>");
+            return;
+        }
+        switch (args[2].toLowerCase()) {
+            case "list" -> {
+                List<Location> locs = hub.configuredOneblocks();
+                if (locs.isEmpty()) {
+                    Msg.send(sender, "<gray>No community OneBlocks configured "
+                            + "<dark_gray>(a single default at spawn+1 is used until you add one).");
+                    return;
+                }
+                Msg.send(sender, "<gold>Community OneBlocks <gray>(" + locs.size() + "):");
+                for (int i = 0; i < locs.size(); i++) {
+                    Msg.send(sender, "<gray>" + (i + 1) + ". <white>" + formatLocation(locs.get(i)));
+                }
+            }
+            case "add" -> {
+                if (!(sender instanceof Player p)) { Msg.send(sender, "<red>Players only."); return; }
+                if (!p.getWorld().getName().equals(hub.communityWorldName())) {
+                    Msg.send(sender, "<red>Stand in the community world to add a OneBlock.");
+                    return;
+                }
+                Location at = p.getLocation().getBlock().getLocation();
+                List<Location> locs = hub.configuredOneblocks();
+                for (Location l : locs) {
+                    if (com.nova.novablock.community.CommunityHubManager.sameBlockLoc(l, at)) {
+                        Msg.send(sender, "<red>A community OneBlock already exists at that block.");
+                        return;
+                    }
+                }
+                locs.add(at);
+                hub.saveOneblocks(locs);
+                hub.placeOneblock(at);
+                Msg.send(sender, "<green>Added community OneBlock #" + locs.size()
+                        + " at <white>" + formatLocation(at) + "<green>.");
+            }
+            case "delete", "remove" -> {
+                List<Location> locs = hub.configuredOneblocks();
+                Integer idx = parseHubIndex(sender, args, locs.size());
+                if (idx == null) return;
+                Location removed = locs.remove((int) idx);
+                hub.saveOneblocks(locs);
+                if (removed.getWorld() != null) {
+                    removed.getBlock().setType(Material.AIR, false);
+                    removed.clone().add(0, -1, 0).getBlock().setType(Material.AIR, false);
+                }
+                Msg.send(sender, "<green>Removed community OneBlock at <white>"
+                        + formatLocation(removed) + "<green>.");
+            }
+            case "move" -> {
+                if (!(sender instanceof Player p)) { Msg.send(sender, "<red>Players only."); return; }
+                if (!p.getWorld().getName().equals(hub.communityWorldName())) {
+                    Msg.send(sender, "<red>Stand in the community world to move a OneBlock.");
+                    return;
+                }
+                List<Location> locs = hub.configuredOneblocks();
+                Integer idx = parseHubIndex(sender, args, locs.size());
+                if (idx == null) return;
+                Location to = p.getLocation().getBlock().getLocation();
+                for (int i = 0; i < locs.size(); i++) {
+                    if (i != idx && com.nova.novablock.community.CommunityHubManager.sameBlockLoc(locs.get(i), to)) {
+                        Msg.send(sender, "<red>A community OneBlock already exists at the destination.");
+                        return;
+                    }
+                }
+                Location old = locs.get(idx);
+                if (old.getWorld() != null) {
+                    old.getBlock().setType(Material.AIR, false);
+                    old.clone().add(0, -1, 0).getBlock().setType(Material.AIR, false);
+                }
+                locs.set(idx, to);
+                hub.saveOneblocks(locs);
+                hub.placeOneblock(to);
+                Msg.send(sender, "<green>Moved community OneBlock #" + (idx + 1)
+                        + " to <white>" + formatLocation(to) + "<green>.");
+            }
+            default -> Msg.send(sender, "<yellow>/obadmin hub oneblock <list|add|delete #|move #>");
+        }
+    }
+
+    /** Parse a 1-based OneBlock index from args[3], validated against {@code size}. */
+    private Integer parseHubIndex(CommandSender sender, String[] args, int size) {
+        if (args.length < 4) {
+            Msg.send(sender, "<red>Specify a number. Use <yellow>/obadmin hub oneblock list<red>.");
+            return null;
+        }
+        int idx;
+        try {
+            idx = Integer.parseInt(args[3]) - 1;
+        } catch (NumberFormatException e) {
+            Msg.send(sender, "<red>Invalid number: <white>" + args[3]);
+            return null;
+        }
+        if (size == 0) {
+            Msg.send(sender, "<red>No community OneBlocks are configured yet.");
+            return null;
+        }
+        if (idx < 0 || idx >= size) {
+            Msg.send(sender, "<red>No OneBlock #" + args[3] + " <gray>(there "
+                    + (size == 1 ? "is 1" : "are " + size) + ").");
+            return null;
+        }
+        return idx;
     }
 
     private void handleFix(CommandSender sender, String[] args) {
@@ -585,7 +710,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 case "sprint" -> List.of("status", "reset", "podium", "addscore").stream()
                         .filter(n -> n.startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
-                case "hub" -> List.of("status", "create", "resetworld", "payout", "raid", "resetweekly", "setblock", "reload").stream()
+                case "hub" -> List.of("status", "create", "resetworld", "payout", "raid", "resetweekly", "setblock", "setspawn", "oneblock", "reload").stream()
                         .filter(n -> n.startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
                 case "fix" -> {
@@ -635,6 +760,11 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("hub") && args[1].equalsIgnoreCase("payout")) {
             return "weekly".startsWith(args[2].toLowerCase()) ? List.of("weekly") : Collections.emptyList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("hub") && args[1].equalsIgnoreCase("oneblock")) {
+            return List.of("list", "add", "delete", "move").stream()
+                    .filter(n -> n.startsWith(args[2].toLowerCase()))
+                    .collect(Collectors.toList());
         }
         if (args.length == 4 && args[0].equalsIgnoreCase("sprint") && args[1].equalsIgnoreCase("addscore")) {
             return Bukkit.getOnlinePlayers().stream()
