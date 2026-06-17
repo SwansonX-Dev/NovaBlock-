@@ -33,7 +33,7 @@ public class Phase {
         this.bossId = bossId;
         this.lootRoomIds = Collections.unmodifiableList(lootRoomIds);
         int sum = 0;
-        for (PhaseBlock b : blocks) sum += b.weight();
+        for (PhaseBlock b : blocks) sum += b.effectiveWeight();
         this.totalWeight = sum;
     }
 
@@ -52,7 +52,7 @@ public class Phase {
         int roll = rng.nextInt(totalWeight);
         int acc = 0;
         for (PhaseBlock b : blocks) {
-            acc += b.weight();
+            acc += b.effectiveWeight();
             if (roll < acc) return b.material();
         }
         return blocks.get(blocks.size() - 1).material();

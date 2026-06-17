@@ -195,7 +195,7 @@ public class CommunityBlock {
     private static final int COMMUNITY_TOTAL_WEIGHT;
     static {
         int sum = 0;
-        for (PhaseBlock b : COMMUNITY_BLOCKS) sum += b.weight();
+        for (PhaseBlock b : COMMUNITY_BLOCKS) sum += b.effectiveWeight();
         COMMUNITY_TOTAL_WEIGHT = sum;
     }
 
@@ -204,7 +204,7 @@ public class CommunityBlock {
         int roll = rng.nextInt(COMMUNITY_TOTAL_WEIGHT);
         int acc = 0;
         for (PhaseBlock b : COMMUNITY_BLOCKS) {
-            acc += b.weight();
+            acc += b.effectiveWeight();
             if (roll < acc) return b.material();
         }
         return COMMUNITY_BLOCKS.get(COMMUNITY_BLOCKS.size() - 1).material();
