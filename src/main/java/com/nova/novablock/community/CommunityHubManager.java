@@ -134,13 +134,6 @@ public class CommunityHubManager {
         markDirty();
     }
 
-    /** Counts a non-community block break toward the weekly goal only. */
-    public void recordIslandBreak(Player p) {
-        if (!isEnabled()) return;
-        goal.recordBreak(p, 1L);
-        markDirty();
-    }
-
     public void markDirty() {
         if (!dirty.compareAndSet(false, true)) return;
         Bukkit.getScheduler().runTaskLaterAsynchronously(plugin, this::flush, SAVE_DEBOUNCE_TICKS);

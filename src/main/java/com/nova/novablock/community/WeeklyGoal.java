@@ -20,9 +20,12 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Server-wide weekly community goal. Every block break (personal-island or
- * community) calls {@link #recordBreak(Player, long)}; on hitting milestones
- * we broadcast, and on the goal being met we distribute tiered coin rewards.
+ * Weekly Community OneBlock goal. ONLY Community OneBlock breaks call
+ * {@link #recordBreak(Player, long)} (via CommunityHubManager.handleBreak) —
+ * personal-island breaks are deliberately excluded, so both the goal progress
+ * and the contributor podium reflect only players mining the community block.
+ * On hitting milestones we broadcast, and on the goal being met we distribute
+ * tiered coin rewards.
  *
  * <p>Resets at Monday 00:00 server-local — matches WeeklySprintManager's
  * convention so the two reset on the same heartbeat.

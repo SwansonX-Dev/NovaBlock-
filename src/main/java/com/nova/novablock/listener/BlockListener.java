@@ -262,7 +262,9 @@ public class BlockListener implements Listener {
         island.recordBreak(broken);
         plugin.claimBlockRewards().recordPersonalBreak(player);
         plugin.sprint().recordBlocksBroken(island.data().getId(), 1L);
-        if (plugin.community() != null) plugin.community().recordIslandBreak(player);
+        // NOTE: personal-island breaks deliberately do NOT count toward the weekly
+        // community goal — only Community OneBlock breaks do (see handleBreak). This
+        // keeps the goal progress and its contributor podium to community miners.
         // Block-break milestones — fire once at exact thresholds. Existing islands past
         // a threshold won't retroactively claim; the milestone is the act of crossing.
         // Overworld-only milestone in v1.
