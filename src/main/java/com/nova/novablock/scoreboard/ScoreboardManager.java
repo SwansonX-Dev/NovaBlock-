@@ -6,6 +6,7 @@ import com.nova.novablock.phase.Phase;
 import com.nova.novablock.progression.PlayerProgression;
 import com.nova.novablock.progression.SkillType;
 import com.nova.novablock.util.Msg;
+import io.papermc.paper.scoreboard.numbers.NumberFormat;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
@@ -142,6 +143,8 @@ public class ScoreboardManager {
                         : "<gradient:#7B61FF:#4FC3F7><bold>NovaBlock");
         obj = board.registerNewObjective("nb", Criteria.DUMMY, title);
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
+        // Hide the red side scores on every line (Paper number-format API).
+        obj.numberFormat(NumberFormat.blank());
 
         List<String> lines = resolveLines(p, inCommunity);
         // Render top-to-bottom: highest score on top
