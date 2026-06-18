@@ -24,7 +24,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
             "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
-            "giveoneblock", "giveminion", "nodepool", "flags", "storage", "menu", "path", "sprint", "hub", "freshstart", "fix", "setspawn");
+            "giveoneblock", "givecommunityblock", "giveminion", "nodepool", "flags", "storage", "menu", "path", "sprint", "hub", "freshstart", "fix", "setspawn");
     private static final List<String> EVENTS = List.of(
             "diamond_hour", "double_coins", "blood_moon", "lush_bloom", "rift_storm", "stop");
 
@@ -166,6 +166,22 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 Msg.send(sender, "<green>Gave " + amount + "x Personal " + nodeType.displayName() + " OneBlock to " + target.getName() + ".");
                 Msg.send(target, "<green>You received a <#7B61FF>Personal " + nodeType.displayName() + " OneBlock<green>! "
                         + "Place it on your Community OneBlock claim.");
+            }
+            case "givecommunityblock" -> {
+                if (args.length < 2) { Msg.send(sender, "<red>/obadmin givecommunityblock <player> [amount]"); return true; }
+                Player target = Bukkit.getPlayerExact(args[1]);
+                if (target == null) { Msg.send(sender, "<red>Player not online."); return true; }
+                int amount = 1;
+                if (args.length > 2) {
+                    try { amount = Math.max(1, Math.min(64, Integer.parseInt(args[2]))); }
+                    catch (NumberFormatException ex) { Msg.send(sender, "<red>Amount must be a number."); return true; }
+                }
+                ItemStack item = com.nova.novablock.listener.CommunityBlockGrantListener.create(plugin, amount);
+                var leftover = target.getInventory().addItem(item);
+                for (ItemStack drop : leftover.values()) target.getWorld().dropItemNaturally(target.getLocation(), drop);
+                Msg.send(sender, "<green>Gave " + amount + "x Community OneBlock to " + target.getName() + ".");
+                Msg.send(target, "<green>You received a <gold>Community OneBlock<green>! "
+                        + "Place it in the community world to spawn a new shared OneBlock.");
             }
             case "nodepool" -> {
                 if (!(sender instanceof Player viewer)) { Msg.send(sender, "<red>Players only."); return true; }
@@ -700,7 +716,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2) {
             return switch (args[0].toLowerCase()) {
-                case "setphase", "givecoins", "wipe", "freshstart", "giveoneblock", "giveminion" -> Bukkit.getOnlinePlayers().stream()
+                case "setphase", "givecoins", "wipe", "freshstart", "giveoneblock", "givecommunityblock", "giveminion" -> Bukkit.getOnlinePlayers().stream()
                         .map(Player::getName)
                         .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());

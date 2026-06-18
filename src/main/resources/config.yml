@@ -115,6 +115,10 @@ community:
   oneblocks:
     # Community phases intentionally take much longer than personal islands.
     phase-required-multiplier: 10.0
+    # Hard cap on total community OneBlocks. Players can grow the hub by placing the
+    # "Community OneBlock" reward item (/obadmin givecommunityblock) in the community
+    # world; each one becomes a real shared block. This bounds runaway growth.
+    max: 200
     positions:
       - { x: 0, y: 81, z: 0 }
       - { x: 2, y: 81, z: 0 }

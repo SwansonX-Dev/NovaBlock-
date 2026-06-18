@@ -217,6 +217,44 @@ public class CommunityHubManager {
         return block.placeInitial(at);
     }
 
+    /** How many shared community OneBlocks currently exist (configured + implicit default). */
+    public int oneblockCount() {
+        return blockLocations().size();
+    }
+
+    /** Hard cap on the number of community OneBlocks, to bound player-grown hubs. */
+    public int maxOneblocks() {
+        return Math.max(1, plugin.getConfig().getInt("community.oneblocks.max", 200));
+    }
+
+    /**
+     * Register a brand-new <em>shared</em> community OneBlock at {@code at} and lay
+     * it down (bedrock anchor + breakable block on top). Used by the Community
+     * OneBlock reward item so players can grow the communal hub. The result is a
+     * real community block — anyone may mine it, it shares the community phase and
+     * feeds the shared payout pool.
+     *
+     * @return true if registered and placed; false if disabled, not the community
+     *         world, a block already exists there, or the cap is reached.
+     */
+    public boolean addOneblockAt(Location at) {
+        if (!isEnabled() || at == null || at.getWorld() == null) return false;
+        if (!at.getWorld().getName().equals(communityWorldName())) return false;
+        if (isCommunityBlock(at)) return false;
+        if (oneblockCount() >= maxOneblocks()) return false;
+        // Seed with the current effective set so the implicit spawn+1 default block
+        // (used while no positions are configured) is preserved once we persist.
+        List<Location> locs = configuredOneblocks();
+        if (locs.isEmpty()) locs.addAll(blockLocations());
+        for (Location l : locs) {
+            if (sameBlock(l, at)) return false;
+        }
+        locs.add(at);
+        saveOneblocks(locs);
+        block.placeInitial(at);
+        return true;
+    }
+
     /** True if two locations refer to the same block (exposed for admin tooling). */
     public static boolean sameBlockLoc(Location a, Location b) {
         return sameBlock(a, b);
