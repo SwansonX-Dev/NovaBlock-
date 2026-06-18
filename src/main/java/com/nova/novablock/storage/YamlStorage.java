@@ -105,6 +105,10 @@ public class YamlStorage implements DataStorage {
                 data.setNetherUnlocked(netherUnlocked);
                 data.setFirstNetherVisit(firstNetherVisit);
                 data.getMembers().addAll(memberIds);
+                for (String t : y.getStringList("trusted")) {
+                    try { data.getTrusted().add(UUID.fromString(t)); }
+                    catch (IllegalArgumentException ignored) { /* skip malformed UUID */ }
+                }
                 data.setBankBalance(y.getLong("bankBalance", 0));
                 ConfigurationSection rolesSec = y.getConfigurationSection("roles");
                 if (rolesSec != null) {
@@ -171,6 +175,11 @@ public class YamlStorage implements DataStorage {
         List<String> mem = new ArrayList<>();
         for (UUID u : data.getMembers()) mem.add(u.toString());
         y.set("members", mem);
+        if (!data.getTrusted().isEmpty()) {
+            List<String> tr = new ArrayList<>();
+            for (UUID u : data.getTrusted()) tr.add(u.toString());
+            y.set("trusted", tr);
+        }
         if (data.getBankBalance() > 0) y.set("bankBalance", data.getBankBalance());
         // Only non-default (non-MEMBER) roles are persisted; owner role is implicit.
         for (var e : data.getRoles().entrySet()) {

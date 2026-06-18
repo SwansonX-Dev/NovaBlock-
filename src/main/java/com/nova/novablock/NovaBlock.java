@@ -198,6 +198,11 @@ public final class NovaBlock extends JavaPlugin {
         getCommand("backpack").setExecutor(new BackpackCommand(this));
         getCommand("novahelp").setExecutor(new HelpCommand(this));
         getCommand("spawn").setExecutor(new SpawnCommand(this));
+        com.nova.novablock.command.TrustCommand trustCmd = new com.nova.novablock.command.TrustCommand(this);
+        getCommand("trust").setExecutor(trustCmd);
+        getCommand("trust").setTabCompleter(trustCmd);
+        getCommand("untrust").setExecutor(trustCmd);
+        getCommand("untrust").setTabCompleter(trustCmd);
         MinionCommand minionCmd = new MinionCommand(this);
         getCommand("obminions").setExecutor(minionCmd);
         getCommand("obminions").setTabCompleter(minionCmd);

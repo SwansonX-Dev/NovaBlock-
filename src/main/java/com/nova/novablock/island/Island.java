@@ -94,6 +94,9 @@ public class Island {
     public boolean isOwner(UUID id) { return data.getOwner().equals(id); }
     public boolean isOwner(Player p) { return isOwner(p.getUniqueId()); }
 
+    public boolean isTrusted(UUID id) { return data.isTrusted(id); }
+    public boolean isTrusted(Player p) { return isTrusted(p.getUniqueId()); }
+
     public IslandRole roleOf(UUID id) { return data.getRole(id); }
     public IslandRole roleOf(Player p) { return roleOf(p.getUniqueId()); }
 

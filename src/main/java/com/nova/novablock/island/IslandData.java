@@ -25,6 +25,12 @@ public class IslandData {
     private final Set<UUID> members = new HashSet<>();
     /** Per-member rank. The owner is implicitly OWNER; non-owner members default to MEMBER. */
     private final Map<UUID, IslandRole> roles = new HashMap<>();
+    /**
+     * Non-member players granted build/break + container access on this island
+     * via /trust. Distinct from {@link #members} — trusted players keep their own
+     * island and have no roster/bank rights here, only build access.
+     */
+    private final Set<UUID> trusted = new HashSet<>();
     private final Map<IslandFlag, Boolean> flags = new EnumMap<>(IslandFlag.class);
     private final Map<IslandUpgrade, Integer> upgrades = new EnumMap<>(IslandUpgrade.class);
     /** Shared island bank, in whole coins. Funds upgrades; members deposit, owner withdraws. */
@@ -93,6 +99,25 @@ public class IslandData {
         if (role == null || role == IslandRole.MEMBER) roles.remove(playerId);
         else roles.put(playerId, role);
     }
+
+    // --- trusted players -----------------------------------------------------
+
+    /** Live trusted-player set. */
+    public Set<UUID> getTrusted() { return trusted; }
+
+    public boolean isTrusted(UUID playerId) { return trusted.contains(playerId); }
+
+    /**
+     * Grant build access to a non-member. Returns false (changing nothing) if the
+     * player is the owner or an existing member — they already have access.
+     */
+    public boolean addTrusted(UUID playerId) {
+        if (owner.equals(playerId) || members.contains(playerId)) return false;
+        return trusted.add(playerId);
+    }
+
+    /** Revoke a player's trust. Returns false if they weren't trusted. */
+    public boolean removeTrusted(UUID playerId) { return trusted.remove(playerId); }
 
     // --- island bank ---------------------------------------------------------
 

@@ -32,6 +32,14 @@ commands:
   spawn:
     description: Teleport to your personal spawn (falls back to the world spawn).
     usage: /<command>
+  trust:
+    description: Grant a player build/break access on your island.
+    usage: /<command> <player|list>
+    permission: novablock.trust
+  untrust:
+    description: Revoke a player's build access on your island.
+    usage: /<command> <player>
+    permission: novablock.trust
   obminions:
     description: Open or manage NovaBlock minions
     usage: /<command> [overview|shop|help|types|reload|debug|give|list|removeall|outputs]
@@ -54,6 +62,9 @@ permissions:
     default: true
   novablock.friend:
     description: Allows using /ob friend (add/accept/deny/remove/list).
+    default: true
+  novablock.trust:
+    description: Allows granting/revoking build access on your island via /trust and /untrust.
     default: true
   novablock.hub:
     description: Allows opening the community hub and teleport shortcut.

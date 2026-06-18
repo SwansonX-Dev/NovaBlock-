@@ -121,7 +121,8 @@ public class IslandManager {
         if (player.hasPermission("novablock.build.bypass") || player.hasPermission("novablock.admin")) return true;
         Island island = atLocation(loc);
         if (island == null) return true;
-        return island.isMember(player) || island.data().isFlag(IslandFlag.VISITOR_BUILD);
+        return island.isMember(player) || island.isTrusted(player)
+                || island.data().isFlag(IslandFlag.VISITOR_BUILD);
     }
 
     /** True if the player may open containers (chests, barrels, hoppers, etc.) at this location. */
@@ -129,7 +130,8 @@ public class IslandManager {
         if (player.hasPermission("novablock.build.bypass") || player.hasPermission("novablock.admin")) return true;
         Island island = atLocation(loc);
         if (island == null) return true;
-        return island.isMember(player) || island.data().isFlag(IslandFlag.VISITOR_CONTAINER_ACCESS);
+        return island.isMember(player) || island.isTrusted(player)
+                || island.data().isFlag(IslandFlag.VISITOR_CONTAINER_ACCESS);
     }
 
     /** Starter bank gift for new island owners. 100 coins, or the bank's min deposit — whichever is larger. */
@@ -213,6 +215,26 @@ public class IslandManager {
     public void setMemberRole(Island island, UUID playerId, IslandRole role) {
         island.data().setRole(playerId, role);
         plugin.storage().saveIsland(island.data());
+    }
+
+    // --- trusted players -----------------------------------------------------
+
+    /**
+     * Grant a non-member build + container access on this island and persist.
+     * Returns false (no change) if they're the owner, an existing member, or
+     * already trusted.
+     */
+    public boolean addTrusted(Island island, UUID playerId) {
+        if (!island.data().addTrusted(playerId)) return false;
+        plugin.storage().saveIsland(island.data());
+        return true;
+    }
+
+    /** Revoke a player's trust and persist. Returns false if they weren't trusted. */
+    public boolean removeTrusted(Island island, UUID playerId) {
+        if (!island.data().removeTrusted(playerId)) return false;
+        plugin.storage().saveIsland(island.data());
+        return true;
     }
 
     // --- island bank ---------------------------------------------------------
