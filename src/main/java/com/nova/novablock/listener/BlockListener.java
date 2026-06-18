@@ -72,6 +72,11 @@ public class BlockListener implements Listener {
     public void onCommunityBreak(BlockBreakEvent event) {
         if (plugin.community() == null) return;
         Player player = event.getPlayer();
+        // Anti-AFK gate — block community mining while a chat captcha is owed.
+        if (plugin.antiAfk().blocksMining(player)) {
+            event.setCancelled(true);
+            return;
+        }
         Location loc = event.getBlock().getLocation();
         if (plugin.community().isAnchorBlock(loc)) {
             event.setCancelled(true);
@@ -89,6 +94,12 @@ public class BlockListener implements Listener {
         Player player = event.getPlayer();
         Block block = event.getBlock();
         Location loc = block.getLocation();
+
+        // Anti-AFK gate — block all mining while the player owes a chat captcha.
+        if (plugin.antiAfk().blocksMining(player)) {
+            event.setCancelled(true);
+            return;
+        }
 
         // Community hub branch — handled before island lookup since the hub sits in
         // the main spawn world, not an island slot.
@@ -307,9 +318,6 @@ public class BlockListener implements Listener {
 
         // Paxel XP — progresses tool tier as the player levels Mining
         plugin.paxels().onMine(player, broken);
-
-        // Anti-AFK tracker — counts OneBlock activity, prompts a chat captcha every 30 min.
-        plugin.antiAfk().recordMineActivity(player);
 
         // Phase progression
         int progressAfter = nether ? island.data().getNetherPhaseProgress() : island.data().getPhaseProgress();

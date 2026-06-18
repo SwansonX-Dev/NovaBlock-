@@ -50,15 +50,15 @@ cooldowns:
 #  - a player who's actually playing moves around, which resets the clock.
 anti-afk:
   enabled: true
-  # How long of non-stop, stationary mining before a check is issued.
+  # How long a player can hold a pickaxe or paxel before an AFK check is issued.
+  # The clock resets whenever they switch off a mining tool.
   challenge-interval-seconds: 1800
-  # How long the player has to click the green wool before it fails.
+  # How long they have to type the random letter in chat before failing. While
+  # the check is pending they cannot mine, and their answer is hidden from chat.
   challenge-timeout-seconds: 30
-  # A mining gap longer than this ends the session (clock resets).
-  active-window-seconds: 30
-  # Moving more than this many blocks from the mining spot resets the clock —
-  # so normal play (walking around while mining) is never flagged.
-  move-threshold-blocks: 1.5
+  # Warp the player to spawn if they ignore the check past the timeout — this
+  # breaks an auto-mine loop. Set false to only block mining until they answer.
+  warp-on-timeout: true
 
 # Endless island questline. Every island shares one ever-advancing chain of
 # objectives (break blocks, defeat bosses, clear loot rooms, fulfil prophecies).
