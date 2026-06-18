@@ -95,12 +95,14 @@ public class LootRoomManager implements Listener {
     public LootRoom byId(String id) { return registry.get(id); }
     public int roomCount() { return registry.size(); }
 
-    public void offerEntry(Player player, Island island, String roomId) {
+    public void offerEntry(Player player, Island island, String roomId, boolean nether) {
         LootRoom room = registry.get(roomId);
         if (room == null) return;
         // Place the rift two blocks NORTH of the centre block, one block above the centre's Y.
-        Location center = island.centerBlock();
-        World w = center.getWorld();
+        // A Nether roll must anchor on the Nether OneBlock, otherwise the marker spawns
+        // in the Overworld where the player isn't and the "rift opened" message lies.
+        Location center = nether ? island.netherCenterBlock() : island.centerBlock();
+        World w = center == null ? null : center.getWorld();
         if (w == null) return;
         int bx = center.getBlockX() + 2;
         int by = center.getBlockY() + 1;
@@ -113,7 +115,7 @@ public class LootRoomManager implements Listener {
         RiftOffer prior = offers.remove(player.getUniqueId());
         if (prior != null) prior.clearMarker();
         offers.put(player.getUniqueId(),
-                new RiftOffer(roomId, island.data().getId(), w.getName(), bx, by, bz, System.currentTimeMillis() + 30_000));
+                new RiftOffer(roomId, island.data().getId(), w.getName(), bx, by, bz, nether, System.currentTimeMillis() + 30_000));
         Msg.send(player, "<light_purple>★ A <yellow>" + room.displayName()
                 + " <light_purple>rift opened next to your block! Step on it within 30s.");
         player.playSound(player.getLocation(), Sound.BLOCK_PORTAL_AMBIENT, 0.6f, 1.2f);
@@ -190,7 +192,8 @@ public class LootRoomManager implements Listener {
         // Always send players back to the island's bedrock spawn next to the OneBlock.
         // Capturing p.getLocation() risked stranding them in mid-air where the rift
         // portal used to sit (the portal block is outside the bedrock skirt).
-        Location returnLoc = island.data().spawnLocation();
+        // Nether rifts return to the Nether OneBlock, not the Overworld one.
+        Location returnLoc = offer.nether ? island.data().netherSpawnLocation() : island.data().spawnLocation();
         LootRoomRun run = new LootRoomRun(room, p.getUniqueId(), island, anchor,
                 returnLoc, instance.getName(), Bukkit.getCurrentTick());
         active.put(p.getUniqueId(), run);
@@ -452,13 +455,15 @@ public class LootRoomManager implements Listener {
         final UUID islandId;
         final String worldName;
         final int bx, by, bz;
+        final boolean nether;
         final long expiresAt;
 
-        RiftOffer(String roomId, UUID islandId, String worldName, int bx, int by, int bz, long expiresAt) {
+        RiftOffer(String roomId, UUID islandId, String worldName, int bx, int by, int bz, boolean nether, long expiresAt) {
             this.roomId = roomId;
             this.islandId = islandId;
             this.worldName = worldName;
             this.bx = bx; this.by = by; this.bz = bz;
+            this.nether = nether;
             this.expiresAt = expiresAt;
         }
 

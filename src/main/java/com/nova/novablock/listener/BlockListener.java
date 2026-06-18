@@ -708,7 +708,7 @@ public class BlockListener implements Listener {
             }
             if (rng.nextInt(denom) == 0 && !phase.getLootRoomIds().isEmpty()) {
                 String roomId = phase.getLootRoomIds().get(rng.nextInt(phase.getLootRoomIds().size()));
-                plugin.lootRooms().offerEntry(player, island, roomId);
+                plugin.lootRooms().offerEntry(player, island, roomId, nether);
                 if (nether) island.data().setNetherLastLootRoomAt(broken);
                 else island.data().setLastLootRoomAt(broken);
             }
