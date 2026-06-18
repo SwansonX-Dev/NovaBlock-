@@ -92,6 +92,15 @@ public class ParkourRoom implements LootRoom {
     }
 
     @Override
+    public void onStart(LootRoomRun run, Player player) {
+        // Strip any flight the player carried in from the island fly flag —
+        // flying would trivialise the course. The PlayerToggleFlightEvent guard
+        // in LootRoomManager keeps them from re-enabling temp fly mid-run.
+        player.setFlying(false);
+        player.setAllowFlight(false);
+    }
+
+    @Override
     public void tick(LootRoomRun run) {
         Player p = run.player();
         if (p == null) { run.markFinished(); return; }

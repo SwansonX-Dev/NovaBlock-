@@ -30,6 +30,7 @@ import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.io.IOException;
@@ -277,10 +278,12 @@ public class LootRoomManager implements Listener {
             Location a = run.anchor();
             if (a == null || a.getWorld() == null) continue;
             if (!a.getWorld().equals(loc.getWorld())) continue;
-            // Each room fits comfortably inside an 18-block half-width box around its anchor;
-            // the largest is the Arena at radius 11, with a small buffer.
-            if (Math.abs(loc.getBlockX() - a.getBlockX()) > 18) continue;
-            if (Math.abs(loc.getBlockZ() - a.getBlockZ()) > 18) continue;
+            // Half-width box around the anchor. The Parkour course runs out to
+            // dx≈26 / dz≈12 from the anchor, so an 18-block box left the far half
+            // of the course unprotected (breakable). 32 covers every room with a
+            // buffer; each run owns a private world so a generous box is harmless.
+            if (Math.abs(loc.getBlockX() - a.getBlockX()) > 32) continue;
+            if (Math.abs(loc.getBlockZ() - a.getBlockZ()) > 32) continue;
             if (loc.getBlockY() < a.getBlockY() - 2 || loc.getBlockY() > a.getBlockY() + 10) continue;
             return run;
         }
@@ -306,6 +309,24 @@ public class LootRoomManager implements Listener {
         LootRoomRun run = runAt(event.getEntity().getLocation());
         if (run == null || !run.room().id().startsWith("parkour_")) return;
         event.setCancelled(true);
+    }
+
+    /**
+     * Block temp fly inside a Parkour rift. The island fly flag can leave a
+     * player with {@code allowFlight} when they enter; this cancels any attempt
+     * to actually start flying so the course can't be skipped.
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onToggleFlightInRoom(PlayerToggleFlightEvent event) {
+        if (!event.isFlying()) return;
+        Player p = event.getPlayer();
+        if (p.getGameMode() == org.bukkit.GameMode.CREATIVE
+                || p.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
+        LootRoomRun run = active.get(p.getUniqueId());
+        if (run == null || !run.room().id().startsWith("parkour_")) return;
+        event.setCancelled(true);
+        p.setAllowFlight(false);
+        Msg.actionBar(p, "<red>No flying in the parkour rift.");
     }
 
     @EventHandler(ignoreCancelled = true)
