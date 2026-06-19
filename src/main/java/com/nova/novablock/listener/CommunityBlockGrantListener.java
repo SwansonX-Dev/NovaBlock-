@@ -12,7 +12,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -51,7 +53,7 @@ public final class CommunityBlockGrantListener implements Listener {
                     Msg.mm("<!italic><gray>community world to spawn a <white>shared<gray> OneBlock"),
                     Msg.mm("<!italic><gray>anyone can mine. Shares the community phase & pool."),
                     Msg.mm("<!italic> "),
-                    Msg.mm("<!italic><dark_gray>One-time use · your claim in the community world.")));
+                    Msg.mm("<!italic><dark_gray>Sneak-punch to reclaim · your claim in the community world.")));
             meta.getPersistentDataContainer().set(key(plugin), PersistentDataType.BYTE, (byte) 1);
             item.setItemMeta(meta);
         }
@@ -106,7 +108,7 @@ public final class CommunityBlockGrantListener implements Listener {
         consumeOne(p, event.getHand());
         Location at = placed.getLocation();
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            if (hub.addOneblockAt(at)) {
+            if (hub.addOneblockAt(at, p.getUniqueId())) {
                 Msg.send(p, "<green>New community OneBlock placed! <gray>Anyone can mine it — "
                         + "it shares the community phase.");
                 p.playSound(p.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 1.2f);
@@ -130,6 +132,44 @@ public final class CommunityBlockGrantListener implements Listener {
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             if (placed.getType() == Material.BEDROCK) placed.setType(Material.AIR, false);
         });
+    }
+
+    /**
+     * Sneak-punch (sneak + left-click) a placed shared community OneBlock to remove it:
+     * the <b>owner</b> who placed it gets the reward item back; a <b>novablock.admin</b>
+     * can clear anyone's (no item returned — admin cleanup). Anyone else just mines it
+     * normally. Mirrors the personal-node reclaim. The implicit default block (no owner,
+     * not in config) can't be reclaimed this way — admins manage it via /obadmin hub oneblock.
+     */
+    @EventHandler(ignoreCancelled = false)
+    public void onReclaimPunch(PlayerInteractEvent event) {
+        if (event.getAction() != Action.LEFT_CLICK_BLOCK || event.getHand() != EquipmentSlot.HAND) return;
+        Block block = event.getClickedBlock();
+        if (block == null) return;
+        Player p = event.getPlayer();
+        if (!p.isSneaking()) return;
+
+        CommunityHubManager hub = plugin.community();
+        if (hub == null || !hub.isEnabled()) return;
+        Location loc = block.getLocation();
+        if (!hub.isCommunityBlock(loc)) return;
+
+        java.util.UUID owner = hub.ownerAt(loc);
+        boolean isOwner = owner != null && owner.equals(p.getUniqueId());
+        boolean isAdmin = p.hasPermission("novablock.admin");
+        if (!isOwner && !isAdmin) return; // not theirs — let them mine it normally
+
+        event.setCancelled(true);
+        if (!hub.removeOneblockAt(loc)) return;
+        if (isOwner) {
+            for (ItemStack leftover : p.getInventory().addItem(create(plugin, 1)).values()) {
+                p.getWorld().dropItemNaturally(p.getLocation(), leftover);
+            }
+            Msg.send(p, "<gray>Community OneBlock reclaimed — your reward item was returned.");
+        } else {
+            Msg.send(p, "<gray>Removed that community OneBlock.");
+        }
+        p.playSound(p.getLocation(), Sound.BLOCK_BEACON_DEACTIVATE, 0.8f, 1.0f);
     }
 
     private void consumeOne(Player p, EquipmentSlot hand) {

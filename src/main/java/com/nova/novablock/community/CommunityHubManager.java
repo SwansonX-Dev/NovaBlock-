@@ -198,18 +198,104 @@ public class CommunityHubManager {
         return out;
     }
 
-    /** Persist a new list of OneBlock positions to config (block coords). */
+    /**
+     * Persist a new list of OneBlock positions to config (block coords). Any
+     * existing per-position {@code owner} (matched by coordinates) is carried over
+     * so admin add/delete/move don't wipe reward-block ownership.
+     */
     public void saveOneblocks(List<Location> locs) {
+        Map<String, String> owners = new java.util.HashMap<>();
+        for (Map<?, ?> row : plugin.getConfig().getMapList("community.oneblocks.positions")) {
+            Object o = row.get("owner");
+            if (o instanceof String s && !s.isBlank()) {
+                owners.put(blockKey((int) number(row.get("x"), 0),
+                        (int) number(row.get("y"), 0), (int) number(row.get("z"), 0)), s);
+            }
+        }
         List<Map<String, Object>> positions = new ArrayList<>();
         for (Location l : locs) {
             Map<String, Object> m = new java.util.LinkedHashMap<>();
             m.put("x", l.getBlockX());
             m.put("y", l.getBlockY());
             m.put("z", l.getBlockZ());
+            String owner = owners.get(blockKey(l.getBlockX(), l.getBlockY(), l.getBlockZ()));
+            if (owner != null) m.put("owner", owner);
             positions.add(m);
         }
         plugin.getConfig().set("community.oneblocks.positions", positions);
         plugin.saveConfig();
+    }
+
+    /** UUID of the player who placed the community OneBlock at {@code at}, or null (unowned / admin / default). */
+    public java.util.UUID ownerAt(Location at) {
+        if (at == null) return null;
+        for (Map<?, ?> row : plugin.getConfig().getMapList("community.oneblocks.positions")) {
+            if (sameRow(row, at)) {
+                Object o = row.get("owner");
+                if (o instanceof String s && !s.isBlank()) {
+                    try { return java.util.UUID.fromString(s); } catch (IllegalArgumentException ignored) {}
+                }
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /** Stamp (or clear, if null) the owner on the position at {@code at}. */
+    public void setOwnerAt(Location at, java.util.UUID owner) {
+        List<Map<String, Object>> positions = rawPositions();
+        boolean changed = false;
+        for (Map<String, Object> row : positions) {
+            if (sameRow(row, at)) {
+                if (owner != null) row.put("owner", owner.toString());
+                else row.remove("owner");
+                changed = true;
+                break;
+            }
+        }
+        if (changed) {
+            plugin.getConfig().set("community.oneblocks.positions", positions);
+            plugin.saveConfig();
+        }
+    }
+
+    /** Remove the shared community OneBlock at {@code at}: drop it from config and tear down the block + anchor. */
+    public boolean removeOneblockAt(Location at) {
+        if (at == null || at.getWorld() == null) return false;
+        List<Location> locs = configuredOneblocks();
+        if (locs.isEmpty()) locs.addAll(blockLocations());
+        if (!locs.removeIf(l -> sameBlock(l, at))) return false;
+        saveOneblocks(locs);
+        at.getBlock().setType(Material.AIR, false);
+        Location anchor = at.clone().add(0, -1, 0);
+        if (anchor.getBlock().getType() == Material.BEDROCK) anchor.getBlock().setType(Material.AIR, false);
+        return true;
+    }
+
+    /** Mutable copy of the raw config position rows (x/y/z[/owner]), preserving the owner field. */
+    private List<Map<String, Object>> rawPositions() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<?, ?> row : plugin.getConfig().getMapList("community.oneblocks.positions")) {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("x", (int) number(row.get("x"), 0));
+            m.put("y", (int) number(row.get("y"), 0));
+            m.put("z", (int) number(row.get("z"), 0));
+            Object owner = row.get("owner");
+            if (owner instanceof String s && !s.isBlank()) m.put("owner", s);
+            out.add(m);
+        }
+        return out;
+    }
+
+    private static boolean sameRow(Map<?, ?> row, Location at) {
+        return at != null
+                && (int) number(row.get("x"), Integer.MIN_VALUE) == at.getBlockX()
+                && (int) number(row.get("y"), Integer.MIN_VALUE) == at.getBlockY()
+                && (int) number(row.get("z"), Integer.MIN_VALUE) == at.getBlockZ();
+    }
+
+    private static String blockKey(int x, int y, int z) {
+        return x + ":" + y + ":" + z;
     }
 
     /** Place the OneBlock (and its bedrock anchor) at {@code at} if missing. */
@@ -238,6 +324,11 @@ public class CommunityHubManager {
      *         world, a block already exists there, or the cap is reached.
      */
     public boolean addOneblockAt(Location at) {
+        return addOneblockAt(at, null);
+    }
+
+    /** As {@link #addOneblockAt(Location)}, recording {@code owner} as the placer (null = unowned). */
+    public boolean addOneblockAt(Location at, java.util.UUID owner) {
         if (!isEnabled() || at == null || at.getWorld() == null) return false;
         if (!at.getWorld().getName().equals(communityWorldName())) return false;
         if (isCommunityBlock(at)) return false;
@@ -250,7 +341,8 @@ public class CommunityHubManager {
             if (sameBlock(l, at)) return false;
         }
         locs.add(at);
-        saveOneblocks(locs);
+        saveOneblocks(locs);          // persists positions, preserving other owners
+        if (owner != null) setOwnerAt(at, owner); // stamp the placer on the new block
         block.placeInitial(at);
         return true;
     }
