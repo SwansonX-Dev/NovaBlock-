@@ -50,7 +50,7 @@ public final class OneBlockGrantListener implements Listener {
                     Msg.mm("<!italic><gray>to drop a regenerating <white>" + type.displayName() + "<gray> OneBlock."),
                     Msg.mm("<!italic><gray>Mine it for <white>" + reward + "<gray>."),
                     Msg.mm("<!italic> "),
-                    Msg.mm("<!italic><dark_gray>Sneak-break to reclaim · one-time use.")));
+                    Msg.mm("<!italic><dark_gray>Sneak-punch to reclaim · one-time use.")));
             var pdc = meta.getPersistentDataContainer();
             pdc.set(key(plugin), PersistentDataType.BYTE, (byte) 1);
             pdc.set(typeKey(plugin), PersistentDataType.STRING, type.id());
@@ -88,11 +88,13 @@ public final class OneBlockGrantListener implements Listener {
         org.bukkit.block.Block placed = event.getBlockPlaced();
         if (!canPlaceAt(p, placed.getLocation())) {
             Msg.send(p, "<red>Place your Personal OneBlock on land you own — your claim or your island.");
+            clearGhost(placed);
             return;
         }
         int limit = plugin.communityNodes().limit(p);
         if (plugin.communityNodes().count(p.getUniqueId()) >= limit) {
             Msg.send(p, "<red>You've reached your Personal OneBlock limit (" + limit + ").");
+            clearGhost(placed);
             return;
         }
         CommunityNodeType type = typeOf(plugin, event.getItemInHand());
@@ -110,6 +112,18 @@ public final class OneBlockGrantListener implements Listener {
         if (com.nova.novablock.compat.ClaimBridge.ownsClaimAt(p, loc)) return true;
         com.nova.novablock.island.Island island = plugin.islands().atLocation(loc);
         return island != null && island.isMember(p);
+    }
+
+    /**
+     * Belt-and-braces against a lingering grant bedrock. We always cancel the place,
+     * but a cancelled solid-block placement can desync and leave a real/ghost bedrock
+     * when we take a deny path (no node overwrites the spot). Clear it next tick so a
+     * rejected placement never leaves inert bedrock behind.
+     */
+    private void clearGhost(org.bukkit.block.Block placed) {
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (placed.getType() == Material.BEDROCK) placed.setType(Material.AIR, false);
+        });
     }
 
     private void consumeOne(Player p, EquipmentSlot hand) {

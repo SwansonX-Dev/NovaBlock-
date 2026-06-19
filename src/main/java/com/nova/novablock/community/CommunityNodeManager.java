@@ -4,13 +4,17 @@ import com.nova.novablock.NovaBlock;
 import com.nova.novablock.listener.OneBlockGrantListener;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
 import java.io.File;
@@ -69,6 +73,41 @@ public final class CommunityNodeManager implements Listener {
         save();
     }
 
+    /**
+     * Sneak-punch (sneak + left-click) reclaim: the owner instantly picks the node
+     * back up as its grant item without having to fully mine the block. Mirrors the
+     * sneak-break path in {@link #onBreak} but fires on the first punch, so a node
+     * that rolled into a slow-to-break material (obsidian, ore, etc.) still pops
+     * straight back into the inventory.
+     */
+    @EventHandler(ignoreCancelled = false)
+    public void onPunch(PlayerInteractEvent event) {
+        if (event.getAction() != Action.LEFT_CLICK_BLOCK || event.getHand() != EquipmentSlot.HAND) return;
+        Block block = event.getClickedBlock();
+        if (block == null) return;
+        Player p = event.getPlayer();
+        if (!p.isSneaking()) return;
+        String locKey = key(block.getLocation());
+        Node node = nodes.get(locKey);
+        if (node == null || !node.owner().equals(p.getUniqueId())) return;
+
+        event.setCancelled(true);
+        nodes.remove(locKey);
+        save();
+        block.setType(Material.AIR, false);
+        returnGrant(p, node);
+        p.playSound(p.getLocation(), org.bukkit.Sound.BLOCK_AMETHYST_BLOCK_BREAK, 0.8f, 1.0f);
+    }
+
+    /** Give the node's grant item back to {@code p}; overflow drops at their feet. */
+    private void returnGrant(Player p, Node node) {
+        for (ItemStack leftover : p.getInventory().addItem(
+                OneBlockGrantListener.create(plugin, node.type(), 1)).values()) {
+            p.getWorld().dropItemNaturally(p.getLocation(), leftover);
+        }
+        Msg.send(p, "<gray>Personal OneBlock reclaimed — your grant item was returned.");
+    }
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
@@ -78,14 +117,13 @@ public final class CommunityNodeManager implements Listener {
         Player p = event.getPlayer();
 
         // Owner sneak-breaks to reclaim: node removed (no regen), grant item returned.
+        // Sneak-punching reclaims instantly via onPunch; this is the fallback for when
+        // the block is fully broken while sneaking (e.g. creative instant-break).
         if (p.isSneaking() && node.owner().equals(p.getUniqueId())) {
             nodes.remove(locKey);
             save();
             event.setDropItems(false);
-            for (ItemStack leftover : p.getInventory().addItem(OneBlockGrantListener.create(plugin, node.type(), 1)).values()) {
-                p.getWorld().dropItemNaturally(p.getLocation(), leftover);
-            }
-            Msg.send(p, "<gray>Personal OneBlock reclaimed — your grant item was returned.");
+            returnGrant(p, node);
             return;
         }
 

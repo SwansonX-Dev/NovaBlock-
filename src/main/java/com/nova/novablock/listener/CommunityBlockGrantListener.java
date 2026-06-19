@@ -21,9 +21,9 @@ import org.bukkit.persistence.PersistentDataType;
 import java.util.List;
 
 /**
- * The "Community OneBlock" reward item — a tagged bedrock that, when placed in
- * the community OneBlock world, spawns a brand-new <em>shared</em> community
- * OneBlock at that spot. Unlike the Personal OneBlock node
+ * The "Community OneBlock" reward item — a tagged bedrock that, when placed on
+ * the player's own claim in the community OneBlock world, spawns a brand-new
+ * <em>shared</em> community OneBlock at that spot. Unlike the Personal OneBlock node
  * ({@link OneBlockGrantListener}), the result is a real community block: anyone
  * may mine it, it shares the community phase progression, and it feeds the
  * shared payout pool — the player only chooses where it appears. One-time use;
@@ -47,11 +47,11 @@ public final class CommunityBlockGrantListener implements Listener {
         if (meta != null) {
             meta.displayName(Msg.mm("<!italic><gradient:#FFD54F:#FFF59D><bold>Community OneBlock"));
             meta.lore(List.of(
-                    Msg.mm("<!italic><gray>Place it in the <gold>community world<gray> to spawn"),
-                    Msg.mm("<!italic><gray>a new <white>shared<gray> OneBlock anyone can mine."),
-                    Msg.mm("<!italic><gray>It shares the community phase & payout pool."),
+                    Msg.mm("<!italic><gray>Place it on <gold>your own claim<gray> in the"),
+                    Msg.mm("<!italic><gray>community world to spawn a <white>shared<gray> OneBlock"),
+                    Msg.mm("<!italic><gray>anyone can mine. Shares the community phase & pool."),
                     Msg.mm("<!italic> "),
-                    Msg.mm("<!italic><dark_gray>One-time use · community world only.")));
+                    Msg.mm("<!italic><dark_gray>One-time use · your claim in the community world.")));
             meta.getPersistentDataContainer().set(key(plugin), PersistentDataType.BYTE, (byte) 1);
             item.setItemMeta(meta);
         }
@@ -74,23 +74,32 @@ public final class CommunityBlockGrantListener implements Listener {
         event.setCancelled(true);
         Player p = event.getPlayer();
 
+        Block placed = event.getBlockPlaced();
         CommunityHubManager hub = plugin.community();
         if (hub == null || !hub.isEnabled()) {
             Msg.send(p, "<red>The community hub is currently disabled.");
+            clearGhost(placed);
             return;
         }
-        Block placed = event.getBlockPlaced();
         if (!placed.getWorld().getName().equals(hub.communityWorldName())) {
             Msg.send(p, "<red>A Community OneBlock can only be placed in the community world. "
                     + "Use <yellow>/warp community<red> first.");
+            clearGhost(placed);
+            return;
+        }
+        if (!com.nova.novablock.compat.ClaimBridge.ownsClaimAt(p, placed.getLocation())) {
+            Msg.send(p, "<red>You can only place a Community OneBlock on your own claim.");
+            clearGhost(placed);
             return;
         }
         if (hub.isCommunityBlock(placed.getLocation())) {
             Msg.send(p, "<red>There's already a community OneBlock there.");
+            clearGhost(placed);
             return;
         }
         if (hub.oneblockCount() >= hub.maxOneblocks()) {
             Msg.send(p, "<red>The community has reached its OneBlock limit (" + hub.maxOneblocks() + ").");
+            clearGhost(placed);
             return;
         }
 
@@ -102,10 +111,24 @@ public final class CommunityBlockGrantListener implements Listener {
                         + "it shares the community phase.");
                 p.playSound(p.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 1.2f);
             } else {
-                // Lost the spot/limit between the checks above and this tick — refund.
+                // Lost the spot/limit between the checks above and this tick — refund
+                // and make sure no inert grant bedrock is left behind.
                 refund(p);
+                if (placed.getType() == Material.BEDROCK) placed.setType(Material.AIR, false);
                 Msg.send(p, "<red>Couldn't place the community OneBlock there — your item was returned.");
             }
+        });
+    }
+
+    /**
+     * Belt-and-braces against a lingering grant bedrock. We always cancel the place,
+     * but a cancelled solid-block placement can desync and leave a real/ghost bedrock
+     * when we take a deny path (no community block overwrites the spot). Clear it next
+     * tick so a rejected placement never leaves inert bedrock behind.
+     */
+    private void clearGhost(Block placed) {
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (placed.getType() == Material.BEDROCK) placed.setType(Material.AIR, false);
         });
     }
 

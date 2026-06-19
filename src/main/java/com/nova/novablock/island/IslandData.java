@@ -27,7 +27,7 @@ public class IslandData {
     private final Map<UUID, IslandRole> roles = new HashMap<>();
     /**
      * Non-member players granted build/break + container access on this island
-     * via /trust. Distinct from {@link #members} — trusted players keep their own
+     * via /ob trust. Distinct from {@link #members} — trusted players keep their own
      * island and have no roster/bank rights here, only build access.
      */
     private final Set<UUID> trusted = new HashSet<>();

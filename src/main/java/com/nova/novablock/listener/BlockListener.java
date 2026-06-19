@@ -137,7 +137,7 @@ public class BlockListener implements Listener {
             return; // some other block on the island — fine to break
         }
 
-        if (!island.isMember(player)) {
+        if (!canUseOneBlock(island, player)) {
             event.setCancelled(true);
             Msg.actionBar(player, "<red>This isn't your island.");
             return;
@@ -340,7 +340,7 @@ public class BlockListener implements Listener {
         if (block == null || !isUnsafeOneBlockMaterial(block.getType())) return;
         Island island = plugin.islands().atLocation(block.getLocation());
         if (island == null || !isCenterBlock(island, block.getLocation())) return;
-        if (!island.isMember(event.getPlayer())) return;
+        if (!canUseOneBlock(island, event.getPlayer())) return;
 
         event.setCancelled(true);
         Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
@@ -357,7 +357,7 @@ public class BlockListener implements Listener {
         if (block == null || block.getType() != Material.CHEST) return;
         Island island = plugin.islands().atLocation(block.getLocation());
         if (island == null || !isCenterBlock(island, block.getLocation())) return;
-        if (!island.isMember(event.getPlayer())) return;
+        if (!canUseOneBlock(island, event.getPlayer())) return;
         if (block.getState() instanceof Container container && !isLootMarked(container)) {
             Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
             if (phase != null) fillPhaseChest(block, phase);
@@ -381,6 +381,17 @@ public class BlockListener implements Listener {
             Phase phase = plugin.phases().getOrLast(island.data().getPhaseIndex());
             if (phase != null) fillPhaseChest(block, phase);
         }
+    }
+
+    /**
+     * Who may mine and regenerate the OneBlock centre: the island's members and
+     * anyone they've trusted (/ob trust). Trusted players already have general
+     * build/break rights via {@link com.nova.novablock.island.IslandManager#canBuild};
+     * this extends that to the centre block, its loot chest, the unsafe-material
+     * fix, and the regen-column place guard so they're full participants.
+     */
+    private boolean canUseOneBlock(Island island, Player player) {
+        return island.isMember(player) || island.isTrusted(player);
     }
 
     private boolean isCenterBlock(Island island, Location loc) {
@@ -842,7 +853,7 @@ public class BlockListener implements Listener {
         }
         Island island = plugin.islands().atLocation(placedLoc);
         if (island == null) return;
-        if (!island.isMember(event.getPlayer())) return;
+        if (!canUseOneBlock(island, event.getPlayer())) return;
 
         Location center = island.centerBlock();
 

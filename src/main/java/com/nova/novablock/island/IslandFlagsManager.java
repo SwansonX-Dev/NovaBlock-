@@ -7,6 +7,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Enderman;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
@@ -27,6 +28,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.InventoryHolder;
@@ -295,6 +297,51 @@ public class IslandFlagsManager implements Listener {
                     net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
                             .deserialize("<red>That container belongs to this island."));
         }
+    }
+
+    // ---- ITEM FRAMES (protected like blocks: only members/trusted may use them) ----
+    // Three vectors: right-click to rotate/place an item (PlayerInteractEntityEvent),
+    // punch to pop the item out (EntityDamageByEntityEvent, frame survives), and
+    // punch an empty frame to break it (HangingBreakByEntityEvent). Glow item frames
+    // are a subtype of ItemFrame, so the instanceof covers both.
+
+    @EventHandler(ignoreCancelled = true)
+    public void onItemFrameInteract(PlayerInteractEntityEvent event) {
+        if (!(event.getRightClicked() instanceof ItemFrame frame)) return;
+        if (islandAt(frame.getLocation()) == null) return;
+        if (!plugin.islands().canBuild(event.getPlayer(), frame.getLocation())) {
+            event.setCancelled(true);
+            denyItemFrame(event.getPlayer());
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onItemFrameDamage(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof ItemFrame frame)) return;
+        if (islandAt(frame.getLocation()) == null) return;
+        Player attacker = resolvePlayer(event.getDamager());
+        if (attacker == null) return; // non-player damage isn't a visitor interaction
+        if (!plugin.islands().canBuild(attacker, frame.getLocation())) {
+            event.setCancelled(true);
+            denyItemFrame(attacker);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onItemFrameBreak(HangingBreakByEntityEvent event) {
+        if (!(event.getEntity() instanceof ItemFrame frame)) return;
+        if (islandAt(frame.getLocation()) == null) return;
+        Player remover = resolvePlayer(event.getRemover());
+        if (remover == null) return;
+        if (!plugin.islands().canBuild(remover, frame.getLocation())) {
+            event.setCancelled(true);
+            denyItemFrame(remover);
+        }
+    }
+
+    private void denyItemFrame(Player p) {
+        p.sendActionBar(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                .deserialize("<red>You can't touch item frames on this island."));
     }
 
     // ---- KEEP_INVENTORY ----

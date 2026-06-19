@@ -11,7 +11,7 @@ softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, LuckPerms, xPets, xTags, 
 commands:
   oneblock:
     description: Main NovaBlock command
-    usage: /<command> [create|delete|home [nether]|hub|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|toggle|setspawn|friend|minions|sprint|help]
+    usage: /<command> [create|delete|home [nether]|hub|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|trust|untrust|toggle|setspawn|friend|minions|sprint|help]
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command
@@ -32,14 +32,6 @@ commands:
   spawn:
     description: Teleport to your personal spawn (falls back to the world spawn).
     usage: /<command>
-  trust:
-    description: Grant a player build/break access on your island.
-    usage: /<command> <player|list>
-    permission: novablock.trust
-  untrust:
-    description: Revoke a player's build access on your island.
-    usage: /<command> <player>
-    permission: novablock.trust
   obminions:
     description: Open or manage NovaBlock minions
     usage: /<command> [overview|shop|help|types|reload|debug|give|list|removeall|outputs]
@@ -64,7 +56,7 @@ permissions:
     description: Allows using /ob friend (add/accept/deny/remove/list).
     default: true
   novablock.trust:
-    description: Allows granting/revoking build access on your island via /trust and /untrust.
+    description: Allows granting/revoking build access on your island via /ob trust and /ob untrust.
     default: true
   novablock.hub:
     description: Allows opening the community hub and teleport shortcut.

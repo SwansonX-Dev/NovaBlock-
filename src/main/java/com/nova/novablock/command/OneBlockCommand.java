@@ -32,8 +32,8 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
             "visit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
             "setspawn", "friend", "friends", "sprint", "minion", "minions", "hub", "community",
-            "team", "members", "roster", "promote", "demote", "kick", "bank", "autosell",
-            "backpack", "help");
+            "team", "members", "roster", "promote", "demote", "kick", "trust", "untrust",
+            "bank", "autosell", "backpack", "help");
     private static final List<String> FRIEND_SUBS = List.of("add", "accept", "deny", "remove", "list");
     private static final List<String> BANK_SUBS = List.of("deposit", "withdraw", "balance");
     private static final long DELETE_CONFIRM_WINDOW_MS = 30_000L;
@@ -112,6 +112,8 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "promote" -> promote(p, args);
             case "demote" -> demote(p, args);
             case "kick" -> kick(p, args);
+            case "trust" -> handleTrust(p, args, false);
+            case "untrust" -> handleTrust(p, args, true);
             case "bank" -> bank(p, args);
             case "visit" -> visit(p, args);
             case "upgrades", "upgrade" -> new com.nova.novablock.gui.UpgradesGui(plugin).open(p);
@@ -335,6 +337,98 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             Player member = org.bukkit.Bukkit.getPlayer(m);
             if (member != null && !member.equals(p)) Msg.send(member, "<gray>" + name + " was removed from the island.");
         }
+    }
+
+    // ---------------- trust ----------------
+
+    /**
+     * {@code /ob trust <player|list>} and {@code /ob untrust <player>} — grant or
+     * revoke build/break and container access on the sender's island. Only the
+     * owner or a co-owner (anyone who can manage the roster) may change trust.
+     */
+    private void handleTrust(Player p, String[] args, boolean untrust) {
+        if (!p.hasPermission("novablock.trust")) { denied(p); return; }
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) {
+            Msg.send(p, "<red>You need an island first. Try <yellow>/ob create</yellow>.");
+            return;
+        }
+        if (!island.roleOf(p).canManageRoster()) {
+            Msg.send(p, "<red>Only the owner or a co-owner can " + (untrust ? "untrust" : "trust") + " players.");
+            return;
+        }
+        if (!untrust && args.length >= 2 && args[1].equalsIgnoreCase("list")) {
+            listTrusted(p, island);
+            return;
+        }
+        if (args.length < 2) {
+            Msg.send(p, "<gray>Usage: <yellow>/ob " + (untrust ? "untrust <player>" : "trust <player|list>"));
+            return;
+        }
+
+        org.bukkit.OfflinePlayer target = resolveOffline(args[1]);
+        if (target == null) { Msg.send(p, "<red>Never seen a player named " + args[1] + "."); return; }
+        UUID targetId = target.getUniqueId();
+        String name = target.getName() != null ? target.getName() : args[1];
+
+        if (targetId.equals(p.getUniqueId())) {
+            Msg.send(p, "<red>You can't " + (untrust ? "untrust" : "trust") + " yourself.");
+            return;
+        }
+
+        if (untrust) {
+            if (!plugin.islands().removeTrusted(island, targetId)) {
+                Msg.send(p, "<gray>" + name + " isn't trusted on your island.");
+                return;
+            }
+            Msg.send(p, "<gray>Revoked <yellow>" + name + "<gray>'s build access on your island.");
+            Player online = target.getPlayer();
+            if (online != null) {
+                Msg.send(online, "<gray>" + p.getName() + " removed your build access on their island.");
+            }
+            return;
+        }
+
+        if (island.isMember(targetId)) {
+            Msg.send(p, "<gray>" + name + " is already a member of your island.");
+            return;
+        }
+        if (!plugin.islands().addTrusted(island, targetId)) {
+            Msg.send(p, "<gray>" + name + " is already trusted on your island.");
+            return;
+        }
+        Msg.send(p, "<green>Trusted <yellow>" + name
+                + "<green> — they can now build and break on your island.");
+        Player online = target.getPlayer();
+        if (online != null) {
+            Msg.send(online, "<green>" + p.getName()
+                    + " trusted you — you can now build on their island.");
+            online.playSound(online.getLocation(), org.bukkit.Sound.UI_TOAST_IN, 1f, 1.4f);
+        }
+    }
+
+    private void listTrusted(Player p, Island island) {
+        var trusted = island.data().getTrusted();
+        if (trusted.isEmpty()) {
+            Msg.send(p, "<gray>No one is trusted on your island. Add someone with <yellow>/ob trust <player>.");
+            return;
+        }
+        Msg.send(p, "<gold><bold>Trusted players");
+        for (UUID u : trusted) {
+            org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(u);
+            String name = op.getName() != null ? op.getName() : u.toString().substring(0, 8);
+            Msg.send(p, "<gray>· " + (op.isOnline() ? "<green>" : "<dark_gray>") + name);
+        }
+    }
+
+    /** Resolve a name to an OfflinePlayer: online first, then cache, then a played-before lookup. */
+    private org.bukkit.OfflinePlayer resolveOffline(String name) {
+        Player online = org.bukkit.Bukkit.getPlayerExact(name);
+        if (online != null) return online;
+        org.bukkit.OfflinePlayer cached = org.bukkit.Bukkit.getOfflinePlayerIfCached(name);
+        if (cached != null) return cached;
+        org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(name);
+        return op.hasPlayedBefore() ? op : null;
     }
 
     // ---------------- island bank ----------------
@@ -619,6 +713,27 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 if (op.getName() != null && op.getName().toLowerCase().startsWith(prefix)) names.add(op.getName());
             }
             return names;
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("untrust") && sender instanceof Player tp) {
+            // /ob untrust suggests only the players already trusted on the sender's island.
+            String prefix = args[1].toLowerCase();
+            Island island = plugin.islands().ofPlayer(tp);
+            if (island == null) return Collections.emptyList();
+            java.util.List<String> names = new java.util.ArrayList<>();
+            for (UUID u : island.data().getTrusted()) {
+                org.bukkit.OfflinePlayer op = org.bukkit.Bukkit.getOfflinePlayer(u);
+                if (op.getName() != null && op.getName().toLowerCase().startsWith(prefix)) names.add(op.getName());
+            }
+            return names;
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("trust")) {
+            String prefix = args[1].toLowerCase();
+            java.util.List<String> out = org.bukkit.Bukkit.getOnlinePlayers().stream()
+                    .map(Player::getName)
+                    .filter(n -> n.toLowerCase().startsWith(prefix))
+                    .collect(Collectors.toList());
+            if ("list".startsWith(prefix)) out.add("list");
+            return out;
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("bank")) {
             String prefix = args[1].toLowerCase();
