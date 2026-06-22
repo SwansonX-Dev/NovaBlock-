@@ -23,7 +23,7 @@ public class EventManager {
     }
 
     private void autosave() {
-        plugin.islands().saveAll();
+        plugin.islands().saveDirty();
         plugin.progression().saveAll();
     }
 

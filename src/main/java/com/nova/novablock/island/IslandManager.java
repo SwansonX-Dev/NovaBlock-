@@ -23,6 +23,10 @@ public class IslandManager {
 
     public void loadAll() {
         for (IslandData data : plugin.storage().loadAllIslands()) {
+            // Freshly hydrated data already matches its file; the load-time setters
+            // flipped the dirty flag, so reset it. Any genuine change below (e.g.
+            // the Nether migration) re-marks it.
+            data.clearDirty();
             plugin.worlds().ensureWorld(data.getWorldName());
             Island island = new Island(plugin, data);
             // Silent migration: any island already past the Nether Gates phase
@@ -38,8 +42,25 @@ public class IslandManager {
         recalculateNextSlot();
     }
 
+    /** Persist every island. Used on shutdown; storage drains its IO queue afterwards. */
     public void saveAll() {
         for (Island i : byId.values()) plugin.storage().saveIsland(i.data());
+    }
+
+    /**
+     * Autosave pass: persist only islands with unsaved changes. saveIsland builds
+     * the YAML snapshot on this (main) thread, clears the dirty flag, and writes to
+     * disk on a background thread — so a quiet server does almost no work here and
+     * a busy one never blocks the tick on file I/O. Returns the number written.
+     */
+    public int saveDirty() {
+        int saved = 0;
+        for (Island i : byId.values()) {
+            if (!i.data().isDirty()) continue;
+            plugin.storage().saveIsland(i.data());
+            saved++;
+        }
+        return saved;
     }
 
     /** Current computed island level (always accurate; derived from progress). */

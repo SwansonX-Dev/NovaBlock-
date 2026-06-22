@@ -47,6 +47,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class MinionManager implements Listener {
     private final NovaBlock plugin;
@@ -62,6 +65,8 @@ public class MinionManager implements Listener {
     private BukkitTask task;
     private long tickRate;
     private boolean dirty;
+    /** Background writer for minions.yml so the per-tick save never does disk I/O on the main thread. */
+    private ExecutorService ioExecutor;
 
     public MinionManager(NovaBlock plugin) {
         this.plugin = plugin;
@@ -71,6 +76,11 @@ public class MinionManager implements Listener {
 
     public void start() {
         file = new File(plugin.getDataFolder(), "minions.yml");
+        ioExecutor = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "NovaBlock-MinionIO");
+            t.setDaemon(true);
+            return t;
+        });
         tickRate = Math.max(20L, plugin.getConfig().getLong("minions.tick-rate-ticks", 20L));
         load();
         loadOutputTables();
@@ -83,7 +93,18 @@ public class MinionManager implements Listener {
 
     public void shutdown() {
         if (task != null) task.cancel();
-        save();
+        save(); // builds the snapshot on this thread and queues the final write
+        if (ioExecutor != null) {
+            ioExecutor.shutdown();
+            try {
+                if (!ioExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
+                    plugin.getLogger().warning("Minion IO did not finish within 10s during shutdown.");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            ioExecutor = null;
+        }
         cleanupDisplays();
     }
 
@@ -742,6 +763,22 @@ public class MinionManager implements Listener {
 
     public void save() {
         if (file == null) return;
+        // Build the snapshot on the calling (main) thread, then hand the disk write
+        // to the IO thread so the per-tick save never blocks on file I/O. Clearing
+        // dirty here means a change arriving mid-write re-marks for the next save.
+        YamlConfiguration yaml = buildYaml();
+        dirty = false;
+        final File target = file;
+        Runnable write = () -> {
+            try { yaml.save(target); }
+            catch (IOException ex) { plugin.getLogger().warning("Failed to save minions.yml: " + ex.getMessage()); }
+        };
+        ExecutorService ex = ioExecutor;
+        if (ex == null || ex.isShutdown()) write.run();
+        else ex.execute(write);
+    }
+
+    private YamlConfiguration buildYaml() {
         YamlConfiguration yaml = new YamlConfiguration();
         for (MinionData data : minions.values()) {
             String path = data.isCommunity()
@@ -760,6 +797,6 @@ public class MinionManager implements Listener {
             }
             for (var entry : data.upgrades().entrySet()) yaml.set(path + "upgrades." + entry.getKey().name().toLowerCase(Locale.ROOT).replace('_', '-'), entry.getValue());
         }
-        try { yaml.save(file); dirty = false; } catch (IOException ex) { plugin.getLogger().warning("Failed to save minions.yml: " + ex.getMessage()); }
+        return yaml;
     }
 }

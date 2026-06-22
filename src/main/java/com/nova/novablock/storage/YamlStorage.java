@@ -19,6 +19,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class YamlStorage implements DataStorage {
 
@@ -28,6 +31,15 @@ public class YamlStorage implements DataStorage {
     private final NovaBlock plugin;
     private File islandDir;
     private File playerDir;
+
+    /**
+     * Single background thread that performs island file I/O (the atomic write +
+     * move). Island YAML is built on the main thread — a cheap in-memory snapshot —
+     * then handed here so the disk write never stalls a tick. A single thread keeps
+     * writes for the same island strictly ordered, so an autosave can't clobber a
+     * later immediate save. Drained on {@link #shutdown()}.
+     */
+    private ExecutorService ioExecutor;
 
     public YamlStorage(NovaBlock plugin) {
         this.plugin = plugin;
@@ -39,6 +51,11 @@ public class YamlStorage implements DataStorage {
         playerDir = new File(plugin.getDataFolder(), "players");
         if (!islandDir.exists()) islandDir.mkdirs();
         if (!playerDir.exists()) playerDir.mkdirs();
+        ioExecutor = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "NovaBlock-IslandIO");
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     /** Atomic YAML save: write to .tmp then move into place so a crash can't truncate the real file. */
@@ -50,7 +67,31 @@ public class YamlStorage implements DataStorage {
     }
 
     @Override
-    public void shutdown() {}
+    public void shutdown() {
+        // Drain queued island writes so nothing is lost when the server stops.
+        if (ioExecutor != null) {
+            ioExecutor.shutdown();
+            try {
+                if (!ioExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
+                    plugin.getLogger().warning("Island IO did not finish within 30s during shutdown.");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            ioExecutor = null;
+        }
+    }
+
+    /** Submit an island file write to the IO thread, or run it inline if the executor is gone (e.g. mid-shutdown). */
+    private void submitIslandWrite(YamlConfiguration y, File f, UUID id) {
+        Runnable write = () -> {
+            try { atomicSave(y, f); }
+            catch (IOException ex) { plugin.getLogger().warning("Failed to save island " + id + ": " + ex.getMessage()); }
+        };
+        ExecutorService ex = ioExecutor;
+        if (ex == null || ex.isShutdown()) write.run();
+        else ex.execute(write);
+    }
 
     @Override
     public Collection<IslandData> loadAllIslands() {
@@ -150,7 +191,17 @@ public class YamlStorage implements DataStorage {
 
     @Override
     public void saveIsland(IslandData data) {
+        // Build the YAML snapshot on the calling (main) thread so it reflects a
+        // consistent view of the live data, then hand the disk write to the IO
+        // thread. Clearing dirty here — at snapshot time — means any mutation that
+        // lands afterwards re-marks the island for the next autosave.
         File f = new File(islandDir, data.getId() + ".yml");
+        YamlConfiguration y = buildIslandYaml(data);
+        data.clearDirty();
+        submitIslandWrite(y, f, data.getId());
+    }
+
+    private YamlConfiguration buildIslandYaml(IslandData data) {
         YamlConfiguration y = new YamlConfiguration();
         y.set("schemaVersion", SCHEMA_VERSION);
         y.set("id", data.getId().toString());
@@ -204,14 +255,18 @@ public class YamlStorage implements DataStorage {
             y.set("prestige.receivedTemplates",
                     data.getReceivedPrestigeTemplates().stream().sorted().toList());
         }
-        try { atomicSave(y, f); }
-        catch (IOException ex) { plugin.getLogger().warning("Failed to save island " + data.getId() + ": " + ex.getMessage()); }
+        return y;
     }
 
     @Override
     public void deleteIsland(UUID islandId) {
+        // Route deletes through the same IO thread so they stay ordered against any
+        // queued writes for the same island (a save then delete deletes last).
         File f = new File(islandDir, islandId + ".yml");
-        if (f.exists()) f.delete();
+        Runnable del = () -> { if (f.exists()) f.delete(); };
+        ExecutorService ex = ioExecutor;
+        if (ex == null || ex.isShutdown()) del.run();
+        else ex.execute(del);
     }
 
     @Override

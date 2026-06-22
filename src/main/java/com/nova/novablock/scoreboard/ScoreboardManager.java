@@ -30,6 +30,8 @@ public class ScoreboardManager {
 
     private final NovaBlock plugin;
     private final Map<UUID, Scoreboard> boards = new HashMap<>();
+    /** Last rendered title+lines per viewer, so the 1s tick only rebuilds the board when something changed. */
+    private final Map<UUID, List<String>> lastRendered = new HashMap<>();
     private BukkitTask ticker;
 
     /** Scoreboard sidebars are capped at 15 score lines by the vanilla client. */
@@ -131,22 +133,34 @@ public class ScoreboardManager {
                 && plugin.community().isEnabled()
                 && p.getWorld().getName().equals(plugin.community().communityWorldName());
 
+        String titleOverride = inCommunity ? customCommunityTitle : customTitle;
+        String titleStr = (titleOverride != null && !titleOverride.isBlank())
+                ? resolve(p, titleOverride)
+                : (inCommunity
+                        ? "<gradient:#FFB347:#FFD700><bold>Community"
+                        : "<gradient:#7B61FF:#4FC3F7><bold>NovaBlock");
+        List<String> lines = resolveLines(p, inCommunity);
+
+        // Push-on-change: the tick fires every second, but most seconds nothing
+        // visible changed. Skip the whole objective/team rebuild (and the nameplate
+        // refresh) when this viewer's title+lines match what we last rendered.
+        List<String> signature = new ArrayList<>(lines.size() + 1);
+        signature.add(titleStr);
+        signature.addAll(lines);
+        if (boards.containsKey(p.getUniqueId()) && signature.equals(lastRendered.get(p.getUniqueId()))) {
+            return;
+        }
+        lastRendered.put(p.getUniqueId(), signature);
+
         Scoreboard board = boards.computeIfAbsent(p.getUniqueId(),
                 u -> Bukkit.getScoreboardManager().getNewScoreboard());
         Objective obj = board.getObjective("nb");
         if (obj != null) obj.unregister();
-        String titleOverride = inCommunity ? customCommunityTitle : customTitle;
-        var title = (titleOverride != null && !titleOverride.isBlank())
-                ? Msg.mm(resolve(p, titleOverride))
-                : Msg.mm(inCommunity
-                        ? "<gradient:#FFB347:#FFD700><bold>Community"
-                        : "<gradient:#7B61FF:#4FC3F7><bold>NovaBlock");
-        obj = board.registerNewObjective("nb", Criteria.DUMMY, title);
+        obj = board.registerNewObjective("nb", Criteria.DUMMY, Msg.mm(titleStr));
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
         // Hide the red side scores on every line (Paper number-format API).
         obj.numberFormat(NumberFormat.blank());
 
-        List<String> lines = resolveLines(p, inCommunity);
         // Render top-to-bottom: highest score on top
         int score = lines.size();
         // Reuse a stable set of team names so we don't churn entities
@@ -348,6 +362,7 @@ public class ScoreboardManager {
     }
 
     public void clear(Player p) {
+        lastRendered.remove(p.getUniqueId());
         Scoreboard b = boards.remove(p.getUniqueId());
         if (b != null) {
             p.setScoreboard(Bukkit.getScoreboardManager().getNewScoreboard());
@@ -359,5 +374,6 @@ public class ScoreboardManager {
         if (ticker != null) { ticker.cancel(); ticker = null; }
         for (Player p : Bukkit.getOnlinePlayers()) clear(p);
         boards.clear();
+        lastRendered.clear();
     }
 }

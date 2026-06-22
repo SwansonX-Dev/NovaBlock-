@@ -65,6 +65,20 @@ public class IslandData {
     /** True until the owner has visited their own Nether for the first time. */
     private boolean firstNetherVisit = true;
 
+    /**
+     * Set whenever persisted state changes; cleared once written to disk. The
+     * autosave only rewrites dirty islands. Starts {@code false}: a freshly
+     * loaded island already matches its file, and {@code create()} saves once
+     * immediately. Mutated only from the main thread.
+     */
+    private transient boolean dirty;
+
+    /** Mark this island as having unsaved changes. */
+    public void markDirty() { this.dirty = true; }
+    public boolean isDirty() { return dirty; }
+    /** Clear the dirty flag — call right after the data has been (or is being) persisted. */
+    public void clearDirty() { this.dirty = false; }
+
     public IslandData(UUID id, UUID owner, String worldName, int slotX, int slotZ) {
         this.id = id;
         this.owner = owner;
@@ -98,6 +112,7 @@ public class IslandData {
         if (owner.equals(playerId) || !members.contains(playerId)) return;
         if (role == null || role == IslandRole.MEMBER) roles.remove(playerId);
         else roles.put(playerId, role);
+        markDirty();
     }
 
     // --- trusted players -----------------------------------------------------
@@ -113,16 +128,22 @@ public class IslandData {
      */
     public boolean addTrusted(UUID playerId) {
         if (owner.equals(playerId) || members.contains(playerId)) return false;
-        return trusted.add(playerId);
+        if (!trusted.add(playerId)) return false;
+        markDirty();
+        return true;
     }
 
     /** Revoke a player's trust. Returns false if they weren't trusted. */
-    public boolean removeTrusted(UUID playerId) { return trusted.remove(playerId); }
+    public boolean removeTrusted(UUID playerId) {
+        if (!trusted.remove(playerId)) return false;
+        markDirty();
+        return true;
+    }
 
     // --- island bank ---------------------------------------------------------
 
     public long getBankBalance() { return bankBalance; }
-    public void setBankBalance(long v) { this.bankBalance = Math.max(0, v); }
+    public void setBankBalance(long v) { this.bankBalance = Math.max(0, v); markDirty(); }
 
     /** Live flag map. Missing entries fall back to {@link IslandFlag#defaultValue}. */
     public Map<IslandFlag, Boolean> getFlags() { return flags; }
@@ -132,7 +153,7 @@ public class IslandData {
         return v == null ? f.defaultValue : v;
     }
 
-    public void setFlag(IslandFlag f, boolean v) { flags.put(f, v); }
+    public void setFlag(IslandFlag f, boolean v) { flags.put(f, v); markDirty(); }
 
     public Map<IslandUpgrade, Integer> getUpgrades() { return upgrades; }
 
@@ -143,66 +164,67 @@ public class IslandData {
 
     public void setUpgradeLevel(IslandUpgrade u, int level) {
         upgrades.put(u, Math.max(0, Math.min(u.maxLevel, level)));
+        markDirty();
     }
 
     public String getStorageBase64() { return storageBase64; }
-    public void setStorageBase64(String s) { this.storageBase64 = s == null ? "" : s; }
+    public void setStorageBase64(String s) { this.storageBase64 = s == null ? "" : s; markDirty(); }
 
     public Set<String> getReceivedPrestigeTemplates() { return receivedPrestigeTemplates; }
 
     public long getBlocksBroken() { return blocksBroken; }
-    public void setBlocksBroken(long v) { this.blocksBroken = v; }
-    public void incrementBlocksBroken() { this.blocksBroken++; }
+    public void setBlocksBroken(long v) { this.blocksBroken = v; markDirty(); }
+    public void incrementBlocksBroken() { this.blocksBroken++; markDirty(); }
 
     public int getPhaseIndex() { return phaseIndex; }
-    public void setPhaseIndex(int v) { this.phaseIndex = v; }
+    public void setPhaseIndex(int v) { this.phaseIndex = v; markDirty(); }
 
     public int getPhaseProgress() { return phaseProgress; }
-    public void setPhaseProgress(int v) { this.phaseProgress = v; }
-    public void incrementPhaseProgress() { this.phaseProgress++; }
+    public void setPhaseProgress(int v) { this.phaseProgress = v; markDirty(); }
+    public void incrementPhaseProgress() { this.phaseProgress++; markDirty(); }
 
     public int getPrestigeLevel() { return prestigeLevel; }
-    public void setPrestigeLevel(int v) { this.prestigeLevel = v; }
+    public void setPrestigeLevel(int v) { this.prestigeLevel = v; markDirty(); }
 
     public int getLevel() { return level; }
-    public void setLevel(int v) { this.level = v; }
+    public void setLevel(int v) { this.level = v; markDirty(); }
 
     public int getQuestlineStage() { return questlineStage; }
-    public void setQuestlineStage(int v) { this.questlineStage = Math.max(1, v); }
+    public void setQuestlineStage(int v) { this.questlineStage = Math.max(1, v); markDirty(); }
 
     public int getQuestlineProgress() { return questlineProgress; }
-    public void setQuestlineProgress(int v) { this.questlineProgress = Math.max(0, v); }
+    public void setQuestlineProgress(int v) { this.questlineProgress = Math.max(0, v); markDirty(); }
 
     public long getLastBossAt() { return lastBossAt; }
-    public void setLastBossAt(long v) { this.lastBossAt = v; }
+    public void setLastBossAt(long v) { this.lastBossAt = v; markDirty(); }
 
     public long getLastLootRoomAt() { return lastLootRoomAt; }
-    public void setLastLootRoomAt(long v) { this.lastLootRoomAt = v; }
+    public void setLastLootRoomAt(long v) { this.lastLootRoomAt = v; markDirty(); }
 
     // --- Nether accessors ----------------------------------------------------
 
     public long getNetherBlocksBroken() { return netherBlocksBroken; }
-    public void setNetherBlocksBroken(long v) { this.netherBlocksBroken = v; }
-    public void incrementNetherBlocksBroken() { this.netherBlocksBroken++; }
+    public void setNetherBlocksBroken(long v) { this.netherBlocksBroken = v; markDirty(); }
+    public void incrementNetherBlocksBroken() { this.netherBlocksBroken++; markDirty(); }
 
     public int getNetherPhaseIndex() { return netherPhaseIndex; }
-    public void setNetherPhaseIndex(int v) { this.netherPhaseIndex = v; }
+    public void setNetherPhaseIndex(int v) { this.netherPhaseIndex = v; markDirty(); }
 
     public int getNetherPhaseProgress() { return netherPhaseProgress; }
-    public void setNetherPhaseProgress(int v) { this.netherPhaseProgress = v; }
-    public void incrementNetherPhaseProgress() { this.netherPhaseProgress++; }
+    public void setNetherPhaseProgress(int v) { this.netherPhaseProgress = v; markDirty(); }
+    public void incrementNetherPhaseProgress() { this.netherPhaseProgress++; markDirty(); }
 
     public long getNetherLastBossAt() { return netherLastBossAt; }
-    public void setNetherLastBossAt(long v) { this.netherLastBossAt = v; }
+    public void setNetherLastBossAt(long v) { this.netherLastBossAt = v; markDirty(); }
 
     public long getNetherLastLootRoomAt() { return netherLastLootRoomAt; }
-    public void setNetherLastLootRoomAt(long v) { this.netherLastLootRoomAt = v; }
+    public void setNetherLastLootRoomAt(long v) { this.netherLastLootRoomAt = v; markDirty(); }
 
     public boolean isNetherUnlocked() { return netherUnlocked; }
-    public void setNetherUnlocked(boolean v) { this.netherUnlocked = v; }
+    public void setNetherUnlocked(boolean v) { this.netherUnlocked = v; markDirty(); }
 
     public boolean isFirstNetherVisit() { return firstNetherVisit; }
-    public void setFirstNetherVisit(boolean v) { this.firstNetherVisit = v; }
+    public void setFirstNetherVisit(boolean v) { this.firstNetherVisit = v; markDirty(); }
 
     /** Centre block (the one that regenerates). */
     public Location centerBlock() {
