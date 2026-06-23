@@ -6,6 +6,11 @@ authors: [Nova]
 description: A reimagined OneBlock experience with phases, bosses, loot rooms, skill trees, prophecies and more.
 load: POSTWORLD
 depend: [xEconomy]
+# Must enable before Multiverse-Core so our void ChunkGenerator is registered by
+# the time Multiverse loads the island worlds with `generator: NovaBlock`.
+# Without this, Multiverse can't resolve the generator and the world loads as
+# vanilla terrain (which IslandWorldManager then just adopts).
+loadbefore: [Multiverse-Core]
 softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, LuckPerms, xPets, xTags, OGOneBlock]
 
 commands:
