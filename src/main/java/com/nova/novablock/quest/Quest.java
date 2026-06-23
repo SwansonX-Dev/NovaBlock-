@@ -23,6 +23,7 @@ public record Quest(String id, String displayName, String description,
         KILL_BOSS,
         FULFILL_PROPHECY,
         REACH_COMBO,
+        HARVEST_CROPS,
         COMMUNITY_BREAK,
         OG_BREAK,
         PET_GATHER

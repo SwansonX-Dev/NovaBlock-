@@ -293,6 +293,24 @@ prestige:
     - "petadmin give %player% novablock_prestige_%level_capped%"
     - "swansonstocks give %player% 10"
 
+# Manual-farming rewards. Hand-harvesting fully-grown crops builds a "farming
+# combo" — a short streak that ramps a temporary xEconomy sell boost plus bonus
+# Farming XP. Minions never trigger this (they don't break blocks), so the combo
+# is purely a reward for hands-on farming. Pairs well with xEconomy's Crop of the
+# Day. Requires xEconomy 0.4.0+ for the sell boost.
+farming:
+  combo:
+    # The streak resets if you go this long without harvesting a crop.
+    window-seconds: 6
+    # Sell-price bonus added per combo step (0.02 = +2% per harvest in the streak).
+    boost-per-combo: 0.02
+    # Maximum sell bonus the combo can reach (0.50 = +50%). NOTE: the sell boost
+    # is whole-payout (xEconomy has no per-item hook), so while a combo is hot any
+    # sale is boosted — by design, and the short window keeps it tied to farming.
+    boost-cap: 0.50
+    # Bonus Farming XP granted per combo step.
+    xp-per-combo: 2
+
 # Weekly sprint. Two parallel boards reset Monday 00:00 server-local; the
 # Sunday 20:00 podium broadcasts top 3 and dispatches the rewards below.
 # Island progress is never touched — only the per-week counters reset.

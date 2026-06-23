@@ -78,6 +78,10 @@ public class QuestManager {
                 QuestType.FULFILL_PROPHECY, QuestCategory.PERSONAL, null, Material.AMETHYST_SHARD, 2, 1600, 540));
         pool.add(new Quest("p_combo", "On a Roll", "Reach a x25 break combo.",
                 QuestType.REACH_COMBO, QuestCategory.PERSONAL, null, Material.BLAZE_POWDER, 25, 1300, 440));
+        pool.add(new Quest("p_harvest", "Green Harvest", "Harvest 64 fully-grown crops by hand.",
+                QuestType.HARVEST_CROPS, QuestCategory.PERSONAL, null, Material.WHEAT, 64, 900, 320));
+        pool.add(new Quest("p_harvest_big", "Bumper Crop", "Harvest 256 fully-grown crops by hand.",
+                QuestType.HARVEST_CROPS, QuestCategory.PERSONAL, null, Material.HAY_BLOCK, 256, 2400, 820));
 
         // --- Community OneBlock -------------------------------------------------
         pool.add(new Quest("c_contrib", "Community Pillar", "Break 150 blocks on the Community OneBlock.",
@@ -221,6 +225,9 @@ public class QuestManager {
     public void onProphecyFulfilled(Player p) { advanceType(p, QuestType.FULFILL_PROPHECY, 1); }
 
     public void onCommunityBreak(Player p) { advanceType(p, QuestType.COMMUNITY_BREAK, 1); }
+
+    /** A fully-grown crop harvested by hand (fired from {@code SkillActionListener}). */
+    public void onCropHarvested(Player p) { advanceType(p, QuestType.HARVEST_CROPS, 1); }
 
     /** A combo is a high-water mark, not an accumulation — record the best reached. */
     public void onComboReached(Player p, int combo) {

@@ -68,6 +68,7 @@ public final class NovaBlock extends JavaPlugin {
     private PrestigeManager prestigeManager;
     private LoginStreakManager loginStreakManager;
     private QuestManager questManager;
+    private com.nova.novablock.farming.FarmingComboManager farmingComboManager;
     private com.nova.novablock.questline.IslandQuestlineManager islandQuestlineManager;
     private PaxelManager paxelManager;
     private BlockListener blockListener;
@@ -133,6 +134,7 @@ public final class NovaBlock extends JavaPlugin {
 
         this.questManager = new QuestManager(this);
         this.questManager.loadDailyQuests();
+        this.farmingComboManager = new com.nova.novablock.farming.FarmingComboManager(this);
         this.islandQuestlineManager = new com.nova.novablock.questline.IslandQuestlineManager(this);
         this.paxelManager = new PaxelManager(this);
         this.hotbarManager = new HotbarMenuManager(this);
@@ -238,10 +240,15 @@ public final class NovaBlock extends JavaPlugin {
         var sellBoosts = dev.xsuite.economy.api.XEconomy.sellBoosts();
         if (sellBoosts != null) {
             sellBoosts.register("novablock-prestige", prestigeManager::sellMultiplierFor);
+            // Manual-farming combo sell boost — a hot harvest streak briefly lifts sell payouts.
+            sellBoosts.register("novablock-farming-combo", farmingComboManager::sellMultiplierFor);
         } else {
             getLogger().warning("xEconomy sell-boost API not available (needs xEconomy 0.4.0+) — "
                     + "prestige sell boost is disabled.");
         }
+
+        // Expire stale farming-combo entries so the map can't grow over a long uptime.
+        getServer().getScheduler().runTaskTimer(this, farmingComboManager::sweep, 6000L, 6000L);
 
         // Plug NovaBlock into the /help index so players can discover commands without leaving chat.
         HelpRegistrar.register(this);
@@ -265,7 +272,10 @@ public final class NovaBlock extends JavaPlugin {
         // Unhook the prestige sell boost so a reloaded NovaBlock re-registers cleanly.
         try {
             var sellBoosts = dev.xsuite.economy.api.XEconomy.sellBoosts();
-            if (sellBoosts != null) sellBoosts.unregister("novablock-prestige");
+            if (sellBoosts != null) {
+                sellBoosts.unregister("novablock-prestige");
+                sellBoosts.unregister("novablock-farming-combo");
+            }
         } catch (Throwable ignored) {
             // xEconomy may already be disabled during shutdown ordering.
         }
@@ -325,6 +335,7 @@ public final class NovaBlock extends JavaPlugin {
     public PrestigeManager prestige() { return prestigeManager; }
     public LoginStreakManager loginStreaks() { return loginStreakManager; }
     public QuestManager quests() { return questManager; }
+    public com.nova.novablock.farming.FarmingComboManager farmingCombo() { return farmingComboManager; }
 
     public com.nova.novablock.questline.IslandQuestlineManager islandQuestline() { return islandQuestlineManager; }
     public PaxelManager paxels() { return paxelManager; }

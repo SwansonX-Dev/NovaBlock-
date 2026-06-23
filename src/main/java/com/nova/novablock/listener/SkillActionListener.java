@@ -92,6 +92,12 @@ public class SkillActionListener implements Listener {
     private void handleFarming(Player p, PlayerProgression prog, Block block, Material m) {
         plugin.progression().addXp(p, SkillType.FARMING, SkillEffects.xpPerAction(SkillType.FARMING));
 
+        // Manual-farming rewards: build the harvest combo (sell boost + bonus XP)
+        // and advance any "harvest crops" daily quest. Both fire only here — i.e.
+        // only on a real hand-harvest, never for minion output.
+        plugin.farmingCombo().recordHarvest(p);
+        plugin.quests().onCropHarvested(p);
+
         boolean green = plugin.abilities().tryActivate(p, ActiveAbility.GREEN_TERRA);
         int extra = 0;
         if (plugin.abilities().isActive(p, ActiveAbility.GREEN_TERRA)) {

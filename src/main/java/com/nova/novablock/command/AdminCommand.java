@@ -51,6 +51,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 plugin.phases().loadPhases();
                 plugin.phases().loadNetherPhases();
                 plugin.quests().loadDailyQuests();
+                plugin.farmingCombo().reload();
                 plugin.islandQuestline().reloadConfig();
                 plugin.antiAfk().reload();
                 plugin.prestige().reload();
