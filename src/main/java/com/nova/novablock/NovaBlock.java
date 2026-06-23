@@ -365,4 +365,29 @@ public final class NovaBlock extends JavaPlugin {
     public com.nova.novablock.community.NodePoolManager nodePools() { return nodePoolManager; }
     public ClaimBlockRewardService claimBlockRewards() { return claimBlockRewardService; }
     public IslandVisitService visits() { return islandVisitService; }
+
+    /**
+     * Exposes NovaBlock's void terrain to whoever loads the island world, so the
+     * generator is applied by name regardless of load order. Without this, a
+     * world loaded by Multiverse or bukkit.yml before our onEnable comes up as
+     * normal terrain and {@link IslandWorldManager#ensureWorld} then just adopts
+     * it (it only attaches its own generator to worlds it creates itself).
+     *
+     * <p>Reference it with Multiverse {@code -g NovaBlock} or bukkit.yml
+     * {@code worlds: { oneblock: { generator: NovaBlock } }}.
+     */
+    @Override
+    public org.bukkit.generator.ChunkGenerator getDefaultWorldGenerator(String worldName, String id) {
+        return new IslandWorldManager.VoidGenerator();
+    }
+
+    /** Matching biome provider so the void world reads as a coherent biome (Nether for the nether island world). */
+    @Override
+    public org.bukkit.generator.BiomeProvider getDefaultBiomeProvider(String worldName, String id) {
+        String nether = getConfig().getString("netherIslandWorld", IslandWorldManager.DEFAULT_NETHER_WORLD_NAME);
+        boolean isNether = (nether != null && nether.equalsIgnoreCase(worldName))
+                || IslandWorldManager.DEFAULT_NETHER_WORLD_NAME.equalsIgnoreCase(worldName);
+        return new IslandWorldManager.SingleBiomeProvider(
+                isNether ? org.bukkit.block.Biome.CRIMSON_FOREST : org.bukkit.block.Biome.PLAINS);
+    }
 }
