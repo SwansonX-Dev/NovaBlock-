@@ -94,13 +94,14 @@ public class IslandWorldManager {
         var cfg = plugin.getConfig();
         boolean disableSpawning = cfg.getBoolean("disableNaturalSpawning", true);
         boolean keepInv = cfg.getBoolean("keepInventoryOnDeath", true);
+        boolean mobGriefing = cfg.getBoolean("mobGriefing", true);
         world.setSpawnFlags(false, false);
         world.setDifficulty(Difficulty.NORMAL);
         world.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, !disableSpawning);
         world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, true);
         world.setGameRule(org.bukkit.GameRule.KEEP_INVENTORY, keepInv);
         world.setGameRule(org.bukkit.GameRule.DO_FIRE_TICK, false);
-        world.setGameRule(org.bukkit.GameRule.MOB_GRIEFING, false);
+        world.setGameRule(org.bukkit.GameRule.MOB_GRIEFING, mobGriefing);
     }
 
     public World getWorld() { return world; }

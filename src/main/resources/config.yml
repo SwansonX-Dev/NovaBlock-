@@ -31,6 +31,12 @@ slotSize: 256
 # Disable any vanilla mob spawning in the OneBlock world (recommended true).
 disableNaturalSpawning: true
 
+# mobGriefing gamerule for the OneBlock worlds (overworld + nether). Keep true so
+# villagers farm, copper golems sort chests, endermen/etc. behave normally. This
+# is reapplied on every startup, so set it here rather than via /gamerule (manual
+# /gamerule edits get overwritten on the next restart).
+mobGriefing: true
+
 # Whether to keep inventory on death inside the OneBlock world.
 keepInventoryOnDeath: true
 
