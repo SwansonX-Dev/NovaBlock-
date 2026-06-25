@@ -76,18 +76,20 @@ public class ArenaRoom implements LootRoom {
 
     @Override
     public void tick(LootRoomRun run) {
-        Player p = run.player();
-        if (p == null) { run.markFinished(); return; }
+        java.util.List<Player> players = run.players();
+        if (players.isEmpty()) return; // manager aborts an empty run; nothing to fight
+        org.bukkit.World world = run.anchor().getWorld();
+        if (world == null) return;
         int wave = (int) (run.state() >>> 32);
         int remaining = (int) (run.state() & 0xFFFFFFFFL);
 
         // Count nearby alive mobs spawned for THIS run only. We match on our own
-        // arena-mob tag rather than "any non-player LivingEntity" so the player's
+        // arena-mob tag rather than "any non-player LivingEntity" so a player's
         // xPets companion (which follows them into the rift world) doesn't keep the
         // count above zero — otherwise the first wave never spawns and waves never
         // advance.
         int alive = 0;
-        for (var e : p.getWorld().getNearbyEntities(run.anchor(), RADIUS + 2, 8, RADIUS + 2)) {
+        for (var e : world.getNearbyEntities(run.anchor(), RADIUS + 2, 8, RADIUS + 2)) {
             if (e instanceof LivingEntity le && !(le instanceof Player) && !le.isDead()
                     && le.getPersistentDataContainer().has(arenaMobKey, PersistentDataType.BYTE)) alive++;
         }
@@ -98,25 +100,39 @@ public class ArenaRoom implements LootRoom {
                 run.markFinished();
                 return;
             }
-            int toSpawn = 3 + wave * 2;
+            // Scale the wave to the party size so a group isn't trivial.
+            int toSpawn = (3 + wave * 2) * Math.max(1, players.size());
             var pool = theme.mobPool();
             var rng = ThreadLocalRandom.current();
             for (int i = 0; i < toSpawn; i++) {
                 Location at = run.anchor().clone().add(rng.nextInt(-RADIUS + 2, RADIUS - 2), 1, rng.nextInt(-RADIUS + 2, RADIUS - 2));
-                var ent = p.getWorld().spawnEntity(at, pool.get(rng.nextInt(pool.size())));
+                var ent = world.spawnEntity(at, pool.get(rng.nextInt(pool.size())));
                 if (ent instanceof LivingEntity le) {
                     le.setRemoveWhenFarAway(false);
                     le.getPersistentDataContainer().set(arenaMobKey, PersistentDataType.BYTE, (byte) 1);
-                    if (ent instanceof org.bukkit.entity.Mob mob) mob.setTarget(p);
+                    if (ent instanceof org.bukkit.entity.Mob mob) mob.setTarget(nearest(players, at));
                 }
             }
-            Msg.title(p, "<red>Wave " + wave, "<gray>" + toSpawn + " enemies incoming");
-            p.playSound(p.getLocation(), Sound.EVENT_RAID_HORN, 0.5f, 0.7f);
+            for (Player p : players) {
+                Msg.title(p, "<red>Wave " + wave, "<gray>" + toSpawn + " enemies incoming");
+                p.playSound(p.getLocation(), Sound.EVENT_RAID_HORN, 0.5f, 0.7f);
+            }
             run.setState(((long) (wave + 1) << 32) | toSpawn);
             return;
         }
         // Update remaining count to actual alive count
         run.setState(((long) wave << 32) | Math.max(0, alive));
+    }
+
+    /** Closest party member to {@code at} (all participants share the rift world). */
+    private Player nearest(java.util.List<Player> players, Location at) {
+        Player best = null;
+        double bestSq = Double.MAX_VALUE;
+        for (Player p : players) {
+            double d = p.getLocation().distanceSquared(at);
+            if (d < bestSq) { bestSq = d; best = p; }
+        }
+        return best;
     }
 
     @Override

@@ -37,14 +37,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
 public class LootRoomManager implements Listener {
 
+    /** How long a rift's portal stays open for others to step in after the opener enters. */
+    private static final long JOIN_WINDOW_MS = 60_000L;
+
     private final NovaBlock plugin;
     private final Map<String, LootRoom> registry = new HashMap<>();
-    private final Map<UUID, LootRoomRun> active = new HashMap<>();
+    /** Active runs keyed by their unique instance world name (one entry per rift). */
+    private final Map<String, LootRoomRun> runsByWorld = new HashMap<>();
+    /** Every participant (opener + joiners) → their run, for per-player lookups. */
+    private final Map<UUID, LootRoomRun> runByPlayer = new HashMap<>();
     /** Players who have a rift offered. */
     private final Map<UUID, RiftOffer> offers = new HashMap<>();
     /** Players who died mid-run; we'll redirect their respawn to the saved return location. */
@@ -121,44 +128,49 @@ public class LootRoomManager implements Listener {
 
     private void tickAll() {
         long now = System.currentTimeMillis();
-        // Clean up expired offers + remove their portal frames
+        // Clean up expired offers + remove their portal frames. An opened offer
+        // expiring just closes its join window — the run it spawned ticks on.
         offers.entrySet().removeIf(e -> {
             if (e.getValue().expiresAt < now) {
                 e.getValue().clearMarker();
-                Player p = Bukkit.getPlayer(e.getKey());
-                if (p != null) Msg.actionBar(p, "<gray>Rift fizzled away.");
+                if (!e.getValue().opened()) {
+                    Player p = Bukkit.getPlayer(e.getKey());
+                    if (p != null) Msg.actionBar(p, "<gray>Rift fizzled away.");
+                }
                 return true;
             }
             return false;
         });
-        // Trigger entry when the player is on or one block above the marker
+        // Offer handling: an unopened offer waits for its OWNER to step on to open
+        // the rift; an opened offer's portal lets ANYONE step on to join the run.
         for (var entry : new HashMap<>(offers).entrySet()) {
-            Player p = Bukkit.getPlayer(entry.getKey());
-            if (p == null) continue;
             RiftOffer offer = entry.getValue();
-            if (!p.getWorld().getName().equals(offer.worldName)) continue;
-            int px = p.getLocation().getBlockX();
-            int py = p.getLocation().getBlockY();
-            int pz = p.getLocation().getBlockZ();
-            // Player stands on the portal (py == bx+1) OR is in it (py == by).
-            boolean onPortal = px == offer.bx && pz == offer.bz
-                    && (py == offer.by || py == offer.by + 1);
-            if (onPortal) enter(p, offer);
+            if (!offer.opened()) {
+                Player owner = Bukkit.getPlayer(entry.getKey());
+                if (owner != null && onPortal(owner, offer)) enter(owner, offer);
+                continue;
+            }
+            LootRoomRun run = runsByWorld.get(offer.openedWorld);
+            if (run == null) { offer.clearMarker(); offers.remove(entry.getKey()); continue; }
+            World w = Bukkit.getWorld(offer.worldName);
+            if (w == null) continue;
+            for (Player p : w.getPlayers()) {
+                if (!run.hasParticipant(p.getUniqueId()) && onPortal(p, offer)) joinRun(p, run);
+            }
         }
         // Tick runs
-        for (var it = active.entrySet().iterator(); it.hasNext(); ) {
+        for (var it = runsByWorld.entrySet().iterator(); it.hasNext(); ) {
             LootRoomRun run = it.next().getValue();
-            // If the player has left the rift world (teleport, portal,
-            // plugin-driven warp) the run would tick forever and ArenaRoom's
-            // p.getWorld().getNearbyEntities(run.anchor(), ...) would throw
-            // "Location cannot be in a different world" every cadence. Abort
-            // the run cleanly instead — no reward, mobs and rift world purged.
-            Player p = run.player();
             World anchorWorld = run.anchor().getWorld();
-            if (p == null || anchorWorld == null || !p.getWorld().equals(anchorWorld)) {
-                cleanupRoomMobs(run);
-                cleanupRunWorld(run);
+            // Drop participants who went offline or left the rift world (teleport,
+            // plugin-driven warp). Room logic only ever touches players still inside,
+            // so this keeps ArenaRoom from throwing cross-world on getNearbyEntities.
+            if (anchorWorld != null) pruneParticipants(run, anchorWorld);
+            // No one left inside (or the world is gone) → abort cleanly, no reward.
+            if (anchorWorld == null || run.participants().isEmpty()) {
                 it.remove();
+                cleanupRunWorld(run);
+                forgetRun(run);
                 continue;
             }
             try { run.room().tick(run); } catch (Throwable t) {
@@ -166,23 +178,77 @@ public class LootRoomManager implements Listener {
             }
             if (run.finished()) {
                 complete(run);
-                cleanupRunWorld(run);
                 it.remove();
+                cleanupRunWorld(run);
+                forgetRun(run);
             }
         }
     }
 
+    /** True if {@code p} is standing on (or one block inside) the offer's portal frame. */
+    private boolean onPortal(Player p, RiftOffer offer) {
+        if (!p.getWorld().getName().equals(offer.worldName)) return false;
+        int px = p.getLocation().getBlockX();
+        int py = p.getLocation().getBlockY();
+        int pz = p.getLocation().getBlockZ();
+        return px == offer.bx && pz == offer.bz && (py == offer.by || py == offer.by + 1);
+    }
+
+    /** Remove participants who logged off or are no longer inside the rift world. */
+    private void pruneParticipants(LootRoomRun run, World anchorWorld) {
+        for (Iterator<UUID> it = run.participants().iterator(); it.hasNext(); ) {
+            UUID id = it.next();
+            Player p = Bukkit.getPlayer(id);
+            if (p == null || !p.isOnline() || !p.getWorld().equals(anchorWorld)) {
+                it.remove();
+                runByPlayer.remove(id, run);
+            }
+        }
+    }
+
+    /** Bring a player into an already-running rift via its open portal. */
+    private void joinRun(Player p, LootRoomRun run) {
+        LootRoomRun existing = runByPlayer.get(p.getUniqueId());
+        if (existing == run) return;
+        if (existing != null) finishEarly(p); // can't be in two rifts at once
+        run.addParticipant(p.getUniqueId());
+        runByPlayer.put(p.getUniqueId(), run);
+        p.teleport(run.entryLocation());
+        Msg.title(p, "<light_purple>" + run.room().displayName(), "<gray>You joined the rift");
+        p.playSound(p.getLocation(), Sound.ITEM_CHORUS_FRUIT_TELEPORT, 1f, 1f);
+        for (Player other : run.players()) {
+            if (!other.equals(p)) Msg.actionBar(other, "<light_purple>" + p.getName() + " joined the rift!");
+        }
+    }
+
+    /** Forget a finished/aborted run's bookkeeping: participant lookups + its open portal. */
+    private void forgetRun(LootRoomRun run) {
+        for (UUID id : run.participants()) runByPlayer.remove(id, run);
+        closeOfferFor(run);
+    }
+
+    /** Remove and clear the join portal that opened this run, if it's still around. */
+    private void closeOfferFor(LootRoomRun run) {
+        offers.entrySet().removeIf(e -> {
+            if (run.worldName().equals(e.getValue().openedWorld)) {
+                e.getValue().clearMarker();
+                return true;
+            }
+            return false;
+        });
+    }
+
     private void enter(Player p, RiftOffer offer) {
-        offers.remove(p.getUniqueId());
-        offer.clearMarker();
         LootRoom room = registry.get(offer.roomId);
         Island island = plugin.islands().get(offer.islandId);
-        if (room == null || island == null) return;
-        if (active.containsKey(p.getUniqueId())) finishEarly(p);
+        if (room == null || island == null) { offers.remove(p.getUniqueId()); offer.clearMarker(); return; }
+        if (runByPlayer.containsKey(p.getUniqueId())) finishEarly(p);
         RoomTheme theme = themeForRoomId(room.id());
         World instance = createInstanceWorld(p, theme);
         if (instance == null) {
             Msg.send(p, "<red>Could not create a private rift world. Try again.");
+            offers.remove(p.getUniqueId());
+            offer.clearMarker();
             return;
         }
         Location anchor = new Location(instance, 0, 100, 0);
@@ -191,22 +257,35 @@ public class LootRoomManager implements Listener {
         // Capturing p.getLocation() risked stranding them in mid-air where the rift
         // portal used to sit (the portal block is outside the bedrock skirt).
         Location returnLoc = island.data().spawnLocation();
-        LootRoomRun run = new LootRoomRun(room, p.getUniqueId(), island, anchor,
+        LootRoomRun run = new LootRoomRun(room, p.getUniqueId(), island, anchor, entry,
                 returnLoc, instance.getName(), Bukkit.getCurrentTick());
-        active.put(p.getUniqueId(), run);
+        runsByWorld.put(instance.getName(), run);
+        runByPlayer.put(p.getUniqueId(), run);
+        // Keep the portal standing so others can step in — it now feeds this run.
+        // Re-open the join window from now so latecomers aren't cut off by the
+        // original 30s offer timer.
+        offer.openedWorld = instance.getName();
+        offer.expiresAt = System.currentTimeMillis() + JOIN_WINDOW_MS;
         p.teleport(entry);
         room.onStart(run, p);
         Msg.title(p, "<light_purple>" + room.displayName(), "<gray>Complete to claim loot");
+        Msg.send(p, "<light_purple>Others can join — have them step on the rift portal within "
+                + (JOIN_WINDOW_MS / 1000) + "s.");
         p.playSound(p.getLocation(), Sound.ITEM_CHORUS_FRUIT_TELEPORT, 1f, 1f);
     }
 
+    /** Pull a single player out of their run. Ends the whole run only if they were the last one in. */
     public void finishEarly(Player p) {
-        LootRoomRun run = active.remove(p.getUniqueId());
+        LootRoomRun run = runByPlayer.remove(p.getUniqueId());
         if (run == null) return;
-        cleanupRoomMobs(run);
+        run.removeParticipant(p.getUniqueId());
         p.teleport(run.returnLocation());
-        cleanupRunWorld(run);
         Msg.actionBar(p, "<gray>You forfeited the rift.");
+        if (run.participants().isEmpty()) {
+            runsByWorld.remove(run.worldName());
+            cleanupRunWorld(run);
+            closeOfferFor(run);
+        }
     }
 
     /**
@@ -228,11 +307,18 @@ public class LootRoomManager implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onDeath(PlayerDeathEvent event) {
         UUID id = event.getEntity().getUniqueId();
-        LootRoomRun run = active.remove(id);
+        LootRoomRun run = runByPlayer.remove(id);
         if (run == null) return;
+        run.removeParticipant(id);
         pendingReturn.put(id, run.returnLocation());
-        pendingCleanup.put(id, run);
-        cleanupRoomMobs(run);
+        // Only tear the rift down once the LAST participant has fallen — otherwise
+        // a co-op partner's death would purge the world out from under the survivors.
+        if (run.participants().isEmpty()) {
+            runsByWorld.remove(run.worldName());
+            cleanupRoomMobs(run);
+            pendingCleanup.put(id, run);
+            closeOfferFor(run);
+        }
         Msg.title(event.getEntity(), "<red>Rift Failed", "<gray>You fell in battle — no rewards.");
     }
 
@@ -248,17 +334,22 @@ public class LootRoomManager implements Listener {
         }
     }
 
-    /** If a runner logs out mid-run, abort it cleanly so we don't leak ticking arenas. */
+    /** If a runner logs out mid-run, drop them; abort the run only if they were the last one in. */
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        LootRoomRun run = active.remove(event.getPlayer().getUniqueId());
+        UUID id = event.getPlayer().getUniqueId();
+        LootRoomRun run = runByPlayer.remove(id);
         if (run != null) {
-            cleanupRoomMobs(run);
-            cleanupRunWorld(run);
+            run.removeParticipant(id);
+            if (run.participants().isEmpty()) {
+                runsByWorld.remove(run.worldName());
+                cleanupRunWorld(run);
+                closeOfferFor(run);
+            }
         }
-        LootRoomRun pending = pendingCleanup.remove(event.getPlayer().getUniqueId());
+        LootRoomRun pending = pendingCleanup.remove(id);
         if (pending != null) cleanupRunWorld(pending);
-        pendingReturn.remove(event.getPlayer().getUniqueId());
+        pendingReturn.remove(id);
     }
 
     // ---- room protection: nothing inside an active arena should be break/place/explodable ----
@@ -270,7 +361,7 @@ public class LootRoomManager implements Listener {
 
     private LootRoomRun runAt(Location loc) {
         if (loc == null) return null;
-        for (LootRoomRun run : active.values()) {
+        for (LootRoomRun run : runsByWorld.values()) {
             Location a = run.anchor();
             if (a == null || a.getWorld() == null) continue;
             if (!a.getWorld().equals(loc.getWorld())) continue;
@@ -323,43 +414,66 @@ public class LootRoomManager implements Listener {
         event.blockList().removeIf(b -> insideAnyRoom(b.getLocation()));
     }
 
+    /** Rifts are co-op: party members can't hurt each other. Mobs still damage players. */
+    @EventHandler(ignoreCancelled = true)
+    public void onPvpInRoom(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof Player)) return;
+        if (runAt(event.getEntity().getLocation()) == null) return;
+        if (damagerPlayer(event.getDamager()) != null) event.setCancelled(true);
+    }
+
+    /** The player behind a damage source — directly or via a projectile they fired. */
+    private Player damagerPlayer(Entity damager) {
+        if (damager instanceof Player p) return p;
+        if (damager instanceof org.bukkit.entity.Projectile proj
+                && proj.getShooter() instanceof Player p) return p;
+        return null;
+    }
+
     private void complete(LootRoomRun run) {
-        Player p = run.player();
-        if (p == null) return;
+        java.util.List<Player> winners = run.players();
+        if (winners.isEmpty()) return;
         Island island = plugin.islands().get(run.islandId());
+        if (island == null) return;
+
+        // Coin reward goes to the island bank ONCE. JACKPOT (the opener's Luck 10
+        // perk) and the Double Coins event still apply to that single payout.
         int reward = run.room().rewardCoins(island);
-        // JACKPOT (Luck 10): +25% coin from chest-style rewards. Loot-room payouts qualify.
-        if (com.nova.novablock.progression.Perk.hasPerk(plugin.progression().get(p),
+        Player opener = run.player();
+        if (opener != null && com.nova.novablock.progression.Perk.hasPerk(plugin.progression().get(opener),
                 com.nova.novablock.progression.Perk.JACKPOT)) {
             reward = (int) Math.round(reward * 1.25);
         }
         if (plugin.seasons().active() == com.nova.novablock.season.SeasonManager.ServerEvent.DOUBLE_COINS) reward *= 2;
         plugin.economy().award(island, reward);
-        // Loot-room completion is a magical event — reward MAGIC XP so the tree actually levels.
-        plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.MAGIC, 50L);
-        plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.LUCK, 20L);
-        p.teleport(run.returnLocation());
 
-        // Actual loot — each room defines a thematic drop list. Anything that
-        // doesn't fit in the player's inventory falls at their feet so they
-        // never silently lose a reward.
-        var loot = run.room().rewardItems(island);
-        int itemCount = 0;
-        for (var item : loot) {
-            if (item == null || item.getAmount() <= 0) continue;
-            itemCount += item.getAmount();
-            var overflow = p.getInventory().addItem(item);
-            for (var leftover : overflow.values()) {
-                p.getWorld().dropItemNaturally(p.getLocation(), leftover);
+        // Loot + XP + completion credit are PER participant — each gets their own copy.
+        for (Player p : winners) {
+            plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.MAGIC, 50L);
+            plugin.progression().addXp(p, com.nova.novablock.progression.SkillType.LUCK, 20L);
+            p.teleport(run.returnLocation());
+
+            // Anything that doesn't fit in the player's inventory falls at their
+            // feet so they never silently lose a reward. Each room's drop list is
+            // freshly built per player, so clones aren't required.
+            var loot = run.room().rewardItems(island);
+            int itemCount = 0;
+            for (var item : loot) {
+                if (item == null || item.getAmount() <= 0) continue;
+                itemCount += item.getAmount();
+                var overflow = p.getInventory().addItem(item);
+                for (var leftover : overflow.values()) {
+                    p.getWorld().dropItemNaturally(p.getLocation(), leftover);
+                }
             }
-        }
 
-        Msg.title(p, "<gold>Rift Cleared!", "<yellow>+" + reward + " coins · <aqua>" + itemCount + " items");
-        Msg.actionBar(p, "<gray>Check your inventory for loot.");
-        p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
-        plugin.quests().onLootRoomCompleted(p);
-        plugin.islandQuestline().record(p, com.nova.novablock.questline.IslandObjective.CLEAR_LOOT_ROOMS, 1);
-        plugin.seasonalPaths().award(p, com.nova.novablock.season.SeasonalPathManager.PathSource.LOOT_ROOM, 90);
+            Msg.title(p, "<gold>Rift Cleared!", "<yellow>+" + reward + " coins · <aqua>" + itemCount + " items");
+            Msg.actionBar(p, "<gray>Check your inventory for loot.");
+            p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+            plugin.quests().onLootRoomCompleted(p);
+            plugin.islandQuestline().record(p, com.nova.novablock.questline.IslandObjective.CLEAR_LOOT_ROOMS, 1);
+            plugin.seasonalPaths().award(p, com.nova.novablock.season.SeasonalPathManager.PathSource.LOOT_ROOM, 90);
+        }
     }
 
     private RoomTheme themeForRoomId(String roomId) {
@@ -427,17 +541,17 @@ public class LootRoomManager implements Listener {
         }
     }
 
-    public LootRoomRun getRun(Player p) { return active.get(p.getUniqueId()); }
+    public LootRoomRun getRun(Player p) { return runByPlayer.get(p.getUniqueId()); }
 
     public void shutdown() {
         if (tickTask != null) { tickTask.cancel(); tickTask = null; }
         // Send any active runs back to their return location so players aren't stranded.
-        for (LootRoomRun run : active.values()) {
-            Player p = run.player();
-            if (p != null) p.teleport(run.returnLocation());
+        // cleanupRunWorld teleports every player in the instance out before deleting it.
+        for (LootRoomRun run : runsByWorld.values()) {
             cleanupRunWorld(run);
         }
-        active.clear();
+        runsByWorld.clear();
+        runByPlayer.clear();
         for (LootRoomRun run : pendingCleanup.values()) cleanupRunWorld(run);
         pendingCleanup.clear();
         pendingReturn.clear();
@@ -452,7 +566,9 @@ public class LootRoomManager implements Listener {
         final UUID islandId;
         final String worldName;
         final int bx, by, bz;
-        final long expiresAt;
+        long expiresAt;
+        /** Non-null once the opener has entered: the instance world this portal now feeds for joiners. */
+        String openedWorld;
 
         RiftOffer(String roomId, UUID islandId, String worldName, int bx, int by, int bz, long expiresAt) {
             this.roomId = roomId;
@@ -461,6 +577,8 @@ public class LootRoomManager implements Listener {
             this.bx = bx; this.by = by; this.bz = bz;
             this.expiresAt = expiresAt;
         }
+
+        boolean opened() { return openedWorld != null; }
 
         void clearMarker() {
             World w = Bukkit.getWorld(worldName);

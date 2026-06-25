@@ -93,25 +93,28 @@ public class ParkourRoom implements LootRoom {
 
     @Override
     public void tick(LootRoomRun run) {
-        Player p = run.player();
-        if (p == null) { run.markFinished(); return; }
+        List<Player> players = run.players();
+        if (players.isEmpty()) return; // manager aborts an empty run
         long elapsed = (Bukkit.getCurrentTick() - run.startTick()) / 20;
         if (elapsed > 120) {
-            Msg.actionBar(p, "<red>Time's up!");
+            for (Player p : players) Msg.actionBar(p, "<red>Time's up!");
             run.markFinished();
             return;
         }
-        // Finish condition: standing on the goal block
-        Material under = p.getLocation().clone().subtract(0, 1, 0).getBlock().getType();
-        if (under == goalMaterial()) {
-            run.addScore((int) Math.max(50, 250 - elapsed * 2));
-            run.markFinished();
-            return;
-        }
-        // Falling check — send the player back to start instead of forfeiting.
-        if (p.getLocation().getY() < run.anchor().getY() - 3) {
-            p.teleport(run.anchor().clone().add(0.5, 1, 0.5));
-            Msg.actionBar(p, "<gray>Back to start.");
+        Material goal = goalMaterial();
+        for (Player p : players) {
+            // Finish condition: any party member standing on the goal block clears it for all.
+            Material under = p.getLocation().clone().subtract(0, 1, 0).getBlock().getType();
+            if (under == goal) {
+                run.addScore((int) Math.max(50, 250 - elapsed * 2));
+                run.markFinished();
+                return;
+            }
+            // Falling check — send that player back to start instead of forfeiting.
+            if (p.getLocation().getY() < run.anchor().getY() - 3) {
+                p.teleport(run.anchor().clone().add(0.5, 1, 0.5));
+                Msg.actionBar(p, "<gray>Back to start.");
+            }
         }
     }
 }

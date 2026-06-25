@@ -112,12 +112,12 @@ public class PuzzleRoom implements LootRoom {
 
     @Override
     public void tick(LootRoomRun run) {
-        Player p = run.player();
-        if (p == null) { run.markFinished(); return; }
+        List<Player> players = run.players();
+        if (players.isEmpty()) return; // manager aborts an empty run
 
         long elapsed = (Bukkit.getCurrentTick() - run.startTick()) / 20;
         if (elapsed > TIME_LIMIT_SECONDS) {
-            Msg.actionBar(p, "<red>Time's up!");
+            for (Player p : players) Msg.actionBar(p, "<red>Time's up!");
             run.markFinished();
             return;
         }
@@ -129,12 +129,13 @@ public class PuzzleRoom implements LootRoom {
             return;
         }
 
-        if (remaining != run.state()) {
-            run.setState(remaining);
-            p.playSound(p.getLocation(), Sound.BLOCK_AMETHYST_CLUSTER_BREAK, 0.9f, 1.25f);
+        boolean changed = remaining != run.state();
+        if (changed) run.setState(remaining);
+        for (Player p : players) {
+            if (changed) p.playSound(p.getLocation(), Sound.BLOCK_AMETHYST_CLUSTER_BREAK, 0.9f, 1.25f);
+            Msg.actionBar(p, "<aqua>Crystal caches: <yellow>" + remaining
+                    + "<gray> · <yellow>" + Math.max(0, TIME_LIMIT_SECONDS - elapsed) + "s");
         }
-        Msg.actionBar(p, "<aqua>Crystal caches: <yellow>" + remaining
-                + "<gray> · <yellow>" + Math.max(0, TIME_LIMIT_SECONDS - elapsed) + "s");
     }
 
     private int countTargets(Location anchor) {
