@@ -65,6 +65,7 @@ public final class NovaBlock extends JavaPlugin {
     private LootRoomManager lootRoomManager;
     private ProgressionManager progressionManager;
     private com.nova.novablock.ability.AbilityManager abilityManager;
+    private com.nova.novablock.progression.PlacedLogTracker placedLogTracker;
     private PrestigeManager prestigeManager;
     private LoginStreakManager loginStreakManager;
     private QuestManager questManager;
@@ -116,6 +117,7 @@ public final class NovaBlock extends JavaPlugin {
         this.economyManager = new EconomyManager(this);
         this.progressionManager = new ProgressionManager(this);
         this.abilityManager = new com.nova.novablock.ability.AbilityManager(this);
+        this.placedLogTracker = new com.nova.novablock.progression.PlacedLogTracker(this);
         this.phaseManager = new PhaseManager(this);
         this.phaseManager.loadPhases();
         this.phaseManager.loadNetherPhases();
@@ -179,6 +181,7 @@ public final class NovaBlock extends JavaPlugin {
                 new com.nova.novablock.listener.SkillActionListener(this), this);
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.ability.AbilityListener(this), this);
+        getServer().getPluginManager().registerEvents(placedLogTracker, this);
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.listener.IslandQuestlineListener(this), this);
         getServer().getPluginManager().registerEvents(
@@ -332,6 +335,7 @@ public final class NovaBlock extends JavaPlugin {
     public LootRoomManager lootRooms() { return lootRoomManager; }
     public ProgressionManager progression() { return progressionManager; }
     public com.nova.novablock.ability.AbilityManager abilities() { return abilityManager; }
+    public com.nova.novablock.progression.PlacedLogTracker placedLogs() { return placedLogTracker; }
     public PrestigeManager prestige() { return prestigeManager; }
     public LoginStreakManager loginStreaks() { return loginStreakManager; }
     public QuestManager quests() { return questManager; }

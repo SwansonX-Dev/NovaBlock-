@@ -130,6 +130,13 @@ public class SkillActionListener implements Listener {
     // ---- Woodcutting -------------------------------------------------------
 
     private void handleWoodcutting(Player p, PlayerProgression prog, Block block, Material tool) {
+        // Player-placed logs don't feed the skill: no XP, no passives, and no Tree
+        // Feller — otherwise placing logs farms the skill and felling wipes builds.
+        // The block is being broken now, so forget it (its slot is free again).
+        if (plugin.placedLogs().isPlaced(block)) {
+            plugin.placedLogs().clearPlaced(block);
+            return;
+        }
         plugin.progression().addXp(p, SkillType.WOODCUTTING, SkillEffects.xpPerAction(SkillType.WOODCUTTING));
 
         if (plugin.abilities().tryActivate(p, ActiveAbility.TREE_FELLER)
@@ -158,7 +165,8 @@ public class SkillActionListener implements Listener {
                     for (int dz = -1; dz <= 1; dz++) {
                         if (dx == 0 && dy == 0 && dz == 0) continue;
                         Block n = b.getRelative(dx, dy, dz);
-                        if (Tag.LOGS.isTagged(n.getType()) && !logs.contains(n)) frontier.add(n);
+                        if (Tag.LOGS.isTagged(n.getType()) && !logs.contains(n)
+                                && !plugin.placedLogs().isPlaced(n)) frontier.add(n);
                     }
                 }
             }
