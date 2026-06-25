@@ -138,6 +138,30 @@ public class IslandManager {
         return Math.floorDiv(blockCoord + halfSlot, IslandWorldManager.SLOT_SIZE);
     }
 
+    /**
+     * True if any island's slot region intersects the rectangle [minX..maxX]×[minZ..maxZ]
+     * in an island world. A slot owns {@code [center-128 .. center+127]} on each axis,
+     * matching {@link #nearestSlot}. Both the island overworld and nether share slot
+     * coordinates, so a claim in either world is tested against every island.
+     *
+     * <p>Called reflectively by xGuard's claim guard to stop players claiming over an island.
+     */
+    public boolean intersectsAnyIsland(String worldName, int minX, int minZ, int maxX, int maxZ) {
+        if (worldName == null) return false;
+        boolean islandWorld = worldName.equals(plugin.worlds().worldName())
+                || worldName.equals(plugin.worlds().netherWorldName());
+        if (!islandWorld) return false;
+        int half = IslandWorldManager.SLOT_SIZE / 2;
+        for (Island i : byId.values()) {
+            int cx = i.data().getSlotX() * IslandWorldManager.SLOT_SIZE;
+            int cz = i.data().getSlotZ() * IslandWorldManager.SLOT_SIZE;
+            int iMinX = cx - half, iMaxX = cx + half - 1;
+            int iMinZ = cz - half, iMaxZ = cz + half - 1;
+            if (minX <= iMaxX && maxX >= iMinX && minZ <= iMaxZ && maxZ >= iMinZ) return true;
+        }
+        return false;
+    }
+
     public boolean canBuild(Player player, Location loc) {
         if (player.hasPermission("novablock.build.bypass") || player.hasPermission("novablock.admin")) return true;
         Island island = atLocation(loc);

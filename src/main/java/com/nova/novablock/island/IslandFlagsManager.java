@@ -20,15 +20,21 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockBurnEvent;
+import org.bukkit.event.block.BlockFromToEvent;
+import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockSpreadEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntityPlaceEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
+import org.bukkit.event.hanging.HangingPlaceEvent;
+import org.bukkit.event.player.PlayerBucketEmptyEvent;
+import org.bukkit.event.player.PlayerBucketFillEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.InventoryHolder;
@@ -266,6 +272,65 @@ public class IslandFlagsManager implements Listener {
         Island island = islandAt(event.getBlock().getLocation());
         if (island == null) return;
         if (!plugin.islands().canBuild(event.getPlayer(), event.getBlock().getLocation())) event.setCancelled(true);
+    }
+
+    // ---- VISITOR_BUILD: non-block grief vectors -------------------------------
+    // canBuild already covers BlockBreak/BlockPlace, but a visitor on a neighbour's
+    // island (reached by bridging across the void) could still grief it by other means.
+    // Each of these routes through the same canBuild rule, so VISITOR_BUILD islands
+    // still let visitors do them, consistent with block building.
+
+    /** Pouring lava/water onto a neighbour's island. */
+    @EventHandler(ignoreCancelled = true)
+    public void onBucketEmpty(PlayerBucketEmptyEvent event) {
+        denyBuildAt(event.getPlayer(), event.getBlock().getLocation(), event);
+    }
+
+    /** Scooping lava/water from a neighbour's island. */
+    @EventHandler(ignoreCancelled = true)
+    public void onBucketFill(PlayerBucketFillEvent event) {
+        denyBuildAt(event.getPlayer(), event.getBlock().getLocation(), event);
+    }
+
+    /** Placing entities (end crystals, boats, minecarts, armour stands) on a neighbour's island. */
+    @EventHandler(ignoreCancelled = true)
+    public void onEntityPlace(EntityPlaceEvent event) {
+        if (event.getPlayer() == null) return;
+        denyBuildAt(event.getPlayer(), event.getEntity().getLocation(), event);
+    }
+
+    /** Lighting fires (flint & steel, fire charge) on a neighbour's island. Natural/lava/spread
+     *  fire is left to the FIRE_SPREAD flag handlers — those have no player. */
+    @EventHandler(ignoreCancelled = true)
+    public void onIgnite(BlockIgniteEvent event) {
+        if (event.getPlayer() == null) return;
+        denyBuildAt(event.getPlayer(), event.getBlock().getLocation(), event);
+    }
+
+    /** Hanging paintings / item frames on a neighbour's island (break + use already covered). */
+    @EventHandler(ignoreCancelled = true)
+    public void onHangingPlace(HangingPlaceEvent event) {
+        if (event.getPlayer() == null) return;
+        denyBuildAt(event.getPlayer(), event.getEntity().getLocation(), event);
+    }
+
+    /** Liquids creeping across an island boundary (from the void or an adjacent slot). */
+    @EventHandler(ignoreCancelled = true)
+    public void onLiquidFlow(BlockFromToEvent event) {
+        Island to = islandAt(event.getToBlock().getLocation());
+        if (to == null) return;                                       // flowing into void — fine
+        if (to == islandAt(event.getBlock().getLocation())) return;   // within the same island — fine
+        event.setCancelled(true);                                     // into a different island — block
+    }
+
+    /** Cancel {@code event} and warn if {@code loc} is on an island the player may not build on. */
+    private void denyBuildAt(Player player, Location loc, org.bukkit.event.Cancellable event) {
+        if (islandAt(loc) == null) return;
+        if (!plugin.islands().canBuild(player, loc)) {
+            event.setCancelled(true);
+            player.sendActionBar(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                    .deserialize("<red>This isn't your island."));
+        }
     }
 
     // ---- VISITOR_CONTAINER_ACCESS ----

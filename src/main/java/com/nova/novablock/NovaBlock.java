@@ -318,6 +318,12 @@ public final class NovaBlock extends JavaPlugin {
     public IslandWorldManager worlds() { return worldManager; }
     public IslandManager islands() { return islandManager; }
     public InviteManager invites() { return inviteManager; }
+
+    /** Reflection entry point for xGuard's claim guard — do not rename. True if a claim
+     *  rectangle would overlap any island. See IslandManager#intersectsAnyIsland. */
+    public boolean intersectsIsland(String world, int minX, int minZ, int maxX, int maxZ) {
+        return islandManager.intersectsAnyIsland(world, minX, minZ, maxX, maxZ);
+    }
     public PhaseManager phases() { return phaseManager; }
     public ProphecyManager prophecies() { return prophecyManager; }
 
