@@ -17,6 +17,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.Container;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -708,6 +709,9 @@ public class BlockListener implements Listener {
             if (type != null) {
                 Entity e = center.getWorld().spawnEntity(center.clone().add(0, 1, 0), type);
                 e.setMetadata("nova_natural", new org.bukkit.metadata.FixedMetadataValue(plugin, true));
+                // OneBlock spawns are part of the island, not transient wildlife: stop vanilla
+                // from despawning them once the player roams out of range (hub, nether, AFK).
+                if (e instanceof LivingEntity le) le.setRemoveWhenFarAway(false);
             }
         }
         // Loot room every ~lootCd + denom blocks on average (config-tunable).
