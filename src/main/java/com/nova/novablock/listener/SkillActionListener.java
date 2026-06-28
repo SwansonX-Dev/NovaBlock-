@@ -2,6 +2,7 @@ package com.nova.novablock.listener;
 
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.ability.ActiveAbility;
+import com.nova.novablock.boss.BossManager;
 import com.nova.novablock.progression.Passives;
 import com.nova.novablock.progression.Perk;
 import com.nova.novablock.progression.PlayerProgression;
@@ -14,13 +15,16 @@ import org.bukkit.Tag;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.Ageable;
 import org.bukkit.entity.Item;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
@@ -35,6 +39,10 @@ import java.util.concurrent.ThreadLocalRandom;
  * Woodcutting, Excavation, Mining-off-OneBlock) and Fishing. Runs at MONITOR with
  * ignoreCancelled, so the cancelled OneBlock-centre break (handled in
  * {@link BlockListener}) is skipped entirely — no interference with that flow.
+ *
+ * <p>Also awards Combat XP on any player kill — hostile mobs, animals, naturally
+ * spawned and OneBlock-spawned alike, plus PvP — via {@link #onKill}. Bosses are
+ * left to {@link BossManager}, which grants their own (larger) Combat reward.
  */
 public class SkillActionListener implements Listener {
 
@@ -56,6 +64,9 @@ public class SkillActionListener implements Listener {
             Material.OBSIDIAN, Material.ANCIENT_DEBRIS, Material.AMETHYST_BLOCK);
 
     private static final int TREE_FELLER_MAX = 80;
+
+    /** A player kill is worth this many times a mob kill's Combat XP. */
+    private static final long PLAYER_KILL_XP_MULTIPLIER = 5L;
 
     public SkillActionListener(NovaBlock plugin) { this.plugin = plugin; }
 
@@ -79,6 +90,29 @@ public class SkillActionListener implements Listener {
         } else if ((m.name().endsWith("_ORE") || MINING_EXTRA.contains(m)) && isPickaxe(tool)) {
             handleMiningExtra(p, prog, block, tool);
         }
+    }
+
+    // ---- Combat ------------------------------------------------------------
+
+    /**
+     * Grants Combat XP whenever a player gets a kill. {@link EntityDeathEvent} also
+     * fires for player deaths (PvP), so this single handler covers mob kills and
+     * PvP alike — players are worth {@link #PLAYER_KILL_XP_MULTIPLIER}× a mob.
+     * Bosses are skipped so {@link BossManager}'s dedicated reward isn't doubled.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onKill(EntityDeathEvent event) {
+        LivingEntity dead = event.getEntity();
+        Player killer = dead.getKiller();
+        if (killer == null) return;
+        if (killer.getGameMode() == GameMode.CREATIVE) return;
+        if (!killer.hasPermission("novablock.skills")) return;
+        // The boss itself awards its own Combat XP in BossManager; don't stack on top.
+        if (dead.getPersistentDataContainer().has(BossManager.BOSS_KEY, PersistentDataType.STRING)) return;
+
+        long xp = SkillEffects.xpPerAction(SkillType.COMBAT);
+        if (dead instanceof Player) xp *= PLAYER_KILL_XP_MULTIPLIER;
+        plugin.progression().addXp(killer, SkillType.COMBAT, xp);
     }
 
     // ---- Farming -----------------------------------------------------------

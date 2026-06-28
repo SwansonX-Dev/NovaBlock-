@@ -56,6 +56,7 @@ public final class SkillEffects {
         XP.put(SkillType.WOODCUTTING, 6L);
         XP.put(SkillType.EXCAVATION, 4L);
         XP.put(SkillType.MINING, 3L);   // non-OneBlock ore/stone breaks (center handled in BlockListener)
+        XP.put(SkillType.COMBAT, 5L);   // per mob kill; player kills grant a multiple (see SkillActionListener)
 
         // Active abilities: ready your tool (right-click), next action triggers a timed buff.
         ABILITIES.put("super_breaker", new AbilityCfg(40, 4, 240, 4800, 3));   // Mining   (pickaxe)

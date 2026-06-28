@@ -337,6 +337,25 @@ public final class NovaBlock extends JavaPlugin {
         if (player == null || questManager == null) return;
         questManager.onExternalActivity(player, key, amount);
     }
+
+    /**
+     * Public bridge for NovaFishing: award Fishing-skill XP for a custom-rod catch.
+     * NovaFishing cancels the vanilla {@link org.bukkit.event.player.PlayerFishEvent},
+     * so {@link com.nova.novablock.listener.SkillActionListener} never sees the catch
+     * and the Fishing skill would otherwise never progress while a Nova rod is in use.
+     * Called reflectively, so NovaFishing needs no compile-time dependency on NovaBlock.
+     *
+     * @param weight rarity multiplier on the base per-catch XP (1.0 = vanilla-equivalent).
+     */
+    public void onExternalFishingCatch(org.bukkit.entity.Player player, double weight) {
+        if (player == null || progressionManager == null) return;
+        if (!player.hasPermission("novablock.skills")) return;
+        long base = com.nova.novablock.progression.SkillEffects.xpPerAction(
+                com.nova.novablock.progression.SkillType.FISHING);
+        if (base <= 0) return;
+        progressionManager.addXp(player, com.nova.novablock.progression.SkillType.FISHING,
+                base * Math.max(1.0, weight));
+    }
     public BossManager bosses() { return bossManager; }
     public LootRoomManager lootRooms() { return lootRoomManager; }
     public ProgressionManager progression() { return progressionManager; }
