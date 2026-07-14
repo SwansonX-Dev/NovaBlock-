@@ -121,6 +121,7 @@ public final class NovaBlock extends JavaPlugin {
         this.phaseManager = new PhaseManager(this);
         this.phaseManager.loadPhases();
         this.phaseManager.loadNetherPhases();
+        this.phaseManager.loadEndPhases();
         this.prestigeManager = new PrestigeManager(this);
         this.loginStreakManager = new LoginStreakManager(this);
 

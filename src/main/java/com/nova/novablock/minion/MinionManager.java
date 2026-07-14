@@ -159,7 +159,7 @@ public class MinionManager implements Listener {
         if (island != null) {
             int perPrestige = Math.max(0, plugin.getConfig().getInt("minions.limit-per-prestige", 1));
             int maxBonus = Math.max(0, plugin.getConfig().getInt("minions.max-prestige-limit-bonus", 6));
-            limit += Math.min(maxBonus, island.data().getPrestigeLevel() * perPrestige);
+            limit += Math.min(maxBonus, island.data().getTotalPrestigeLevel() * perPrestige);
         }
         for (var info : player.getEffectivePermissions()) {
             if (!info.getValue()) continue;

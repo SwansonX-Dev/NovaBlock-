@@ -181,11 +181,11 @@ public class MainMenuGui extends ChestGui {
                 });
 
         var island = plugin.islands().ofPlayer(p);
-        int prestige = island == null ? 0 : island.data().getPrestigeLevel();
+        int prestige = island == null ? 0 : island.data().getTotalPrestigeLevel();
         set(33, ItemBuilder.of(Material.NETHER_STAR)
                         .name("<gold>Prestige")
-                        .lore("<gray>Current level: <yellow>" + prestige,
-                                "<gray>Reach the end of Phase 12 to prestige.",
+                        .lore("<gray>Total level: <yellow>" + prestige + " <dark_gray>(stacked)",
+                                "<gray>Each dimension prestiges on its own.",
                                 "<dark_gray>/ob prestige").build(),
                 e -> { p.closeInventory(); p.performCommand("ob prestige"); });
 

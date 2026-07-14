@@ -58,12 +58,25 @@ public class IslandData {
     private long netherBlocksBroken;
     private int netherPhaseIndex;
     private int netherPhaseProgress;
+    private int netherPrestigeLevel;
     private long netherLastBossAt;
     private long netherLastLootRoomAt;
     /** Set the first time the Overworld crosses into Phase 7 (phaseIndex >= 6). */
     private boolean netherUnlocked;
     /** True until the owner has visited their own Nether for the first time. */
     private boolean firstNetherVisit = true;
+
+    // --- End dimension (added in v0.35.0) ------------------------------------
+    private long endBlocksBroken;
+    private int endPhaseIndex;
+    private int endPhaseProgress;
+    private int endPrestigeLevel;
+    private long endLastBossAt;
+    private long endLastLootRoomAt;
+    /** Set the first time the island prestiges (End is a post-prestige dimension). */
+    private boolean endUnlocked;
+    /** True until the owner has visited their own End for the first time. */
+    private boolean firstEndVisit = true;
 
     /**
      * Set whenever persisted state changes; cleared once written to disk. The
@@ -214,6 +227,9 @@ public class IslandData {
     public void setNetherPhaseProgress(int v) { this.netherPhaseProgress = v; markDirty(); }
     public void incrementNetherPhaseProgress() { this.netherPhaseProgress++; markDirty(); }
 
+    public int getNetherPrestigeLevel() { return netherPrestigeLevel; }
+    public void setNetherPrestigeLevel(int v) { this.netherPrestigeLevel = v; markDirty(); }
+
     public long getNetherLastBossAt() { return netherLastBossAt; }
     public void setNetherLastBossAt(long v) { this.netherLastBossAt = v; markDirty(); }
 
@@ -225,6 +241,147 @@ public class IslandData {
 
     public boolean isFirstNetherVisit() { return firstNetherVisit; }
     public void setFirstNetherVisit(boolean v) { this.firstNetherVisit = v; markDirty(); }
+
+    // --- End accessors -------------------------------------------------------
+
+    public long getEndBlocksBroken() { return endBlocksBroken; }
+    public void setEndBlocksBroken(long v) { this.endBlocksBroken = v; markDirty(); }
+    public void incrementEndBlocksBroken() { this.endBlocksBroken++; markDirty(); }
+
+    public int getEndPhaseIndex() { return endPhaseIndex; }
+    public void setEndPhaseIndex(int v) { this.endPhaseIndex = v; markDirty(); }
+
+    public int getEndPhaseProgress() { return endPhaseProgress; }
+    public void setEndPhaseProgress(int v) { this.endPhaseProgress = v; markDirty(); }
+    public void incrementEndPhaseProgress() { this.endPhaseProgress++; markDirty(); }
+
+    public int getEndPrestigeLevel() { return endPrestigeLevel; }
+    public void setEndPrestigeLevel(int v) { this.endPrestigeLevel = v; markDirty(); }
+
+    public long getEndLastBossAt() { return endLastBossAt; }
+    public void setEndLastBossAt(long v) { this.endLastBossAt = v; markDirty(); }
+
+    public long getEndLastLootRoomAt() { return endLastLootRoomAt; }
+    public void setEndLastLootRoomAt(long v) { this.endLastLootRoomAt = v; markDirty(); }
+
+    public boolean isEndUnlocked() { return endUnlocked; }
+    public void setEndUnlocked(boolean v) { this.endUnlocked = v; markDirty(); }
+
+    public boolean isFirstEndVisit() { return firstEndVisit; }
+    public void setFirstEndVisit(boolean v) { this.firstEndVisit = v; markDirty(); }
+
+    // --- Dimension-parameterized convenience accessors -----------------------
+    // Centralize the three-way switching so listeners/services stay clean.
+
+    public long getBlocksBroken(Dimension d) {
+        return switch (d) {
+            case OVERWORLD -> blocksBroken;
+            case NETHER -> netherBlocksBroken;
+            case END -> endBlocksBroken;
+        };
+    }
+
+    public void incrementBlocksBroken(Dimension d) {
+        switch (d) {
+            case OVERWORLD -> incrementBlocksBroken();
+            case NETHER -> incrementNetherBlocksBroken();
+            case END -> incrementEndBlocksBroken();
+        }
+    }
+
+    public int getPhaseIndex(Dimension d) {
+        return switch (d) {
+            case OVERWORLD -> phaseIndex;
+            case NETHER -> netherPhaseIndex;
+            case END -> endPhaseIndex;
+        };
+    }
+
+    public void setPhaseIndex(Dimension d, int v) {
+        switch (d) {
+            case OVERWORLD -> setPhaseIndex(v);
+            case NETHER -> setNetherPhaseIndex(v);
+            case END -> setEndPhaseIndex(v);
+        }
+    }
+
+    public int getPhaseProgress(Dimension d) {
+        return switch (d) {
+            case OVERWORLD -> phaseProgress;
+            case NETHER -> netherPhaseProgress;
+            case END -> endPhaseProgress;
+        };
+    }
+
+    public void setPhaseProgress(Dimension d, int v) {
+        switch (d) {
+            case OVERWORLD -> setPhaseProgress(v);
+            case NETHER -> setNetherPhaseProgress(v);
+            case END -> setEndPhaseProgress(v);
+        }
+    }
+
+    public void incrementPhaseProgress(Dimension d) {
+        switch (d) {
+            case OVERWORLD -> incrementPhaseProgress();
+            case NETHER -> incrementNetherPhaseProgress();
+            case END -> incrementEndPhaseProgress();
+        }
+    }
+
+    public long getLastBossAt(Dimension d) {
+        return switch (d) {
+            case OVERWORLD -> lastBossAt;
+            case NETHER -> netherLastBossAt;
+            case END -> endLastBossAt;
+        };
+    }
+
+    public void setLastBossAt(Dimension d, long v) {
+        switch (d) {
+            case OVERWORLD -> setLastBossAt(v);
+            case NETHER -> setNetherLastBossAt(v);
+            case END -> setEndLastBossAt(v);
+        }
+    }
+
+    public long getLastLootRoomAt(Dimension d) {
+        return switch (d) {
+            case OVERWORLD -> lastLootRoomAt;
+            case NETHER -> netherLastLootRoomAt;
+            case END -> endLastLootRoomAt;
+        };
+    }
+
+    public void setLastLootRoomAt(Dimension d, long v) {
+        switch (d) {
+            case OVERWORLD -> setLastLootRoomAt(v);
+            case NETHER -> setNetherLastLootRoomAt(v);
+            case END -> setEndLastLootRoomAt(v);
+        }
+    }
+
+    /** Each dimension has its own independent prestige level (Overworld = the legacy {@code prestigeLevel}). */
+    public int getPrestigeLevel(Dimension d) {
+        return switch (d) {
+            case OVERWORLD -> prestigeLevel;
+            case NETHER -> netherPrestigeLevel;
+            case END -> endPrestigeLevel;
+        };
+    }
+
+    public void setPrestigeLevel(Dimension d, int v) {
+        switch (d) {
+            case OVERWORLD -> setPrestigeLevel(v);
+            case NETHER -> setNetherPrestigeLevel(v);
+            case END -> setEndPrestigeLevel(v);
+        }
+    }
+
+    /** Sum of all three dimensions' prestige levels (uncapped). */
+    public int getTotalPrestigeLevel() {
+        return prestigeLevel + netherPrestigeLevel + endPrestigeLevel;
+    }
 
     /** Centre block (the one that regenerates). */
     public Location centerBlock() {
@@ -254,5 +411,31 @@ public class IslandData {
     public Location netherSpawnLocation() {
         Location c = netherCenterBlock();
         return new Location(c.getWorld(), c.getX(), c.getY() + 1, c.getZ() + 1.5, 180f, 0f);
+    }
+
+    /**
+     * Same slot coords as {@link #centerBlock()} but resolved against the End
+     * world. Returns a Location with a null world if the End world isn't loaded
+     * — callers should gate on {@link #isEndUnlocked()} and {@code getWorld() != null}.
+     */
+    public Location endCenterBlock() {
+        World w = Bukkit.getWorld(NovaBlock.get().worlds().endWorldName());
+        int x = slotX * SLOT_SIZE;
+        int z = slotZ * SLOT_SIZE;
+        return new Location(w, x + 0.5, 80, z + 0.5);
+    }
+
+    public Location endSpawnLocation() {
+        Location c = endCenterBlock();
+        return new Location(c.getWorld(), c.getX(), c.getY() + 1, c.getZ() + 1.5, 180f, 0f);
+    }
+
+    /** Centre block resolved against whichever dimension's world. */
+    public Location centerBlock(Dimension d) {
+        return switch (d) {
+            case OVERWORLD -> centerBlock();
+            case NETHER -> netherCenterBlock();
+            case END -> endCenterBlock();
+        };
     }
 }

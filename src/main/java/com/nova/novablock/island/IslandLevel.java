@@ -19,9 +19,11 @@ public final class IslandLevel {
     public static long points(IslandData d) {
         return d.getBlocksBroken()
                 + d.getNetherBlocksBroken()
+                + d.getEndBlocksBroken()
                 + (long) d.getPhaseIndex() * 3000L
                 + (long) d.getNetherPhaseIndex() * 3000L
-                + (long) d.getPrestigeLevel() * 30000L
+                + (long) d.getEndPhaseIndex() * 3000L
+                + (long) d.getTotalPrestigeLevel() * 30000L
                 + (long) Math.max(0, d.getQuestlineStage() - 1) * 2000L;
     }
 

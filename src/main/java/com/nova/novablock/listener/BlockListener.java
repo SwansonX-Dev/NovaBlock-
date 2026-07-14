@@ -120,10 +120,16 @@ public class BlockListener implements Listener {
         Island island = plugin.islands().atLocation(loc);
         if (island == null) return;
 
-        boolean nether = loc.getWorld() != null
-                && loc.getWorld().getName().equals(plugin.worlds().netherWorldName())
-                && island.isNetherUnlocked();
-        Location center = nether ? island.netherCenterBlock() : island.centerBlock();
+        com.nova.novablock.island.Dimension dim = com.nova.novablock.island.Dimension.OVERWORLD;
+        String breakWorld = loc.getWorld() == null ? null : loc.getWorld().getName();
+        if (breakWorld != null && breakWorld.equals(plugin.worlds().netherWorldName())
+                && island.isNetherUnlocked()) {
+            dim = com.nova.novablock.island.Dimension.NETHER;
+        } else if (breakWorld != null && breakWorld.equals(plugin.worlds().endWorldName())
+                && island.isEndUnlocked()) {
+            dim = com.nova.novablock.island.Dimension.END;
+        }
+        Location center = island.centerBlock(dim);
         // Always keep a bedrock anchor under the center — replace anything that isn't bedrock there.
         if (loc.getBlockX() == center.getBlockX()
                 && loc.getBlockY() == center.getBlockY() - 1
@@ -213,14 +219,12 @@ public class BlockListener implements Listener {
         // Phase-specific drops & bonuses
         handleBlockEvents(player, island, broken);
 
-        Phase phase = nether
-                ? plugin.phases().getNetherOrLast(island.data().getNetherPhaseIndex())
-                : plugin.phases().getOrLast(island.data().getPhaseIndex());
+        Phase phase = plugin.phases().getOrLast(dim, island.data().getPhaseIndex(dim));
         if (phase == null) return;
 
         // Pull planned next material from the prophecy queue so previews are honest.
-        // Nether breaks bypass the queue (prophecy is Overworld-themed in v1).
-        Material next = nether ? null : island.pollNext();
+        // Nether/End breaks bypass the queue (prophecy is Overworld-themed in v1).
+        Material next = dim.isOverworld() ? island.pollNext() : null;
         if (next == null) next = phase.rollBlock(ThreadLocalRandom.current());
         // FOUR_LEAF (Luck 5): +5% chance to reroll a non-rare next-block into a rare one.
         if (!plugin.prophecies().isRare(next)
@@ -264,13 +268,8 @@ public class BlockListener implements Listener {
             Msg.actionBar(player, "<aqua>★ Diamond Hour bonus!");
         }
 
-        if (nether) {
-            island.data().incrementNetherBlocksBroken();
-            island.data().incrementNetherPhaseProgress();
-        } else {
-            island.data().incrementBlocksBroken();
-            island.data().incrementPhaseProgress();
-        }
+        island.data().incrementBlocksBroken(dim);
+        island.data().incrementPhaseProgress(dim);
         island.recordBreak(broken);
         plugin.claimBlockRewards().recordPersonalBreak(player);
         plugin.sprint().recordBlocksBroken(island.data().getId(), 1L);
@@ -280,7 +279,7 @@ public class BlockListener implements Listener {
         // Block-break milestones — fire once at exact thresholds. Existing islands past
         // a threshold won't retroactively claim; the milestone is the act of crossing.
         // Overworld-only milestone in v1.
-        if (!nether && island.data().getBlocksBroken() == 1000L) {
+        if (dim.isOverworld() && island.data().getBlocksBroken() == 1000L) {
             plugin.economy().award(island, 5000L);
             player.getInventory().addItem(new ItemStack(Material.TOTEM_OF_UNDYING));
             plugin.progression().addXp(player, SkillType.MINING, 100L);
@@ -303,7 +302,7 @@ public class BlockListener implements Listener {
         }
         plugin.progression().addXp(player, SkillType.MINING, breakXpMult);
         plugin.quests().onComboReached(player, island.getComboCount());
-        if (!nether) {
+        if (dim.isOverworld()) {
             plugin.prophecies().onAdvance(island, broken);
             island.refillUpcoming(phase, com.nova.novablock.prophecy.ProphecyManager.QUEUE_SIZE);
         }
@@ -312,7 +311,8 @@ public class BlockListener implements Listener {
         plugin.quests().onBlockBroken(player, broken);
         plugin.islandQuestline().record(player, com.nova.novablock.questline.IslandObjective.MINE_ONEBLOCKS, 1);
         // Surface island level-ups promptly without checking on literally every break.
-        if ((island.data().getBlocksBroken() + island.data().getNetherBlocksBroken()) % 50 == 0) {
+        if ((island.data().getBlocksBroken() + island.data().getNetherBlocksBroken()
+                + island.data().getEndBlocksBroken()) % 50 == 0) {
             plugin.islands().checkLevelUp(island);
         }
         plugin.seasonalPaths().award(player, com.nova.novablock.season.SeasonalPathManager.PathSource.MINING, 1);
@@ -321,14 +321,14 @@ public class BlockListener implements Listener {
         plugin.paxels().onMine(player, broken);
 
         // Phase progression
-        int progressAfter = nether ? island.data().getNetherPhaseProgress() : island.data().getPhaseProgress();
+        int progressAfter = island.data().getPhaseProgress(dim);
         if (progressAfter >= phase.getRequiredBlocks()) {
-            if (nether) advanceNetherPhase(player, island, phase);
-            else advancePhase(player, island, phase);
+            if (dim.isOverworld()) advancePhase(player, island, phase);
+            else advanceSubDimensionPhase(player, island, phase, dim);
         }
 
         // Roll boss / loot room
-        rollEncounters(player, island, phase, center, nether);
+        rollEncounters(player, island, phase, center, dim);
 
         // FX
         center.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, center.clone().add(0.5, 0.5, 0.5), 4, 0.2, 0.2, 0.2);
@@ -664,44 +664,71 @@ public class BlockListener implements Listener {
         }
     }
 
-    private void advanceNetherPhase(Player player, Island island, Phase old) {
+    /**
+     * Phase advance for the Nether and End tracks. The Overworld keeps its own
+     * {@link #advancePhase} because that one carries the Nether-unlock hook and
+     * the prophecy-queue refill; the sub-dimensions share this simpler path.
+     */
+    private void advanceSubDimensionPhase(Player player, Island island, Phase old,
+                                          com.nova.novablock.island.Dimension dim) {
         int nextIdx = old.getIndex() + 1;
-        Phase next = plugin.phases().getNether(nextIdx);
+        Phase next = plugin.phases().get(dim, nextIdx);
+        String dimName = dim.isEnd() ? "End" : "Nether";
         if (next == null) {
-            Msg.title(player, "<gold>You've conquered the Nether!", "<gray>Return to the Overworld for prestige.");
-            island.data().setNetherPhaseProgress(old.getRequiredBlocks());
+            // Completing the Nether's final phase tears open the End — a third
+            // parallel dimension (mirrors how the Overworld's Phase 7 unlocks the
+            // Nether). The End then has its own independent prestige loop.
+            if (dim.isNether() && plugin.worlds().isEndEnabled() && !island.data().isEndUnlocked()) {
+                island.data().setEndUnlocked(true);
+                island.ensureEndPlatform();
+                String ownerName = Bukkit.getOfflinePlayer(island.data().getOwner()).getName();
+                if (ownerName == null) ownerName = player.getName();
+                Bukkit.broadcast(Msg.mm("<#9C27B0>✦ <light_purple>" + ownerName
+                        + "<gray>'s island has <#B47BFF>torn open the End<gray>! <dark_gray>(/ob home end)"));
+            }
+            String finished = dim.isEnd() ? "You've conquered the End!" : "You've conquered the Nether!";
+            String color = dim.isEnd() ? "<#E6E0FF>" : "<gold>";
+            Msg.title(player, color + finished, "<gray>Use <yellow>/ob prestige</yellow> to keep going.");
+            island.data().setPhaseProgress(dim, old.getRequiredBlocks());
             return;
         }
-        island.data().setNetherPhaseIndex(nextIdx);
-        island.data().setNetherPhaseProgress(0);
+        island.data().setPhaseIndex(dim, nextIdx);
+        island.data().setPhaseProgress(dim, 0);
         Msg.title(player, "<" + next.getThemeColor() + ">▶ " + next.getDisplayName(),
-                "<gray>Nether Phase " + (nextIdx + 1) + " unlocked");
+                "<gray>" + dimName + " Phase " + (nextIdx + 1) + " unlocked");
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
         long reward = 500 + nextIdx * 250L;
         if (plugin.seasons().active() == SeasonManager.ServerEvent.DOUBLE_COINS) reward *= 2;
         reward = Math.round(reward * plugin.prestige().coinMultiplier(island));
         plugin.economy().award(island, reward);
         if (old.getBossId() != null) {
-            plugin.bosses().spawn(old.getBossId(), island, player, true);
+            plugin.bosses().spawn(old.getBossId(), island, player, dim);
         }
         plugin.paxels().refreshTier(player);
         plugin.quests().onPhaseAdvanced(player);
         plugin.seasonalPaths().award(player, com.nova.novablock.season.SeasonalPathManager.PathSource.PHASE, 125);
     }
 
-    private void rollEncounters(Player player, Island island, Phase phase, Location center, boolean nether) {
-        long broken = nether ? island.data().getNetherBlocksBroken() : island.data().getBlocksBroken();
+    private void rollEncounters(Player player, Island island, Phase phase, Location center,
+                                com.nova.novablock.island.Dimension dim) {
+        long broken = island.data().getBlocksBroken(dim);
         var rng = ThreadLocalRandom.current();
         SeasonManager.ServerEvent ev = plugin.seasons().active();
         var cfg = plugin.getConfig();
-        int lootCd = Math.max(1, cfg.getInt(
-                nether ? "cooldowns.netherLootRoomMinBlocks" : "cooldowns.lootRoomMinBlocks",
-                nether ? 400 : 150));
-        int bossCd = Math.max(1, cfg.getInt(
-                nether ? "cooldowns.netherBossMinBlocks" : "cooldowns.bossMinBlocks",
-                300));
-        long lastLootRoom = nether ? island.data().getNetherLastLootRoomAt() : island.data().getLastLootRoomAt();
-        long lastBoss = nether ? island.data().getNetherLastBossAt() : island.data().getLastBossAt();
+        String lootKey = switch (dim) {
+            case OVERWORLD -> "cooldowns.lootRoomMinBlocks";
+            case NETHER -> "cooldowns.netherLootRoomMinBlocks";
+            case END -> "cooldowns.endLootRoomMinBlocks";
+        };
+        String bossKey = switch (dim) {
+            case OVERWORLD -> "cooldowns.bossMinBlocks";
+            case NETHER -> "cooldowns.netherBossMinBlocks";
+            case END -> "cooldowns.endBossMinBlocks";
+        };
+        int lootCd = Math.max(1, cfg.getInt(lootKey, dim.isOverworld() ? 150 : 400));
+        int bossCd = Math.max(1, cfg.getInt(bossKey, 300));
+        long lastLootRoom = island.data().getLastLootRoomAt(dim);
+        long lastBoss = island.data().getLastBossAt(dim);
 
         // Mob spawn ~1/18 chance (~every ~45s of steady mining)
         if (!phase.getMobs().isEmpty() && rng.nextInt(18) == 0) {
@@ -732,8 +759,7 @@ public class BlockListener implements Listener {
             if (rng.nextInt(denom) == 0 && !phase.getLootRoomIds().isEmpty()) {
                 String roomId = phase.getLootRoomIds().get(rng.nextInt(phase.getLootRoomIds().size()));
                 plugin.lootRooms().offerEntry(player, island, roomId);
-                if (nether) island.data().setNetherLastLootRoomAt(broken);
-                else island.data().setLastLootRoomAt(broken);
+                island.data().setLastLootRoomAt(dim, broken);
             }
         }
         // Mid-phase boss every ~bossCd blocks (config-tunable). Blood Moon = 4x rolls.
@@ -741,9 +767,8 @@ public class BlockListener implements Listener {
             int denom = 120;
             if (ev == SeasonManager.ServerEvent.BLOOD_MOON) denom = 30;
             if (rng.nextInt(denom) == 0 && phase.getBossId() != null) {
-                plugin.bosses().spawn(phase.getBossId(), island, player, nether);
-                if (nether) island.data().setNetherLastBossAt(broken);
-                else island.data().setLastBossAt(broken);
+                plugin.bosses().spawn(phase.getBossId(), island, player, dim);
+                island.data().setLastBossAt(dim, broken);
             }
         }
     }

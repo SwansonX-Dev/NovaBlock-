@@ -37,6 +37,10 @@ public class IslandManager {
                 if (!data.isNetherUnlocked()) data.setNetherUnlocked(true);
                 island.ensureNetherPlatform();
             }
+            // Rebuild the End pad for islands that already unlocked it (first prestige).
+            if (data.isEndUnlocked() && plugin.worlds().isEndEnabled()) {
+                island.ensureEndPlatform();
+            }
             register(island);
         }
         recalculateNextSlot();
@@ -124,9 +128,12 @@ public class IslandManager {
         int slotZ = nearestSlot(loc.getBlockZ());
         String worldName = loc.getWorld().getName();
         String netherWorldName = plugin.worlds().netherWorldName();
+        String endWorldName = plugin.worlds().endWorldName();
         for (Island i : byId.values()) {
             String islandWorld = i.data().getWorldName();
-            boolean worldMatches = worldName.equals(islandWorld) || worldName.equals(netherWorldName);
+            boolean worldMatches = worldName.equals(islandWorld)
+                    || worldName.equals(netherWorldName)
+                    || worldName.equals(endWorldName);
             if (!worldMatches) continue;
             if (i.data().getSlotX() == slotX && i.data().getSlotZ() == slotZ) return i;
         }
@@ -149,7 +156,8 @@ public class IslandManager {
     public boolean intersectsAnyIsland(String worldName, int minX, int minZ, int maxX, int maxZ) {
         if (worldName == null) return false;
         boolean islandWorld = worldName.equals(plugin.worlds().worldName())
-                || worldName.equals(plugin.worlds().netherWorldName());
+                || worldName.equals(plugin.worlds().netherWorldName())
+                || worldName.equals(plugin.worlds().endWorldName());
         if (!islandWorld) return false;
         int half = IslandWorldManager.SLOT_SIZE / 2;
         for (Island i : byId.values()) {

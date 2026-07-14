@@ -97,16 +97,17 @@ public final class OneBlockRepairService {
      */
     private void scanIsland(@NotNull Island island) {
         if (!hasOnlineMember(island)) return;
-        scanCenter(island, island.centerBlock(), false);
-        if (island.isNetherUnlocked()) scanCenter(island, island.netherCenterBlock(), true);
+        scanCenter(island, island.centerBlock(), Dimension.OVERWORLD);
+        if (island.isNetherUnlocked()) scanCenter(island, island.netherCenterBlock(), Dimension.NETHER);
+        if (island.isEndUnlocked()) scanCenter(island, island.endCenterBlock(), Dimension.END);
     }
 
-    private void scanCenter(@NotNull Island island, @NotNull Location center, boolean nether) {
+    private void scanCenter(@NotNull Island island, @NotNull Location center, Dimension dim) {
         World world = center.getWorld();
         if (world == null) return;
         if (!world.isChunkLoaded(center.getBlockX() >> 4, center.getBlockZ() >> 4)) return; // don't force-load
         if (!needsRepair(center.getBlock().getType())) return;
-        repairAt(island, center, nether, false);
+        repairAt(island, center, dim, false);
     }
 
     private boolean hasOnlineMember(@NotNull Island island) {
@@ -127,12 +128,13 @@ public final class OneBlockRepairService {
         for (Island island : plugin.islands().all().values()) {
             if (repair(island, false)) repaired++;
             if (island.isNetherUnlocked() && repairNether(island, false)) repaired++;
+            if (island.isEndUnlocked() && repairEnd(island, false)) repaired++;
         }
         return repaired;
     }
 
     public boolean repair(@NotNull Island island, boolean force) {
-        return repairAt(island, island.centerBlock(), false, force);
+        return repairAt(island, island.centerBlock(), Dimension.OVERWORLD, force);
     }
 
     /**
@@ -144,10 +146,18 @@ public final class OneBlockRepairService {
         if (!island.isNetherUnlocked()) return false;
         Location center = island.netherCenterBlock();
         if (center.getWorld() == null) return false;
-        return repairAt(island, center, true, force);
+        return repairAt(island, center, Dimension.NETHER, force);
     }
 
-    private boolean repairAt(@NotNull Island island, @NotNull Location center, boolean nether, boolean force) {
+    /** Mirror of {@link #repairNether(Island, boolean)} for the End center. */
+    public boolean repairEnd(@NotNull Island island, boolean force) {
+        if (!island.isEndUnlocked()) return false;
+        Location center = island.endCenterBlock();
+        if (center.getWorld() == null) return false;
+        return repairAt(island, center, Dimension.END, force);
+    }
+
+    private boolean repairAt(@NotNull Island island, @NotNull Location center, Dimension dim, boolean force) {
         if (center.getWorld() == null) return false;
         center.getChunk().load();
 
@@ -158,9 +168,13 @@ public final class OneBlockRepairService {
 
         Block block = center.getBlock();
         if (!force && !needsRepair(block.getType())) return false;
-        Material replacement = nether ? netherReplacementFor(island) : replacementFor(island);
+        Material replacement = switch (dim) {
+            case OVERWORLD -> replacementFor(island);
+            case NETHER -> netherReplacementFor(island);
+            case END -> endReplacementFor(island);
+        };
         block.setType(replacement, false);
-        if (!nether) refillPreview(island);
+        if (dim.isOverworld()) refillPreview(island);
         return true;
     }
 
@@ -208,6 +222,21 @@ public final class OneBlockRepairService {
             }
         }
         return Material.NETHERRACK;
+    }
+
+    private @NotNull Material endReplacementFor(@NotNull Island island) {
+        Phase phase = plugin.phases().getEndOrLast(island.data().getEndPhaseIndex());
+        if (phase != null) {
+            for (int i = 0; i < 12; i++) {
+                Material rolled = phase.rollBlock(ThreadLocalRandom.current());
+                if (!needsRepair(rolled)) return rolled;
+            }
+            for (var phaseBlock : phase.getBlocks()) {
+                Material candidate = phaseBlock.material();
+                if (!needsRepair(candidate)) return candidate;
+            }
+        }
+        return Material.END_STONE;
     }
 
     private void refillPreview(@NotNull Island island) {

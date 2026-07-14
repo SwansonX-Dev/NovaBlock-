@@ -114,19 +114,33 @@ public class NetherPortalListener implements Listener {
     public void onWorldChange(PlayerChangedWorldEvent event) {
         Player player = event.getPlayer();
         if (player.getWorld() == null) return;
-        if (!player.getWorld().getName().equals(plugin.worlds().netherWorldName())) return;
+        String world = player.getWorld().getName();
+        boolean intoNether = world.equals(plugin.worlds().netherWorldName());
+        boolean intoEnd = world.equals(plugin.worlds().endWorldName());
+        if (!intoNether && !intoEnd) return;
         Island island = plugin.islands().atLocation(player.getLocation());
         if (island == null) return;
         if (!player.getUniqueId().equals(island.data().getOwner())) return;
-        if (!island.data().isFirstNetherVisit()) return;
 
-        island.data().setFirstNetherVisit(false);
-        plugin.storage().saveIsland(island.data());
-        Msg.title(player,
-                "<#FF4D4D><bold>Crimson Outpost",
-                "<gray>Break the center to begin your Nether descent.");
-        Msg.send(player, "<#FF6347>The Nether opens. Twelve phases lie between you and the Ashen Warlord.");
-        player.playSound(player.getLocation(), Sound.AMBIENT_NETHER_WASTES_MOOD, 0.8f, 0.7f);
+        if (intoNether) {
+            if (!island.data().isFirstNetherVisit()) return;
+            island.data().setFirstNetherVisit(false);
+            plugin.storage().saveIsland(island.data());
+            Msg.title(player,
+                    "<#FF4D4D><bold>Crimson Outpost",
+                    "<gray>Break the center to begin your Nether descent.");
+            Msg.send(player, "<#FF6347>The Nether opens. Twelve phases lie between you and the Ashen Warlord.");
+            player.playSound(player.getLocation(), Sound.AMBIENT_NETHER_WASTES_MOOD, 0.8f, 0.7f);
+        } else {
+            if (!island.data().isFirstEndVisit()) return;
+            island.data().setFirstEndVisit(false);
+            plugin.storage().saveIsland(island.data());
+            Msg.title(player,
+                    "<#E6E0FF><bold>Outer Islands",
+                    "<gray>Break the center to begin your End ascent.");
+            Msg.send(player, "<#C9B8FF>The Void yawns open. Twelve phases lie between you and the Void Throne.");
+            player.playSound(player.getLocation(), Sound.AMBIENT_CAVE, 0.8f, 0.6f);
+        }
     }
 
     /**

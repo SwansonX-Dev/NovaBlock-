@@ -20,6 +20,7 @@ public class IslandWorldManager {
     public static final String DEFAULT_WORLD_NAME = "oneblock";
     public static final String LEGACY_WORLD_NAME = "novablock_world";
     public static final String DEFAULT_NETHER_WORLD_NAME = "oneblock_nether";
+    public static final String DEFAULT_END_WORLD_NAME = "oneblock_end";
     /**
      * Distance between OneBlock slots. Loaded from config.yml `slotSize` on first
      * init; baked in for the life of the world (changing it later would shift
@@ -30,9 +31,12 @@ public class IslandWorldManager {
     private final NovaBlock plugin;
     private World world;
     private World netherWorld;
+    private World endWorld;
     private String worldName = DEFAULT_WORLD_NAME;
     private String netherWorldName = DEFAULT_NETHER_WORLD_NAME;
+    private String endWorldName = DEFAULT_END_WORLD_NAME;
     private boolean netherEnabled = true;
+    private boolean endEnabled = true;
 
     public IslandWorldManager(NovaBlock plugin) { this.plugin = plugin; }
 
@@ -42,6 +46,9 @@ public class IslandWorldManager {
         this.netherWorldName = plugin.getConfig().getString("netherIslandWorld", DEFAULT_NETHER_WORLD_NAME);
         if (netherWorldName == null || netherWorldName.isBlank()) netherWorldName = DEFAULT_NETHER_WORLD_NAME;
         this.netherEnabled = plugin.getConfig().getBoolean("netherEnabled", true);
+        this.endWorldName = plugin.getConfig().getString("endIslandWorld", DEFAULT_END_WORLD_NAME);
+        if (endWorldName == null || endWorldName.isBlank()) endWorldName = DEFAULT_END_WORLD_NAME;
+        this.endEnabled = plugin.getConfig().getBoolean("endEnabled", true);
         SLOT_SIZE = Math.max(32, plugin.getConfig().getInt("slotSize", 256));
         this.world = ensureWorld(worldName);
         // Reapply gamerules every startup so config edits take effect even on existing worlds.
@@ -49,6 +56,10 @@ public class IslandWorldManager {
         if (netherEnabled) {
             this.netherWorld = ensureNetherWorld();
             if (netherWorld != null) configureVoidWorld(netherWorld);
+        }
+        if (endEnabled) {
+            this.endWorld = ensureEndWorld();
+            if (endWorld != null) configureVoidWorld(endWorld);
         }
     }
 
@@ -104,11 +115,44 @@ public class IslandWorldManager {
         world.setGameRule(org.bukkit.GameRule.MOB_GRIEFING, mobGriefing);
     }
 
+    /**
+     * Void-pad world stamped as an End environment so the sky, ambience and
+     * lighting read correctly. As with the Nether world, {@link VoidGenerator}
+     * suppresses all vanilla generation (no main End island, no dragon, no
+     * outer-island terrain) — the only blocks are the ones the OneBlock spawns.
+     */
+    public World ensureEndWorld() {
+        World existing = Bukkit.getWorld(endWorldName);
+        if (existing != null) return existing;
+        WorldCreator wc = new WorldCreator(endWorldName)
+                .generator(new VoidGenerator())
+                .biomeProvider(new SingleBiomeProvider(Biome.THE_END))
+                .environment(World.Environment.THE_END)
+                .generateStructures(false);
+        World created = wc.createWorld();
+        if (created != null) {
+            configureVoidWorld(created);
+        }
+        return created;
+    }
+
     public World getWorld() { return world; }
     public String worldName() { return worldName; }
     public World getNetherWorld() { return netherWorld; }
     public String netherWorldName() { return netherWorldName; }
     public boolean isNetherEnabled() { return netherEnabled; }
+    public World getEndWorld() { return endWorld; }
+    public String endWorldName() { return endWorldName; }
+    public boolean isEndEnabled() { return endEnabled; }
+
+    /** Resolve the world name backing a dimension track. */
+    public String worldName(Dimension d) {
+        return switch (d) {
+            case OVERWORLD -> worldName;
+            case NETHER -> netherWorldName;
+            case END -> endWorldName;
+        };
+    }
 
     /**
      * Unload the default vanilla Nether and End worlds if they're loaded.
@@ -132,7 +176,7 @@ public class IslandWorldManager {
         if (target == null) return;
         // Don't try to unload one of our own worlds even if a server owner
         // accidentally points the config at it.
-        if (name.equals(worldName) || name.equals(netherWorldName)) return;
+        if (name.equals(worldName) || name.equals(netherWorldName) || name.equals(endWorldName)) return;
         evacuate(target);
         if (Bukkit.unloadWorld(target, false)) {
             plugin.getLogger().info("Unloaded vanilla dimension: " + name);

@@ -13,6 +13,7 @@ public class PhaseManager {
     private final NovaBlock plugin;
     private final List<Phase> phases = new ArrayList<>();
     private final List<Phase> netherPhases = new ArrayList<>();
+    private final List<Phase> endPhases = new ArrayList<>();
 
     public PhaseManager(NovaBlock plugin) { this.plugin = plugin; }
 
@@ -432,4 +433,190 @@ public class PhaseManager {
 
     public List<Phase> allNether() { return Collections.unmodifiableList(netherPhases); }
     public int netherPhaseCount() { return netherPhases.size(); }
+
+    /**
+     * Twelve End phases — unlocked when an island prestiges for the first time.
+     * Mirrors the {@code requiredBlocks} curve of the other two tracks. The
+     * climax phase carries the {@code void_herald} boss. Loot-room IDs use the
+     * {@code _end} suffix registered on {@link com.nova.novablock.lootroom.RoomTheme#END}.
+     */
+    public void loadEndPhases() {
+        endPhases.clear();
+        endPhases.add(p(0, "end_outer_islands", "Outer Islands", "#E6E0FF", 250,
+                List.of(
+                        b(Material.END_STONE, 50),
+                        b(Material.END_STONE_BRICKS, 18),
+                        b(Material.PURPUR_BLOCK, 12),
+                        b(Material.CHORUS_PLANT, 6),
+                        b(Material.CHORUS_FLOWER, 3),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.ENDERMAN, EntityType.ENDERMITE),
+                null, List.of("parkour_end")));
+        endPhases.add(p(1, "end_chorus_fields", "Chorus Fields", "#C9B8FF", 400,
+                List.of(
+                        b(Material.END_STONE, 40),
+                        b(Material.CHORUS_PLANT, 16),
+                        b(Material.CHORUS_FLOWER, 8),
+                        b(Material.PURPUR_BLOCK, 12),
+                        b(Material.END_STONE_BRICKS, 10),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.ENDERMAN, EntityType.SHULKER),
+                null, List.of("arena_end")));
+        endPhases.add(p(2, "end_purpur_spires", "Purpur Spires", "#B47BFF", 550,
+                List.of(
+                        b(Material.PURPUR_BLOCK, 30),
+                        b(Material.PURPUR_PILLAR, 18),
+                        b(Material.PURPUR_STAIRS, 10),
+                        b(Material.END_STONE_BRICKS, 16),
+                        b(Material.END_STONE, 14),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.ENDERMAN, EntityType.SHULKER),
+                null, List.of("puzzle_end")));
+        endPhases.add(p(3, "end_obsidian_pillars", "Obsidian Pillars", "#4B3B6B", 750,
+                List.of(
+                        b(Material.OBSIDIAN, 30),
+                        b(Material.END_STONE, 26),
+                        b(Material.IRON_BARS, 8),
+                        b(Material.END_STONE_BRICKS, 12),
+                        b(Material.END_ROD, 4),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.ENDERMAN, EntityType.PHANTOM),
+                null, List.of("parkour_end")));
+        endPhases.add(p(4, "end_shulker_nest", "Shulker Nest", "#D9A7FF", 950,
+                List.of(
+                        b(Material.PURPUR_BLOCK, 26),
+                        b(Material.END_STONE_BRICKS, 20),
+                        b(Material.PURPUR_PILLAR, 12),
+                        b(Material.SHULKER_BOX, 1),
+                        b(Material.END_STONE, 14),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.SHULKER, EntityType.ENDERMAN),
+                null, List.of("arena_end")));
+        endPhases.add(p(5, "end_void_reef", "Void Reef", "#5EE6D0", 1200,
+                List.of(
+                        b(Material.END_STONE, 28),
+                        b(Material.SCULK, 16),
+                        b(Material.SCULK_CATALYST, 4),
+                        b(Material.END_STONE_BRICKS, 14),
+                        b(Material.PURPUR_BLOCK, 10),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.ENDERMAN, EntityType.PHANTOM, EntityType.SHULKER),
+                null, List.of("puzzle_end")));
+        endPhases.add(p(6, "end_ender_bastion", "Ender Bastion", "#9C6BFF", 1500,
+                List.of(
+                        b(Material.END_STONE_BRICKS, 26),
+                        b(Material.PURPUR_BLOCK, 16),
+                        b(Material.OBSIDIAN, 10),
+                        b(Material.ENDER_CHEST, 1),
+                        b(Material.END_STONE, 14),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.ENDERMAN, EntityType.SHULKER),
+                "void_herald", List.of("arena_end")));
+        endPhases.add(p(7, "end_dragon_perch", "Dragon's Perch", "#7A5CCB", 1850,
+                List.of(
+                        b(Material.OBSIDIAN, 24),
+                        b(Material.END_STONE, 22),
+                        b(Material.END_STONE_BRICKS, 14),
+                        b(Material.DRAGON_HEAD, 1),
+                        b(Material.END_ROD, 6),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.PHANTOM, EntityType.ENDERMAN),
+                null, List.of("parkour_end")));
+        endPhases.add(p(8, "end_sculk_abyss", "Sculk Abyss", "#2FA69A", 2250,
+                List.of(
+                        b(Material.SCULK, 30),
+                        b(Material.SCULK_CATALYST, 6),
+                        b(Material.SCULK_SENSOR, 4),
+                        b(Material.SCULK_SHRIEKER, 3),
+                        b(Material.END_STONE, 12),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.ENDERMAN, EntityType.SHULKER, EntityType.PHANTOM),
+                null, List.of("arena_end")));
+        endPhases.add(p(9, "end_crystal_vaults", "Crystal Vaults", "#FFB3F0", 2700,
+                List.of(
+                        b(Material.AMETHYST_BLOCK, 22),
+                        b(Material.BUDDING_AMETHYST, 4),
+                        b(Material.PURPUR_BLOCK, 14),
+                        b(Material.END_STONE_BRICKS, 12),
+                        b(Material.BEACON, 1),
+                        b(Material.END_STONE, 10),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.SHULKER, EntityType.ENDERMAN),
+                null, List.of("puzzle_end")));
+        endPhases.add(p(10, "end_elytra_roost", "Elytra Roost", "#E6D9FF", 3300,
+                List.of(
+                        b(Material.PURPUR_BLOCK, 22),
+                        b(Material.PURPUR_PILLAR, 14),
+                        b(Material.CHORUS_PLANT, 10),
+                        b(Material.END_ROD, 8),
+                        b(Material.END_STONE_BRICKS, 12),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.PHANTOM, EntityType.ENDERMAN),
+                null, List.of("arena_end")));
+        endPhases.add(p(11, "end_void_throne", "The Void Throne", "#9C27B0", 4200,
+                List.of(
+                        b(Material.OBSIDIAN, 16),
+                        b(Material.CRYING_OBSIDIAN, 8),
+                        b(Material.END_STONE_BRICKS, 14),
+                        b(Material.DRAGON_EGG, 1),
+                        b(Material.NETHERITE_BLOCK, 1),
+                        b(Material.END_ROD, 6),
+                        b(Material.END_STONE, 8),
+                        b(Material.CHEST, 3)
+                ),
+                Phase.mobList(EntityType.SHULKER, EntityType.ENDERMAN, EntityType.PHANTOM),
+                "void_herald", List.of("arena_end")));
+    }
+
+    public Phase getEnd(int index) {
+        if (index < 0 || index >= endPhases.size()) return null;
+        return endPhases.get(index);
+    }
+
+    public Phase getEndOrLast(int index) {
+        if (endPhases.isEmpty()) return null;
+        if (index < 0) return endPhases.get(0);
+        if (index >= endPhases.size()) return endPhases.get(endPhases.size() - 1);
+        return endPhases.get(index);
+    }
+
+    public List<Phase> allEnd() { return Collections.unmodifiableList(endPhases); }
+    public int endPhaseCount() { return endPhases.size(); }
+
+    // --- Dimension-parameterized lookups -------------------------------------
+
+    public Phase get(com.nova.novablock.island.Dimension d, int index) {
+        return switch (d) {
+            case OVERWORLD -> get(index);
+            case NETHER -> getNether(index);
+            case END -> getEnd(index);
+        };
+    }
+
+    public Phase getOrLast(com.nova.novablock.island.Dimension d, int index) {
+        return switch (d) {
+            case OVERWORLD -> getOrLast(index);
+            case NETHER -> getNetherOrLast(index);
+            case END -> getEndOrLast(index);
+        };
+    }
+
+    public int phaseCount(com.nova.novablock.island.Dimension d) {
+        return switch (d) {
+            case OVERWORLD -> phaseCount();
+            case NETHER -> netherPhaseCount();
+            case END -> endPhaseCount();
+        };
+    }
 }

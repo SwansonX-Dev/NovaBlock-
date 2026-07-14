@@ -79,9 +79,13 @@ public class PlaceholderHook extends PlaceholderExpansion {
                 return island == null ? "0"
                         : String.valueOf(com.nova.novablock.island.IslandLevel.pointsThisLevel(island.data()));
             }
-            case "prestige_level" -> { return island == null ? "0" : String.valueOf(island.data().getPrestigeLevel()); }
+            // prestige_level is the stacked total across all three dimensions (back-compat).
+            case "prestige_level" -> { return island == null ? "0" : String.valueOf(island.data().getTotalPrestigeLevel()); }
+            case "prestige_overworld" -> { return island == null ? "0" : String.valueOf(island.data().getPrestigeLevel(com.nova.novablock.island.Dimension.OVERWORLD)); }
+            case "prestige_nether" -> { return island == null ? "0" : String.valueOf(island.data().getPrestigeLevel(com.nova.novablock.island.Dimension.NETHER)); }
+            case "prestige_end" -> { return island == null ? "0" : String.valueOf(island.data().getPrestigeLevel(com.nova.novablock.island.Dimension.END)); }
             case "prestige_title" -> {
-                int lvl = island == null ? 0 : island.data().getPrestigeLevel();
+                int lvl = island == null ? 0 : island.data().getTotalPrestigeLevel();
                 return lvl <= 0 ? "" : plugin.prestige().title(lvl);
             }
             case "event_color" -> {

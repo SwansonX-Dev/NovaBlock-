@@ -32,8 +32,19 @@ public class Island {
 
     public Location centerBlock() { return data.centerBlock(); }
     public Location netherCenterBlock() { return data.netherCenterBlock(); }
+    public Location endCenterBlock() { return data.endCenterBlock(); }
+    public Location centerBlock(Dimension d) { return data.centerBlock(d); }
 
     public boolean isNetherUnlocked() { return data.isNetherUnlocked(); }
+    public boolean isEndUnlocked() { return data.isEndUnlocked(); }
+
+    public boolean isUnlocked(Dimension d) {
+        return switch (d) {
+            case OVERWORLD -> true;
+            case NETHER -> data.isNetherUnlocked();
+            case END -> data.isEndUnlocked();
+        };
+    }
 
     public void ensureSpawnPlatform() {
         ensurePlatformAt(centerBlock(), Material.GRASS_BLOCK);
@@ -49,6 +60,18 @@ public class Island {
         Location c = netherCenterBlock();
         if (c.getWorld() == null) return;
         ensurePlatformAt(c, Material.NETHERRACK);
+    }
+
+    /**
+     * Build the End bedrock pad and a placeholder center. Placeholder is
+     * END_STONE — the next {@link com.nova.novablock.listener.BlockListener}
+     * break and the {@link OneBlockRepairService} both pick a phase-correct
+     * material on the first mine.
+     */
+    public void ensureEndPlatform() {
+        Location c = endCenterBlock();
+        if (c.getWorld() == null) return;
+        ensurePlatformAt(c, Material.END_STONE);
     }
 
     private void ensurePlatformAt(Location c, Material centerMaterial) {
@@ -114,6 +137,16 @@ public class Island {
         Location loc = data.netherSpawnLocation();
         if (loc.getWorld() == null) {
             p.sendMessage("The Nether world isn't loaded.");
+            return;
+        }
+        loc.getChunk().load();
+        p.teleportAsync(loc);
+    }
+
+    public void teleportEndHome(Player p) {
+        Location loc = data.endSpawnLocation();
+        if (loc.getWorld() == null) {
+            p.sendMessage("The End world isn't loaded.");
             return;
         }
         loc.getChunk().load();

@@ -23,8 +23,11 @@ public class EventManager {
     }
 
     private void autosave() {
+        // saveDirty writes only changed islands; saveOnline writes only online
+        // players (offline progression can't change) — both keep the periodic
+        // work proportional to activity, and the disk writes run off-thread.
         plugin.islands().saveDirty();
-        plugin.progression().saveAll();
+        plugin.progression().saveOnline();
     }
 
     private void tickCommunity() {

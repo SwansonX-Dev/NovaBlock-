@@ -26,4 +26,11 @@ public record RoomTheme(String suffix, String displayPrefix, Biome biome, List<E
             Biome.CRIMSON_FOREST,
             List.of(EntityType.PIGLIN, EntityType.WITHER_SKELETON, EntityType.BLAZE, EntityType.MAGMA_CUBE)
     );
+
+    public static final RoomTheme END = new RoomTheme(
+            "end",
+            "End ",
+            Biome.THE_END,
+            List.of(EntityType.ENDERMAN, EntityType.SHULKER, EntityType.PHANTOM, EntityType.ENDERMITE)
+    );
 }

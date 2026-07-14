@@ -70,6 +70,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 Island island = plugin.islands().ofPlayer(p);
                 if (island == null) { Msg.send(p, "<red>You don't have an island yet. Try <yellow>/ob create</yellow>."); return true; }
                 boolean wantsNether = args.length > 1 && args[1].equalsIgnoreCase("nether");
+                boolean wantsEnd = args.length > 1 && args[1].equalsIgnoreCase("end");
                 if (wantsNether) {
                     if (!plugin.worlds().isNetherEnabled()) {
                         Msg.send(p, "<red>The Nether dimension is disabled on this server.");
@@ -81,6 +82,17 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                     }
                     plugin.repairs().repairNether(island, false);
                     island.teleportNetherHome(p);
+                } else if (wantsEnd) {
+                    if (!plugin.worlds().isEndEnabled()) {
+                        Msg.send(p, "<red>The End dimension is disabled on this server.");
+                        return true;
+                    }
+                    if (!island.isEndUnlocked()) {
+                        Msg.send(p, "<red>The End is sealed. <gray>Prestige at least once to tear it open.");
+                        return true;
+                    }
+                    plugin.repairs().repairEnd(island, false);
+                    island.teleportEndHome(p);
                 } else {
                     plugin.repairs().repair(island, false);
                     island.teleportHome(p);
@@ -101,7 +113,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 Msg.send(p, "<gray>You are in <" + phase.getThemeColor() + ">" + phase.getDisplayName()
                         + " <gray>(<white>" + island.data().getPhaseProgress() + "/" + phase.getRequiredBlocks() + "<gray>).");
             }
-            case "prestige" -> openPrestige(p);
+            case "prestige" -> openPrestige(p, args);
             case "invite" -> invite(p, args);
             case "accept" -> accept(p);
             case "leave" -> leave(p);
@@ -549,16 +561,26 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         new com.nova.novablock.gui.HubGui(plugin).open(p);
     }
 
-    private void openPrestige(Player p) {
+    private void openPrestige(Player p, String[] args) {
         Island island = plugin.islands().ofPlayer(p);
         if (island == null) {
             Msg.send(p, "<red>You don't have an island yet. Try <yellow>/ob create</yellow>.");
             return;
         }
-        if (!plugin.prestige().canPrestige(island)) {
-            var last = plugin.phases().get(plugin.phases().phaseCount() - 1);
-            Msg.send(p, "<red>You must complete <" + last.getThemeColor() + ">"
-                    + last.getDisplayName() + " <red>before you can prestige.");
+        // Direct prestige of a named dimension: /ob prestige <overworld|nether|end>.
+        // doPrestige guards eligibility + unlock and messages on failure.
+        if (args.length > 1) {
+            com.nova.novablock.island.Dimension dim = switch (args[1].toLowerCase()) {
+                case "overworld", "over", "ow" -> com.nova.novablock.island.Dimension.OVERWORLD;
+                case "nether", "hell" -> com.nova.novablock.island.Dimension.NETHER;
+                case "end" -> com.nova.novablock.island.Dimension.END;
+                default -> null;
+            };
+            if (dim == null) {
+                Msg.send(p, "<red>Unknown dimension. Use <yellow>overworld<red>, <yellow>nether<red>, or <yellow>end<red>.");
+                return;
+            }
+            plugin.prestige().doPrestige(p, island, dim);
             return;
         }
         new com.nova.novablock.gui.PrestigeGui(plugin).open(p);
@@ -753,7 +775,13 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("home")) {
             String prefix = args[1].toLowerCase();
-            return java.util.stream.Stream.of("nether")
+            return java.util.stream.Stream.of("nether", "end")
+                    .filter(s -> s.startsWith(prefix))
+                    .collect(Collectors.toList());
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("prestige")) {
+            String prefix = args[1].toLowerCase();
+            return java.util.stream.Stream.of("overworld", "nether", "end")
                     .filter(s -> s.startsWith(prefix))
                     .collect(Collectors.toList());
         }

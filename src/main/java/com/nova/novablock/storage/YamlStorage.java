@@ -33,11 +33,12 @@ public class YamlStorage implements DataStorage {
     private File playerDir;
 
     /**
-     * Single background thread that performs island file I/O (the atomic write +
-     * move). Island YAML is built on the main thread — a cheap in-memory snapshot —
-     * then handed here so the disk write never stalls a tick. A single thread keeps
-     * writes for the same island strictly ordered, so an autosave can't clobber a
-     * later immediate save. Drained on {@link #shutdown()}.
+     * Single background thread that performs all file I/O (the atomic write +
+     * move) for both island and player-progression files. The YAML is built on the
+     * main thread — a cheap in-memory snapshot — then handed here so the disk write
+     * never stalls a tick. A single thread keeps writes for the same file strictly
+     * ordered, so an autosave can't clobber a later immediate save (and a delete
+     * always lands after any queued write for that file). Drained on {@link #shutdown()}.
      */
     private ExecutorService ioExecutor;
 
@@ -52,7 +53,7 @@ public class YamlStorage implements DataStorage {
         if (!islandDir.exists()) islandDir.mkdirs();
         if (!playerDir.exists()) playerDir.mkdirs();
         ioExecutor = Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "NovaBlock-IslandIO");
+            Thread t = new Thread(r, "NovaBlock-IO");
             t.setDaemon(true);
             return t;
         });
@@ -82,15 +83,23 @@ public class YamlStorage implements DataStorage {
         }
     }
 
-    /** Submit an island file write to the IO thread, or run it inline if the executor is gone (e.g. mid-shutdown). */
-    private void submitIslandWrite(YamlConfiguration y, File f, UUID id) {
+    /** Submit a file write to the IO thread, or run it inline if the executor is gone (e.g. mid-shutdown). */
+    private void submitWrite(YamlConfiguration y, File f, String label) {
         Runnable write = () -> {
             try { atomicSave(y, f); }
-            catch (IOException ex) { plugin.getLogger().warning("Failed to save island " + id + ": " + ex.getMessage()); }
+            catch (IOException ex) { plugin.getLogger().warning("Failed to save " + label + ": " + ex.getMessage()); }
         };
         ExecutorService ex = ioExecutor;
         if (ex == null || ex.isShutdown()) write.run();
         else ex.execute(write);
+    }
+
+    /** Submit a file delete to the IO thread so it stays ordered against queued writes for the same file. */
+    private void submitDelete(File f) {
+        Runnable del = () -> { if (f.exists()) f.delete(); };
+        ExecutorService ex = ioExecutor;
+        if (ex == null || ex.isShutdown()) del.run();
+        else ex.execute(del);
     }
 
     @Override
@@ -122,10 +131,19 @@ public class YamlStorage implements DataStorage {
                 long netherBlocksBroken = y.getLong("nether.blocksBroken", 0);
                 int netherPhaseIndex = y.getInt("nether.phaseIndex", 0);
                 int netherPhaseProgress = y.getInt("nether.phaseProgress", 0);
+                int netherPrestigeLevel = y.getInt("nether.prestigeLevel", 0);
                 long netherLastBossAt = y.getLong("nether.lastBossAt", 0);
                 long netherLastLootRoomAt = y.getLong("nether.lastLootRoomAt", 0);
                 boolean netherUnlocked = y.getBoolean("nether.unlocked", false);
                 boolean firstNetherVisit = y.getBoolean("nether.firstVisit", true);
+                long endBlocksBroken = y.getLong("end.blocksBroken", 0);
+                int endPhaseIndex = y.getInt("end.phaseIndex", 0);
+                int endPhaseProgress = y.getInt("end.phaseProgress", 0);
+                int endPrestigeLevel = y.getInt("end.prestigeLevel", 0);
+                long endLastBossAt = y.getLong("end.lastBossAt", 0);
+                long endLastLootRoomAt = y.getLong("end.lastLootRoomAt", 0);
+                boolean endUnlocked = y.getBoolean("end.unlocked", false);
+                boolean firstEndVisit = y.getBoolean("end.firstVisit", true);
                 List<String> members = y.getStringList("members");
                 List<UUID> memberIds = new ArrayList<>();
                 for (String m : members) memberIds.add(UUID.fromString(m));
@@ -141,10 +159,19 @@ public class YamlStorage implements DataStorage {
                 data.setNetherBlocksBroken(netherBlocksBroken);
                 data.setNetherPhaseIndex(netherPhaseIndex);
                 data.setNetherPhaseProgress(netherPhaseProgress);
+                data.setNetherPrestigeLevel(netherPrestigeLevel);
                 data.setNetherLastBossAt(netherLastBossAt);
                 data.setNetherLastLootRoomAt(netherLastLootRoomAt);
                 data.setNetherUnlocked(netherUnlocked);
                 data.setFirstNetherVisit(firstNetherVisit);
+                data.setEndBlocksBroken(endBlocksBroken);
+                data.setEndPhaseIndex(endPhaseIndex);
+                data.setEndPhaseProgress(endPhaseProgress);
+                data.setEndPrestigeLevel(endPrestigeLevel);
+                data.setEndLastBossAt(endLastBossAt);
+                data.setEndLastLootRoomAt(endLastLootRoomAt);
+                data.setEndUnlocked(endUnlocked);
+                data.setFirstEndVisit(firstEndVisit);
                 data.getMembers().addAll(memberIds);
                 for (String t : y.getStringList("trusted")) {
                     try { data.getTrusted().add(UUID.fromString(t)); }
@@ -198,7 +225,7 @@ public class YamlStorage implements DataStorage {
         File f = new File(islandDir, data.getId() + ".yml");
         YamlConfiguration y = buildIslandYaml(data);
         data.clearDirty();
-        submitIslandWrite(y, f, data.getId());
+        submitWrite(y, f, "island " + data.getId());
     }
 
     private YamlConfiguration buildIslandYaml(IslandData data) {
@@ -219,10 +246,19 @@ public class YamlStorage implements DataStorage {
         y.set("nether.blocksBroken", data.getNetherBlocksBroken());
         y.set("nether.phaseIndex", data.getNetherPhaseIndex());
         y.set("nether.phaseProgress", data.getNetherPhaseProgress());
+        y.set("nether.prestigeLevel", data.getNetherPrestigeLevel());
         y.set("nether.lastBossAt", data.getNetherLastBossAt());
         y.set("nether.lastLootRoomAt", data.getNetherLastLootRoomAt());
         y.set("nether.unlocked", data.isNetherUnlocked());
         y.set("nether.firstVisit", data.isFirstNetherVisit());
+        y.set("end.blocksBroken", data.getEndBlocksBroken());
+        y.set("end.phaseIndex", data.getEndPhaseIndex());
+        y.set("end.phaseProgress", data.getEndPhaseProgress());
+        y.set("end.prestigeLevel", data.getEndPrestigeLevel());
+        y.set("end.lastBossAt", data.getEndLastBossAt());
+        y.set("end.lastLootRoomAt", data.getEndLastLootRoomAt());
+        y.set("end.unlocked", data.isEndUnlocked());
+        y.set("end.firstVisit", data.isFirstEndVisit());
         List<String> mem = new ArrayList<>();
         for (UUID u : data.getMembers()) mem.add(u.toString());
         y.set("members", mem);
@@ -262,11 +298,7 @@ public class YamlStorage implements DataStorage {
     public void deleteIsland(UUID islandId) {
         // Route deletes through the same IO thread so they stay ordered against any
         // queued writes for the same island (a save then delete deletes last).
-        File f = new File(islandDir, islandId + ".yml");
-        Runnable del = () -> { if (f.exists()) f.delete(); };
-        ExecutorService ex = ioExecutor;
-        if (ex == null || ex.isShutdown()) del.run();
-        else ex.execute(del);
+        submitDelete(new File(islandDir, islandId + ".yml"));
     }
 
     @Override
@@ -320,7 +352,16 @@ public class YamlStorage implements DataStorage {
 
     @Override
     public void saveProgression(PlayerProgression p) {
+        // Build the snapshot on the calling (main) thread for a consistent view of
+        // the live progression, then hand the disk write to the shared IO thread so
+        // it never stalls a tick — mirrors saveIsland. Player YAML is small, so the
+        // build is negligible; the file write was the only slow part.
         File f = new File(playerDir, p.getPlayerId() + ".yml");
+        YamlConfiguration y = buildProgressionYaml(p);
+        submitWrite(y, f, "progression " + p.getPlayerId());
+    }
+
+    private YamlConfiguration buildProgressionYaml(PlayerProgression p) {
         YamlConfiguration y = new YamlConfiguration();
         y.set("schemaVersion", SCHEMA_VERSION);
         for (SkillType type : SkillType.values()) {
@@ -354,14 +395,13 @@ public class YamlStorage implements DataStorage {
         y.set("seasonal.claimedTiers", p.getClaimedSeasonalTiers().stream().sorted().toList());
         y.set("seasonal.pendingCommands", p.getPendingRewardCommands().stream().sorted().toList());
         y.set("claimBlocks.oneBlockBreaks", p.getClaimRewardBreaks());
-        try { atomicSave(y, f); }
-        catch (IOException ex) { plugin.getLogger().warning("Failed to save progression: " + ex.getMessage()); }
+        return y;
     }
 
     @Override
     public void deleteProgression(UUID playerId) {
-        File f = new File(playerDir, playerId + ".yml");
-        if (f.exists()) f.delete();
+        // Route through the IO thread so a queued save can't resurrect the file after delete.
+        submitDelete(new File(playerDir, playerId + ".yml"));
     }
 
     public static Location parseLoc(YamlConfiguration y, String path) {

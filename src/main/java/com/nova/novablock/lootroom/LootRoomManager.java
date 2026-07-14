@@ -74,6 +74,9 @@ public class LootRoomManager implements Listener {
         register(new ParkourRoom(RoomTheme.NETHER));
         register(new ArenaRoom(plugin, RoomTheme.NETHER));
         register(new PuzzleRoom(RoomTheme.NETHER));
+        register(new ParkourRoom(RoomTheme.END));
+        register(new ArenaRoom(plugin, RoomTheme.END));
+        register(new PuzzleRoom(RoomTheme.END));
     }
 
     /**
@@ -480,6 +483,7 @@ public class LootRoomManager implements Listener {
         // Suffix is everything after the final underscore — defensive for legacy
         // unsuffixed room IDs (treat as overworld).
         if (roomId.endsWith("_nether")) return RoomTheme.NETHER;
+        if (roomId.endsWith("_end")) return RoomTheme.END;
         return RoomTheme.OVERWORLD;
     }
 

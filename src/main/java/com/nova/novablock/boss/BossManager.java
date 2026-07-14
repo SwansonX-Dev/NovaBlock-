@@ -81,13 +81,20 @@ public class BossManager implements Listener {
     public java.util.Set<String> bossIds() { return java.util.Collections.unmodifiableSet(registry.keySet()); }
 
     public BossFight spawn(String id, Island island, Player triggering) {
-        return spawn(id, island, triggering, false);
+        return spawn(id, island, triggering, com.nova.novablock.island.Dimension.OVERWORLD);
     }
 
     public BossFight spawn(String id, Island island, Player triggering, boolean inNether) {
+        return spawn(id, island, triggering,
+                inNether ? com.nova.novablock.island.Dimension.NETHER
+                         : com.nova.novablock.island.Dimension.OVERWORLD);
+    }
+
+    public BossFight spawn(String id, Island island, Player triggering,
+                           com.nova.novablock.island.Dimension dim) {
         Boss boss = registry.get(id);
         if (boss == null) return null;
-        org.bukkit.Location arenaCenter = inNether ? island.netherCenterBlock() : island.centerBlock();
+        org.bukkit.Location arenaCenter = island.centerBlock(dim);
         BossFight fight = boss.spawn(island, triggering, arenaCenter);
         if (fight == null) return null;
         active.put(fight.entityId(), fight);

@@ -187,25 +187,31 @@ public class ScoreboardManager {
         PlayerProgression prog = plugin.progression().get(p);
         List<String> lines = new ArrayList<>();
         if (island != null) {
-            boolean inNether = p.getWorld() != null
-                    && p.getWorld().getName().equals(plugin.worlds().netherWorldName());
-            int pLvl = island.data().getPrestigeLevel();
+            com.nova.novablock.island.Dimension dim = com.nova.novablock.island.Dimension.OVERWORLD;
+            if (p.getWorld() != null) {
+                String wn = p.getWorld().getName();
+                if (wn.equals(plugin.worlds().netherWorldName())) dim = com.nova.novablock.island.Dimension.NETHER;
+                else if (wn.equals(plugin.worlds().endWorldName())) dim = com.nova.novablock.island.Dimension.END;
+            }
+            int pLvl = island.data().getTotalPrestigeLevel();
             if (pLvl > 0) {
                 lines.add(plugin.prestige().title(pLvl) + " <gray>(<white>" + pLvl + "<gray>)");
-                int coinPct = (int) Math.round(plugin.prestige().coinMultiplierAtLevel(pLvl) * 100) - 100;
-                int xpPct = (int) Math.round(plugin.prestige().xpMultiplierAtLevel(pLvl) * 100) - 100;
+                int coinPct = (int) Math.round(plugin.prestige().coinMultiplier(island) * 100) - 100;
+                int xpPct = (int) Math.round(plugin.prestige().xpMultiplier(island) * 100) - 100;
                 if (coinPct > 0 || xpPct > 0) {
                     lines.add("<aqua>Bonus: <yellow>+" + coinPct + "%<gray> coins <yellow>+" + xpPct + "%<gray> xp");
                 }
             }
-            Phase phase = inNether
-                    ? plugin.phases().getNetherOrLast(island.data().getNetherPhaseIndex())
-                    : plugin.phases().getOrLast(island.data().getPhaseIndex());
+            Phase phase = plugin.phases().getOrLast(dim, island.data().getPhaseIndex(dim));
             String color = phase == null ? "white" : phase.getThemeColor();
             String name = phase == null ? "?" : phase.getDisplayName();
-            String label = inNether ? "Nether" : "Phase";
+            String label = switch (dim) {
+                case OVERWORLD -> "Phase";
+                case NETHER -> "Nether";
+                case END -> "End";
+            };
             lines.add("<gray>" + label + ": <" + color + ">" + name);
-            int prog2 = inNether ? island.data().getNetherPhaseProgress() : island.data().getPhaseProgress();
+            int prog2 = island.data().getPhaseProgress(dim);
             int req = phase == null ? 1 : phase.getRequiredBlocks();
             int remaining = Math.max(0, req - prog2);
             if (remaining > 0 && remaining <= 50) {
@@ -213,9 +219,9 @@ public class ScoreboardManager {
             } else {
                 lines.add("<gray>" + prog2 + " / " + req + " blocks");
             }
-            long totalBlocks = inNether ? island.data().getNetherBlocksBroken() : island.data().getBlocksBroken();
+            long totalBlocks = island.data().getBlocksBroken(dim);
             lines.add("<gray>Total: <white>" + totalBlocks);
-            String riftLine = nextRiftLine(island, inNether);
+            String riftLine = nextRiftLine(island, dim);
             if (riftLine != null) lines.add(riftLine);
             lines.add("<gold>Coins: <yellow>" + plugin.economy().balance(island));
             var path = plugin.seasonalPaths().activePath();
@@ -316,16 +322,23 @@ public class ScoreboardManager {
      * it once the player is within 50 blocks of either gate so they feel something
      * coming, instead of crunching aimlessly.
      */
-    private String nextRiftLine(Island island, boolean inNether) {
+    private String nextRiftLine(Island island, com.nova.novablock.island.Dimension dim) {
         var cfg = plugin.getConfig();
-        int lootCd = Math.max(1, cfg.getInt(
-                inNether ? "cooldowns.netherLootRoomMinBlocks" : "cooldowns.lootRoomMinBlocks",
-                inNether ? 400 : 150));
-        int bossCd = Math.max(1, cfg.getInt(
-                inNether ? "cooldowns.netherBossMinBlocks" : "cooldowns.bossMinBlocks", 300));
-        long broken = inNether ? island.data().getNetherBlocksBroken() : island.data().getBlocksBroken();
-        long lastLoot = inNether ? island.data().getNetherLastLootRoomAt() : island.data().getLastLootRoomAt();
-        long lastBoss = inNether ? island.data().getNetherLastBossAt() : island.data().getLastBossAt();
+        String lootKey = switch (dim) {
+            case OVERWORLD -> "cooldowns.lootRoomMinBlocks";
+            case NETHER -> "cooldowns.netherLootRoomMinBlocks";
+            case END -> "cooldowns.endLootRoomMinBlocks";
+        };
+        String bossKey = switch (dim) {
+            case OVERWORLD -> "cooldowns.bossMinBlocks";
+            case NETHER -> "cooldowns.netherBossMinBlocks";
+            case END -> "cooldowns.endBossMinBlocks";
+        };
+        int lootCd = Math.max(1, cfg.getInt(lootKey, dim.isOverworld() ? 150 : 400));
+        int bossCd = Math.max(1, cfg.getInt(bossKey, 300));
+        long broken = island.data().getBlocksBroken(dim);
+        long lastLoot = island.data().getLastLootRoomAt(dim);
+        long lastBoss = island.data().getLastBossAt(dim);
         long lootSince = broken - lastLoot;
         long bossSince = broken - lastBoss;
         long lootLeft = lootCd - lootSince;

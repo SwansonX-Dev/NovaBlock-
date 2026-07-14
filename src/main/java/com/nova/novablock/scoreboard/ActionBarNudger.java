@@ -36,33 +36,46 @@ public class ActionBarNudger implements Listener {
         Player player = event.getPlayer();
         Island island = plugin.islands().ofPlayer(player);
         if (island == null) return;
-        boolean nether = player.getWorld() != null
-                && player.getWorld().getName().equals(plugin.worlds().netherWorldName());
-        Phase phase = nether
-                ? plugin.phases().getNetherOrLast(island.data().getNetherPhaseIndex())
-                : plugin.phases().getOrLast(island.data().getPhaseIndex());
+        com.nova.novablock.island.Dimension dim = com.nova.novablock.island.Dimension.OVERWORLD;
+        if (player.getWorld() != null) {
+            String wn = player.getWorld().getName();
+            if (wn.equals(plugin.worlds().netherWorldName())) dim = com.nova.novablock.island.Dimension.NETHER;
+            else if (wn.equals(plugin.worlds().endWorldName())) dim = com.nova.novablock.island.Dimension.END;
+        }
+        Phase phase = plugin.phases().getOrLast(dim, island.data().getPhaseIndex(dim));
         if (phase == null) return;
-        int progress = nether ? island.data().getNetherPhaseProgress() : island.data().getPhaseProgress();
+        int progress = island.data().getPhaseProgress(dim);
         int remaining = phase.getRequiredBlocks() - progress;
         if (remaining <= 0 || remaining > APPROACH_THRESHOLD) return;
 
-        int phaseIdx = nether ? island.data().getNetherPhaseIndex() : island.data().getPhaseIndex();
-        NudgeKey key = new NudgeKey(player.getUniqueId(), nether, phaseIdx);
+        int phaseIdx = island.data().getPhaseIndex(dim);
+        NudgeKey key = new NudgeKey(player.getUniqueId(), dim, phaseIdx);
         if (nudged.putIfAbsent(key, Boolean.TRUE) != null) return;
 
-        Phase next = nether ? plugin.phases().getNether(phaseIdx + 1) : plugin.phases().get(phaseIdx + 1);
+        Phase next = plugin.phases().get(dim, phaseIdx + 1);
         String label;
         String color;
         if (next == null) {
-            label = nether ? "Conquer the Nether" : "Prestige";
+            // Every track has its own prestige now, so the final-phase nudge is
+            // always "Prestige" (of that dimension).
+            label = switch (dim) {
+                case OVERWORLD -> "Prestige";
+                case NETHER -> "Nether Prestige";
+                case END -> "End Prestige";
+            };
             color = "<gradient:#7B61FF:#4FC3F7>";
         } else {
-            label = (nether ? "Nether Phase " : "Phase ") + (phaseIdx + 2) + ": " + next.getDisplayName();
+            String prefix = switch (dim) {
+                case OVERWORLD -> "Phase ";
+                case NETHER -> "Nether Phase ";
+                case END -> "End Phase ";
+            };
+            label = prefix + (phaseIdx + 2) + ": " + next.getDisplayName();
             color = "<" + next.getThemeColor() + ">";
         }
         Msg.actionBar(player,
                 "<gold><bold>" + remaining + "</bold> blocks to " + color + label);
     }
 
-    private record NudgeKey(UUID uuid, boolean nether, int phaseIndex) {}
+    private record NudgeKey(UUID uuid, com.nova.novablock.island.Dimension dim, int phaseIndex) {}
 }

@@ -1,6 +1,7 @@
 package com.nova.novablock.progression;
 
 import com.nova.novablock.NovaBlock;
+import com.nova.novablock.island.Dimension;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.phase.Phase;
 import com.nova.novablock.prophecy.ProphecyManager;
@@ -66,31 +67,50 @@ public class PrestigeManager {
         this.rewardCommands = cfg.getStringList("prestige.reward-commands");
     }
 
-    public boolean canPrestige(Island island) {
+    /** True if the given dimension's track can currently be prestiged. */
+    public boolean canPrestige(Island island, Dimension dim) {
         if (island == null) return false;
-        int lastIdx = plugin.phases().phaseCount() - 1;
-        if (island.data().getPhaseIndex() < lastIdx) return false;
-        Phase last = plugin.phases().get(lastIdx);
-        return last != null && island.data().getPhaseProgress() >= last.getRequiredBlocks();
+        if (!island.isUnlocked(dim)) return false;
+        int lastIdx = plugin.phases().phaseCount(dim) - 1;
+        if (lastIdx < 0) return false;
+        if (island.data().getPhaseIndex(dim) < lastIdx) return false;
+        Phase last = plugin.phases().get(dim, lastIdx);
+        return last != null && island.data().getPhaseProgress(dim) >= last.getRequiredBlocks();
     }
 
-    public void doPrestige(Player player, Island island) {
-        if (!canPrestige(island)) {
-            Msg.send(player, "<red>You must complete Phase " + plugin.phases().phaseCount()
-                    + " before you can prestige.");
+    /** True if ANY of the three tracks can currently be prestiged (command/GUI gate). */
+    public boolean canPrestigeAny(Island island) {
+        return canPrestige(island, Dimension.OVERWORLD)
+                || canPrestige(island, Dimension.NETHER)
+                || canPrestige(island, Dimension.END);
+    }
+
+    /**
+     * Prestige a single dimension's track. Each track is independent: prestiging
+     * one bumps only that track's prestige level and resets only that track's
+     * phase to 1. The coin/XP/sell bonuses stack across all three tracks (see
+     * {@link #cappedTotalLevel}).
+     */
+    public void doPrestige(Player player, Island island, Dimension dim) {
+        if (!canPrestige(island, dim)) {
+            Msg.send(player, "<red>You must complete the final phase of the " + dimName(dim)
+                    + " before you can prestige it.");
             return;
         }
 
-        int newLevel = island.data().getPrestigeLevel() + 1;
-        island.data().setPrestigeLevel(newLevel);
-        island.data().setPhaseIndex(0);
-        island.data().setPhaseProgress(0);
-        // Prestige clears Nightmare so players can opt back in if they want.
-        island.data().setFlag(com.nova.novablock.island.IslandFlag.NIGHTMARE_MODE, false);
-        island.upcomingBlocks().clear();
-        Phase first = plugin.phases().get(0);
-        if (first != null) {
-            island.refillUpcoming(first, ProphecyManager.QUEUE_SIZE);
+        int newLevel = island.data().getPrestigeLevel(dim) + 1;
+        island.data().setPrestigeLevel(dim, newLevel);
+        // Reset ONLY this dimension's track to phase 1.
+        island.data().setPhaseIndex(dim, 0);
+        island.data().setPhaseProgress(dim, 0);
+        if (dim.isOverworld()) {
+            // Nightmare is an Overworld-phase modifier; clear it so players can opt back in.
+            island.data().setFlag(com.nova.novablock.island.IslandFlag.NIGHTMARE_MODE, false);
+            island.upcomingBlocks().clear();
+            Phase first = plugin.phases().get(0);
+            if (first != null) {
+                island.refillUpcoming(first, ProphecyManager.QUEUE_SIZE);
+            }
         }
 
         plugin.paxels().refreshTier(player);
@@ -116,6 +136,7 @@ public class PrestigeManager {
 
         for (String raw : rewardCommands) {
             String cmd = raw.replace("%player%", player.getName())
+                    .replace("%dimension%", dim.name().toLowerCase())
                     .replace("%level_capped%", String.valueOf(Math.min(newLevel, maxLevel)))
                     .replace("%level%", String.valueOf(newLevel));
             try {
@@ -127,10 +148,10 @@ public class PrestigeManager {
 
         plugin.storage().saveIsland(island.data());
 
-        String title = title(newLevel);
-        Msg.title(player, "<gold>✦ Prestige " + roman(newLevel), "<gray>+"
+        String title = dimensionTitle(dim, newLevel);
+        Msg.title(player, title, "<gray>+"
                 + Math.round(coinMultiplier(island) * 100 - 100) + "% coins, +"
-                + Math.round(xpMultiplier(island) * 100 - 100) + "% XP");
+                + Math.round(xpMultiplier(island) * 100 - 100) + "% XP <dark_gray>(stacked)");
         int collected = island.data().getReceivedPrestigeTemplates().size();
         int total = PRESTIGE_TEMPLATES.size();
         if (collectionComplete) {
@@ -146,44 +167,66 @@ public class PrestigeManager {
         plugin.seasonalPaths().award(player, com.nova.novablock.season.SeasonalPathManager.PathSource.PRESTIGE, 500);
 
         Bukkit.broadcast(Msg.mm("<gold>" + title + " <gray>— <yellow>"
-                + player.getName() + " <gray>has prestiged!"));
+                + player.getName() + " <gray>has prestiged their " + dimName(dim) + "!"));
     }
 
     public double coinMultiplier(Island island) {
-        return 1.0 + coinMultPerLevel * cappedLevel(island);
+        return 1.0 + coinMultPerLevel * cappedTotalLevel(island);
     }
 
     public double xpMultiplier(Island island) {
-        return 1.0 + xpMultPerLevel * cappedLevel(island);
+        return 1.0 + xpMultPerLevel * cappedTotalLevel(island);
     }
 
     /**
      * xEconomy sell-price multiplier for a player, derived from their island's
-     * prestige level (capped at max-level). Registered as a sell-boost provider
-     * with xEconomy on enable — applies to /sell, the sell menu, shop selling,
-     * and sell chests (by chest owner). Works for offline players (sell chests
-     * tick while the owner is away).
+     * stacked prestige level across all three dimensions (each capped at
+     * max-level). Registered as a sell-boost provider with xEconomy on enable —
+     * applies to /sell, the sell menu, shop selling, and sell chests (by chest
+     * owner). Works for offline players (sell chests tick while the owner is away).
      */
     public double sellMultiplierFor(java.util.UUID playerId) {
         Island island = plugin.islands().ofPlayer(playerId);
-        return 1.0 + sellBoostPerLevel * cappedLevel(island);
+        return 1.0 + sellBoostPerLevel * cappedTotalLevel(island);
     }
 
-    public double sellMultiplierAtLevel(int level) {
-        return 1.0 + sellBoostPerLevel * Math.min(Math.max(0, level), maxLevel);
-    }
+    // --- Preview helpers for the prestige GUI (operate on a stacked total) ----
+    public double coinMultiplierAtTotal(int total) { return 1.0 + coinMultPerLevel * Math.max(0, total); }
+    public double xpMultiplierAtTotal(int total) { return 1.0 + xpMultPerLevel * Math.max(0, total); }
+    public double sellMultiplierAtTotal(int total) { return 1.0 + sellBoostPerLevel * Math.max(0, total); }
 
-    public double coinMultiplierAtLevel(int level) {
-        return 1.0 + coinMultPerLevel * Math.min(Math.max(0, level), maxLevel);
-    }
+    public int maxLevel() { return maxLevel; }
 
-    public double xpMultiplierAtLevel(int level) {
-        return 1.0 + xpMultPerLevel * Math.min(Math.max(0, level), maxLevel);
-    }
-
-    private int cappedLevel(Island island) {
+    /**
+     * Stacked prestige level driving every bonus: the sum of all three tracks,
+     * each individually capped at {@link #maxLevel}. So with the default cap of
+     * 10, the ceiling is 30 (10 per dimension).
+     */
+    public int cappedTotalLevel(Island island) {
         if (island == null) return 0;
-        return Math.min(island.data().getPrestigeLevel(), maxLevel);
+        return Math.min(island.data().getPrestigeLevel(), maxLevel)
+                + Math.min(island.data().getNetherPrestigeLevel(), maxLevel)
+                + Math.min(island.data().getEndPrestigeLevel(), maxLevel);
+    }
+
+    private static String dimName(Dimension dim) {
+        return switch (dim) {
+            case OVERWORLD -> "Overworld";
+            case NETHER -> "Nether";
+            case END -> "End";
+        };
+    }
+
+    /** Per-dimension prestige title, e.g. "✦ Nether Prestige III". */
+    public String dimensionTitle(Dimension dim, int level) {
+        if (level <= 0) return "";
+        String color = colorFor(level);
+        String prefix = switch (dim) {
+            case OVERWORLD -> "";
+            case NETHER -> "Nether ";
+            case END -> "End ";
+        };
+        return "<" + color + ">✦ " + prefix + "Prestige " + roman(level) + "</" + color + ">";
     }
 
     public String title(int prestigeLevel) {

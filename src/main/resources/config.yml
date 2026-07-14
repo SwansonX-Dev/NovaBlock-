@@ -10,6 +10,14 @@ netherIslandWorld: oneblock_nether
 # the world is not created, and existing Nether progress is preserved but inert.
 netherEnabled: true
 
+# End OneBlock world. Created at startup if endEnabled is true. The End is a
+# post-prestige dimension: an island unlocks it on its FIRST prestige.
+endIslandWorld: oneblock_end
+# Toggle the entire End dimension. When false: /ob home end is rejected, the
+# world is not created, prestige no longer unlocks it, and existing End progress
+# is preserved but inert.
+endEnabled: true
+
 # At startup, unload the vanilla Nether and End worlds (if present) so the
 # server is OneBlock-only. Players in those worlds are evacuated to /spawn
 # before the unload. Set false to keep them around for admin use.
@@ -47,6 +55,9 @@ cooldowns:
   # Same rhythm as the Overworld for now — tune to taste.
   netherBossMinBlocks: 300
   netherLootRoomMinBlocks: 400
+  # End dimension — mirrors the Nether rhythm.
+  endBossMinBlocks: 300
+  endLootRoomMinBlocks: 400
 
 # Anti auto-mine check. A player who STANDS STILL and mines their OneBlock
 # non-stop for challenge-interval-seconds is shown a GUI and must click the

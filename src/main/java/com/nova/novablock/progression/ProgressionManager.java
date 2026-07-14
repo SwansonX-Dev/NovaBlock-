@@ -2,6 +2,7 @@ package com.nova.novablock.progression;
 
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.util.Msg;
+import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 
@@ -30,6 +31,20 @@ public class ProgressionManager {
 
     public void saveAll() {
         for (PlayerProgression p : cache.values()) plugin.storage().saveProgression(p);
+    }
+
+    /**
+     * Persist only online players' progression — used by the periodic autosave.
+     * Offline players in the cache haven't mutated since their quit-save (all
+     * progression changes happen for an online player), so re-saving them every
+     * cycle is pure waste; this keeps the autosave's work proportional to the
+     * live player count instead of every unique login since restart.
+     */
+    public void saveOnline() {
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            PlayerProgression pr = cache.get(p.getUniqueId());
+            if (pr != null) plugin.storage().saveProgression(pr);
+        }
     }
 
     public void unload(UUID id) {
