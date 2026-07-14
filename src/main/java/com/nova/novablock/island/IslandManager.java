@@ -2,6 +2,8 @@ package com.nova.novablock.island;
 
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.phase.Phase;
+import com.nova.novablock.util.Msg;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
@@ -37,13 +39,52 @@ public class IslandManager {
                 if (!data.isNetherUnlocked()) data.setNetherUnlocked(true);
                 island.ensureNetherPlatform();
             }
-            // Rebuild the End pad for islands that already unlocked it (first prestige).
+            // Silent migration: the End unlock hook fires from the Nether's
+            // final-phase advance, which only exists from 0.35.0. An island that
+            // conquered the Nether under an earlier build never ran it, and a
+            // Nether prestige resets that track to phase 1 — putting the unlock
+            // permanently out of reach. Backfill from durable evidence instead:
+            // a Nether prestige, or a Nether track sitting complete.
+            if (plugin.worlds().isEndEnabled() && !data.isEndUnlocked()
+                    && (data.getNetherPrestigeLevel() > 0 || netherTrackComplete(data))) {
+                data.setEndUnlocked(true);
+            }
+            // Rebuild the End pad for islands that have it open.
             if (data.isEndUnlocked() && plugin.worlds().isEndEnabled()) {
                 island.ensureEndPlatform();
             }
             register(island);
         }
         recalculateNextSlot();
+    }
+
+    /** True if the Nether track is parked on its final phase with the block quota met. */
+    private boolean netherTrackComplete(IslandData data) {
+        int lastIdx = plugin.phases().phaseCount(Dimension.NETHER) - 1;
+        if (lastIdx < 0) return false;
+        if (data.getPhaseIndex(Dimension.NETHER) < lastIdx) return false;
+        Phase last = plugin.phases().get(Dimension.NETHER, lastIdx);
+        return last != null && data.getPhaseProgress(Dimension.NETHER) >= last.getRequiredBlocks();
+    }
+
+    /**
+     * Tear open the End for an island: flips the flag, builds the pad and
+     * announces it. No-op (false) when the End is disabled or already open.
+     * Called both from the Nether's final-phase advance and from a Nether
+     * prestige — either one is proof the Nether was conquered, and the prestige
+     * path is what keeps the unlock reachable for an island that cleared the
+     * Nether before this hook existed.
+     */
+    public boolean unlockEnd(Island island, Player fallbackName) {
+        if (!plugin.worlds().isEndEnabled() || island.data().isEndUnlocked()) return false;
+        island.data().setEndUnlocked(true);
+        island.ensureEndPlatform();
+        String ownerName = Bukkit.getOfflinePlayer(island.data().getOwner()).getName();
+        if (ownerName == null && fallbackName != null) ownerName = fallbackName.getName();
+        if (ownerName == null) return true;
+        Bukkit.broadcast(Msg.mm("<#9C27B0>✦ <light_purple>" + ownerName
+                + "<gray>'s island has <#B47BFF>torn open the End<gray>! <dark_gray>(/ob home end)"));
+        return true;
     }
 
     /** Persist every island. Used on shutdown; storage drains its IO queue afterwards. */

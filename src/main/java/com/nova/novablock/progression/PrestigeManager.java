@@ -98,6 +98,12 @@ public class PrestigeManager {
             return;
         }
 
+        // Prestiging the Nether proves it was conquered, so make sure the End is
+        // open before the reset below wipes the track. Without this, an island
+        // that cleared the Nether under a build with no unlock hook would have to
+        // clear all of it a second time to reach the End.
+        if (dim.isNether()) plugin.islands().unlockEnd(island, player);
+
         int newLevel = island.data().getPrestigeLevel(dim) + 1;
         island.data().setPrestigeLevel(dim, newLevel);
         // Reset ONLY this dimension's track to phase 1.

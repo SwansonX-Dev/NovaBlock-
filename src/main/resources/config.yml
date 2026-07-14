@@ -10,12 +10,12 @@ netherIslandWorld: oneblock_nether
 # the world is not created, and existing Nether progress is preserved but inert.
 netherEnabled: true
 
-# End OneBlock world. Created at startup if endEnabled is true. The End is a
-# post-prestige dimension: an island unlocks it on its FIRST prestige.
+# End OneBlock world. Created at startup if endEnabled is true. The End is the
+# third dimension in the chain: an island unlocks it by conquering the Nether.
 endIslandWorld: oneblock_end
 # Toggle the entire End dimension. When false: /ob home end is rejected, the
-# world is not created, prestige no longer unlocks it, and existing End progress
-# is preserved but inert.
+# world is not created, conquering the Nether no longer unlocks it, and existing
+# End progress is preserved but inert.
 endEnabled: true
 
 # At startup, unload the vanilla Nether and End worlds (if present) so the

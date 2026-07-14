@@ -678,14 +678,7 @@ public class BlockListener implements Listener {
             // Completing the Nether's final phase tears open the End — a third
             // parallel dimension (mirrors how the Overworld's Phase 7 unlocks the
             // Nether). The End then has its own independent prestige loop.
-            if (dim.isNether() && plugin.worlds().isEndEnabled() && !island.data().isEndUnlocked()) {
-                island.data().setEndUnlocked(true);
-                island.ensureEndPlatform();
-                String ownerName = Bukkit.getOfflinePlayer(island.data().getOwner()).getName();
-                if (ownerName == null) ownerName = player.getName();
-                Bukkit.broadcast(Msg.mm("<#9C27B0>✦ <light_purple>" + ownerName
-                        + "<gray>'s island has <#B47BFF>torn open the End<gray>! <dark_gray>(/ob home end)"));
-            }
+            if (dim.isNether()) plugin.islands().unlockEnd(island, player);
             String finished = dim.isEnd() ? "You've conquered the End!" : "You've conquered the Nether!";
             String color = dim.isEnd() ? "<#E6E0FF>" : "<gold>";
             Msg.title(player, color + finished, "<gray>Use <yellow>/ob prestige</yellow> to keep going.");

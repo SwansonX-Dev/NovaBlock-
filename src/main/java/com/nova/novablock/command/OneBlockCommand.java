@@ -88,7 +88,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                         return true;
                     }
                     if (!island.isEndUnlocked()) {
-                        Msg.send(p, "<red>The End is sealed. <gray>Prestige at least once to tear it open.");
+                        Msg.send(p, "<red>The End is sealed. <gray>Conquer the Nether to tear it open.");
                         return true;
                     }
                     plugin.repairs().repairEnd(island, false);
