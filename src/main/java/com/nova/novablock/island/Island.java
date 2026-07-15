@@ -133,6 +133,22 @@ public class Island {
         p.teleportAsync(loc);
     }
 
+    /**
+     * Teleports a visitor to the island's visit spot, falling back to
+     * {@link #teleportHome(Player)} when none is set or the stored one no longer
+     * resolves (world unloaded). Used by {@code /ob visit} and the Friends GUI's
+     * Join button so both land in the same place.
+     */
+    public void teleportVisit(Player p) {
+        Location loc = data.visitLocation();
+        if (loc == null) {
+            teleportHome(p);
+            return;
+        }
+        loc.getChunk().load();
+        p.teleportAsync(loc);
+    }
+
     public void teleportNetherHome(Player p) {
         Location loc = data.netherSpawnLocation();
         if (loc.getWorld() == null) {

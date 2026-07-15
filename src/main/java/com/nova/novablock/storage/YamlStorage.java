@@ -172,6 +172,14 @@ public class YamlStorage implements DataStorage {
                 data.setEndLastLootRoomAt(endLastLootRoomAt);
                 data.setEndUnlocked(endUnlocked);
                 data.setFirstEndVisit(firstEndVisit);
+                // Absent for islands saved before visit spots existed, and for any
+                // island whose owner never set one — both mean "use spawnLocation".
+                String visitWorld = y.getString("visit.world");
+                if (visitWorld != null) {
+                    data.restoreVisitSpot(visitWorld,
+                            y.getDouble("visit.x"), y.getDouble("visit.y"), y.getDouble("visit.z"),
+                            (float) y.getDouble("visit.yaw"), (float) y.getDouble("visit.pitch"));
+                }
                 data.getMembers().addAll(memberIds);
                 for (String t : y.getStringList("trusted")) {
                     try { data.getTrusted().add(UUID.fromString(t)); }
@@ -236,6 +244,14 @@ public class YamlStorage implements DataStorage {
         y.set("world", data.getWorldName());
         y.set("slot.x", data.getSlotX());
         y.set("slot.z", data.getSlotZ());
+        if (data.hasVisitSpot()) {
+            y.set("visit.world", data.getVisitWorld());
+            y.set("visit.x", data.getVisitX());
+            y.set("visit.y", data.getVisitY());
+            y.set("visit.z", data.getVisitZ());
+            y.set("visit.yaw", data.getVisitYaw());
+            y.set("visit.pitch", data.getVisitPitch());
+        }
         y.set("blocksBroken", data.getBlocksBroken());
         y.set("phaseIndex", data.getPhaseIndex());
         y.set("phaseProgress", data.getPhaseProgress());

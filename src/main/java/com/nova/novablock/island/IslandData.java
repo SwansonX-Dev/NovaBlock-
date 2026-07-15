@@ -396,6 +396,70 @@ public class IslandData {
         return new Location(c.getWorld(), c.getX(), c.getY() + 1, c.getZ() + 1.5, 180f, 0f);
     }
 
+    // --- visit spot ----------------------------------------------------------
+
+    /**
+     * Where {@code /ob visit} drops a visitor. Unset by default, in which case
+     * visitors land on {@link #spawnLocation()} next to the centre block, which
+     * is what happened before this existed. Set with {@code /ob setvisit}.
+     *
+     * <p>Stored as a world name plus coords rather than a Location so it can be
+     * persisted and so an unloaded world degrades to "unset" instead of throwing.
+     */
+    private String visitWorld;
+    private double visitX;
+    private double visitY;
+    private double visitZ;
+    private float visitYaw;
+    private float visitPitch;
+
+    /** True if the owner has set a custom visit spot. */
+    public boolean hasVisitSpot() { return visitWorld != null; }
+
+    public void setVisitSpot(Location loc) {
+        this.visitWorld = loc.getWorld() == null ? null : loc.getWorld().getName();
+        this.visitX = loc.getX();
+        this.visitY = loc.getY();
+        this.visitZ = loc.getZ();
+        this.visitYaw = loc.getYaw();
+        this.visitPitch = loc.getPitch();
+        markDirty();
+    }
+
+    public void clearVisitSpot() {
+        this.visitWorld = null;
+        markDirty();
+    }
+
+    /**
+     * The stored visit spot, or {@code null} if unset or its world isn't loaded.
+     * Callers should fall back to {@link #spawnLocation()}.
+     */
+    public Location visitLocation() {
+        if (visitWorld == null) return null;
+        World w = Bukkit.getWorld(visitWorld);
+        if (w == null) return null;
+        return new Location(w, visitX, visitY, visitZ, visitYaw, visitPitch);
+    }
+
+    /** Raw accessors for persistence — {@link #visitLocation()} for everything else. */
+    public String getVisitWorld() { return visitWorld; }
+    public double getVisitX() { return visitX; }
+    public double getVisitY() { return visitY; }
+    public double getVisitZ() { return visitZ; }
+    public float getVisitYaw() { return visitYaw; }
+    public float getVisitPitch() { return visitPitch; }
+
+    /** Restores a persisted visit spot without marking dirty — load path only. */
+    public void restoreVisitSpot(String world, double x, double y, double z, float yaw, float pitch) {
+        this.visitWorld = world;
+        this.visitX = x;
+        this.visitY = y;
+        this.visitZ = z;
+        this.visitYaw = yaw;
+        this.visitPitch = pitch;
+    }
+
     /**
      * Same slot coords as {@link #centerBlock()} but resolved against the Nether
      * world. Returns null if the Nether world isn't loaded — callers should

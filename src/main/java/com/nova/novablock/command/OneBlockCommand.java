@@ -30,7 +30,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBCOMMANDS = List.of(
             "create", "delete", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
-            "visit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
+            "visit", "setvisit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
             "setspawn", "friend", "friends", "sprint", "minion", "minions", "hub", "community",
             "team", "members", "roster", "promote", "demote", "kick", "trust", "untrust",
             "bank", "autosell", "backpack", "help");
@@ -128,6 +128,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case "untrust" -> handleTrust(p, args, true);
             case "bank" -> bank(p, args);
             case "visit" -> visit(p, args);
+            case "setvisit" -> setVisit(p, args);
             case "upgrades", "upgrade" -> new com.nova.novablock.gui.UpgradesGui(plugin).open(p);
             case "path", "pass", "season", "atlas" -> new SeasonalPathGui(plugin).open(p);
             case "pet", "pets" -> openPets(p);
@@ -507,6 +508,35 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         return op.getName() != null ? op.getName() : id.toString().substring(0, 8);
     }
 
+    /**
+     * {@code /ob setvisit [clear]} — sets where visitors land, to wherever the
+     * player is standing. Must be on their own island: otherwise an owner could
+     * park the visit spot at spawn, in someone else's island, or out in the void.
+     */
+    private void setVisit(Player p, String[] args) {
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) { Msg.send(p, "<red>You don't have an island."); return; }
+        if (!island.roleOf(p).canManageRoster()) {
+            Msg.send(p, "<red>Only the owner or a co-owner can set the visit spot.");
+            return;
+        }
+        if (args.length >= 2 && args[1].equalsIgnoreCase("clear")) {
+            island.data().clearVisitSpot();
+            plugin.storage().saveIsland(island.data());
+            Msg.send(p, "<green>Visit spot cleared. <gray>Visitors will land at your OneBlock again.");
+            return;
+        }
+        Island here = plugin.islands().atLocation(p.getLocation());
+        if (here == null || !here.data().getId().equals(island.data().getId())) {
+            Msg.send(p, "<red>Stand on your own island to set the visit spot.");
+            return;
+        }
+        island.data().setVisitSpot(p.getLocation());
+        plugin.storage().saveIsland(island.data());
+        Msg.send(p, "<green>Visit spot set. <gray>This is where <yellow>/ob visit</yellow> drops your guests. "
+                + "<gray>(<yellow>/ob setvisit clear</yellow> to undo)");
+    }
+
     private void visit(Player p, String[] args) {
         if (args.length < 2) { Msg.send(p, "<gray>Usage: <yellow>/ob visit <player>"); return; }
         Player target = org.bukkit.Bukkit.getPlayerExact(args[1]);
@@ -532,7 +562,8 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             return;
         }
         p.closeInventory();
-        target.teleportHome(p);
+        // Visit spot if the owner set one, else the island spawn (old behaviour).
+        target.teleportVisit(p);
         Msg.send(p, com.nova.novablock.util.Messages.format("visit-success",
                 "<aqua>Visiting <yellow>{target}<aqua>'s island.", "target", ownerName));
     }
@@ -714,6 +745,10 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             String prefix = args[0].toLowerCase();
             return SUBCOMMANDS.stream().filter(s -> s.startsWith(prefix)).collect(Collectors.toList());
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("setvisit")) {
+            return "clear".startsWith(args[1].toLowerCase())
+                    ? List.of("clear") : Collections.emptyList();
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("invite") || args[0].equalsIgnoreCase("visit"))) {
             String prefix = args[1].toLowerCase();
