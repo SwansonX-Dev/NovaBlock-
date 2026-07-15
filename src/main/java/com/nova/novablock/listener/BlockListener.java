@@ -1,6 +1,7 @@
 package com.nova.novablock.listener;
 
 import com.nova.novablock.NovaBlock;
+import com.nova.novablock.api.NovaBlockBreakEvent;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.phase.Phase;
 import com.nova.novablock.progression.Perk;
@@ -273,6 +274,10 @@ public class BlockListener implements Listener {
         island.recordBreak(broken);
         plugin.claimBlockRewards().recordPersonalBreak(player);
         plugin.sprint().recordBlocksBroken(island.data().getId(), 1L);
+        // We cancelled the vanilla break above, so plugins listening on
+        // BlockBreakEvent with ignoreCancelled never see this. Tell them here.
+        new NovaBlockBreakEvent(player, broken, center,
+                NovaBlockBreakEvent.Source.ISLAND_CENTRE).callEvent();
         // NOTE: personal-island breaks deliberately do NOT count toward the weekly
         // community goal — only Community OneBlock breaks do (see handleBreak). This
         // keeps the goal progress and its contributor podium to community miners.

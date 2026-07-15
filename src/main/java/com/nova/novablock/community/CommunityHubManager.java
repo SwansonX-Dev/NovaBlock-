@@ -1,6 +1,7 @@
 package com.nova.novablock.community;
 
 import com.nova.novablock.NovaBlock;
+import com.nova.novablock.api.NovaBlockBreakEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -127,9 +128,14 @@ public class CommunityHubManager {
         if (!isEnabled()) return;
         Location at = event.getBlock().getLocation();
         if (!isCommunityBlock(at)) return;
-        block.onBreak(player, event.getBlock().getType(), event, at);
+        Material broken = event.getBlock().getType();
+        block.onBreak(player, broken, event, at);
         goal.recordBreak(player, 1L);
         plugin.quests().onCommunityBreak(player);
+        // The caller cancelled the vanilla break, so plugins listening on
+        // BlockBreakEvent with ignoreCancelled never see this. Tell them here.
+        new NovaBlockBreakEvent(player, broken, at,
+                NovaBlockBreakEvent.Source.COMMUNITY_HUB).callEvent();
         block.tickPayoutIfDue();
         markDirty();
     }
