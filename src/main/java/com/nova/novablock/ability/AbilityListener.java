@@ -25,6 +25,9 @@ public class AbilityListener implements Listener {
 
     public AbilityListener(NovaBlock plugin) { this.plugin = plugin; }
 
+    /** How far to ray-trace for the aimed-at block on an air-click (survival reach ≈ 4.5). */
+    private static final int INTERACT_REACH = 5;
+
     @EventHandler
     public void onInteract(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
@@ -36,13 +39,19 @@ public class AbilityListener implements Listener {
         if (ability == null) return;
         // Don't hijack a vanilla tool-on-block interaction (axe strips a log / scrapes
         // copper / removes wax, shovel makes a dirt path, hoe tills soil). Arming there
-        // would pester the player — and risk eating — the interaction they actually want.
-        // They can still ready the ability by right-clicking air or any inert block.
-        if (event.getAction() == Action.RIGHT_CLICK_BLOCK
-                && event.getClickedBlock() != null
-                && toolInteractsWith(tool, event.getClickedBlock())) {
-            return;
-        }
+        // would pester the player — and eat — the interaction they actually want.
+        //
+        // We must check the ray-traced target, not just event.getClickedBlock(): when a
+        // log is surrounded by leaves/branches (natural trees), the client frequently
+        // sends the strike as a "use in air" and Paper fires RIGHT_CLICK_AIR with a null
+        // clicked block. The old guard only covered RIGHT_CLICK_BLOCK, so those slipped
+        // through and armed Tree Feller while the strip silently failed. Resolving the
+        // aimed-at block closes that hole for both actions.
+        Block target = event.getClickedBlock();
+        if (target == null) target = p.getTargetBlockExact(INTERACT_REACH);
+        if (target != null && toolInteractsWith(tool, target)) return;
+        // Players can still ready the ability by right-clicking air (or an inert block)
+        // while not aimed at something the tool would interact with.
         plugin.abilities().ready(p, ability);
     }
 
