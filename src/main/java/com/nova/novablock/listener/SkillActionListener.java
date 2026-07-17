@@ -63,7 +63,11 @@ public class SkillActionListener implements Listener {
             Material.NETHERRACK, Material.BASALT, Material.BLACKSTONE, Material.END_STONE,
             Material.OBSIDIAN, Material.ANCIENT_DEBRIS, Material.AMETHYST_BLOCK);
 
-    private static final int TREE_FELLER_MAX = 80;
+    // Cap on logs felled in one Tree Feller swing. Must clear the tallest natural
+    // trees: a giant 2x2 spruce/jungle runs ~30 blocks × 4 logs/layer (~120) plus
+    // branch logs, so 80 left the crown of big megas standing. 256 covers them with
+    // margin while still bounding a runaway fell through connected log structures.
+    private static final int TREE_FELLER_MAX = 256;
 
     /** A player kill is worth this many times a mob kill's Combat XP. */
     private static final long PLAYER_KILL_XP_MULTIPLIER = 5L;
