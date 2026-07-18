@@ -25,6 +25,7 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.ArrayDeque;
 import java.util.Collection;
@@ -63,11 +64,22 @@ public class SkillActionListener implements Listener {
             Material.NETHERRACK, Material.BASALT, Material.BLACKSTONE, Material.END_STONE,
             Material.OBSIDIAN, Material.ANCIENT_DEBRIS, Material.AMETHYST_BLOCK);
 
-    // Cap on logs felled in one Tree Feller swing. Must clear the tallest natural
-    // trees: a giant 2x2 spruce/jungle runs ~30 blocks × 4 logs/layer (~120) plus
-    // branch logs, so 80 left the crown of big megas standing. 256 covers them with
-    // margin while still bounding a runaway fell through connected log structures.
-    private static final int TREE_FELLER_MAX = 256;
+    // Tree Feller now chops the ENTIRE connected structure — a whole tree plus any
+    // neighbouring trees whose logs or canopies touch it, leaves included — rather
+    // than a single trunk. Because that can be a lot of blocks, the fell is spread
+    // over ticks: a repeating task breaks a small batch each tick (≈50 ms) instead of
+    // everything in one server frame, so felling a stand of trees doesn't stall the server.
+    //
+    // TREE_FELLER_MAX  — hard ceiling on logs felled in one activation (grief/lag guard).
+    // FELL_BATCH       — blocks (logs or leaves) broken per tick (a couple dozen).
+    // FELL_STEP_LIMIT  — max blocks examined per tick (bounds work through big leaf canopies
+    //                    even when few of them turn out to be breakable logs).
+    // FELL_MAX_VISITED — cap on total blocks the flood-fill will look at (memory/CPU guard
+    //                    against a continuous jungle canopy chaining forever).
+    private static final int TREE_FELLER_MAX = 2000;
+    private static final int FELL_BATCH = 24;
+    private static final int FELL_STEP_LIMIT = 512;
+    private static final int FELL_MAX_VISITED = 40000;
 
     /** A player kill is worth this many times a mob kill's Combat XP. */
     private static final long PLAYER_KILL_XP_MULTIPLIER = 5L;
@@ -191,36 +203,104 @@ public class SkillActionListener implements Listener {
         dropExtra(block, block.getDrops(p.getInventory().getItemInMainHand()), extra);
     }
 
+    /**
+     * Fells the whole connected tree structure — every naturally-grown log reachable
+     * through logs and touching leaves, so trees standing next to each other come down
+     * together. Player-placed logs are never broken and act as a hard boundary the fell
+     * won't cross, so log builds beside a tree are safe. The work is chunked across ticks
+     * ({@link #FELL_BATCH} logs per ≈50 ms) so a big stand of trees never stalls the tick.
+     */
     private void fellTree(Player p, PlayerProgression prog, Block origin, Material tool) {
-        Set<Block> logs = new HashSet<>();
-        Deque<Block> frontier = new ArrayDeque<>();
-        frontier.add(origin);
-        while (!frontier.isEmpty() && logs.size() < TREE_FELLER_MAX) {
-            Block b = frontier.poll();
-            if (!logs.add(b)) continue;
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dy = -1; dy <= 1; dy++) {
-                    for (int dz = -1; dz <= 1; dz++) {
-                        if (dx == 0 && dy == 0 && dz == 0) continue;
-                        Block n = b.getRelative(dx, dy, dz);
-                        if (Tag.LOGS.isTagged(n.getType()) && !logs.contains(n)
-                                && !plugin.placedLogs().isPlaced(n)) frontier.add(n);
+        final ItemStack toolItem = p.getInventory().getItemInMainHand().clone();
+        final boolean arborist = Perk.hasPerk(prog, Perk.ARBORIST);
+        final Material originType = origin.getType(); // still the log at MONITOR time
+        final long xpPerLog = SkillEffects.xpPerAction(SkillType.WOODCUTTING);
+
+        // Flood-fill state, seeded from the origin's neighbours (origin itself is
+        // being removed by the vanilla break event that triggered this).
+        final Deque<Block> frontier = new ArrayDeque<>();
+        final Set<Block> seen = new HashSet<>();
+        seen.add(origin);
+        queueTreeNeighbors(origin, frontier, seen);
+
+        new BukkitRunnable() {
+            int felled = 0;
+
+            @Override public void run() {
+                int brokeThisTick = 0;   // logs + leaves broken this tick (throttle)
+                int logsThisTick = 0;    // logs only (drives XP)
+                int steps = 0;
+                while (!frontier.isEmpty()
+                        && brokeThisTick < FELL_BATCH
+                        && felled < TREE_FELLER_MAX
+                        && steps < FELL_STEP_LIMIT) {
+                    steps++;
+                    Block b = frontier.poll();
+                    Material t = b.getType();
+                    boolean isLog = Tag.LOGS.isTagged(t);
+                    boolean isLeaf = Tag.LEAVES.isTagged(t);
+                    if (!isLog && !isLeaf) continue;            // block changed since queued
+                    // A player-placed log is a build: don't break it and don't fell
+                    // past it, so structures behind it are protected too.
+                    if (isLog && plugin.placedLogs().isPlaced(b)) continue;
+
+                    // Spread through both logs and touching leaves — leaves bridge the
+                    // canopies of neighbouring trees so an adjacent stand comes down too.
+                    queueTreeNeighbors(b, frontier, seen);
+
+                    // Break the block (leaves too, for a clean fell) and throttle on both.
+                    b.breakNaturally(toolItem);
+                    brokeThisTick++;
+                    if (isLog) { felled++; logsThisTick++; }
+                }
+
+                if (logsThisTick > 0 && p.isOnline()) {
+                    plugin.progression().addXp(p, SkillType.WOODCUTTING, xpPerLog * logsThisTick);
+                }
+
+                if (frontier.isEmpty() || felled >= TREE_FELLER_MAX) {
+                    if (felled > 0) {
+                        if (arborist) {
+                            // Roughly one sapling back per tree felled.
+                            int saplings = Math.max(1, felled / 8);
+                            Material sap = saplingFor(originType);
+                            for (int i = 0; i < saplings; i++) {
+                                origin.getWorld().dropItemNaturally(
+                                        origin.getLocation().add(0.5, 0.5, 0.5), new ItemStack(sap));
+                            }
+                        }
+                        if (p.isOnline()) {
+                            Msg.actionBar(p, "<#D9A066>Tree Feller! <gray>" + felled + " logs");
+                        }
+                    }
+                    cancel();
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 1L);
+    }
+
+    /**
+     * Queues the log/leaf neighbours of {@code b} (26-neighbourhood) that haven't been
+     * seen yet, up to {@link #FELL_MAX_VISITED} total, so the fill can't run away across
+     * a continuous forest canopy.
+     */
+    private void queueTreeNeighbors(Block b, Deque<Block> frontier, Set<Block> seen) {
+        if (seen.size() >= FELL_MAX_VISITED) return;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) continue;
+                    Block n = b.getRelative(dx, dy, dz);
+                    if (seen.contains(n)) continue;
+                    Material t = n.getType();
+                    if (Tag.LOGS.isTagged(t) || Tag.LEAVES.isTagged(t)) {
+                        seen.add(n);
+                        frontier.add(n);
+                        if (seen.size() >= FELL_MAX_VISITED) return;
                     }
                 }
             }
         }
-        ItemStack toolItem = p.getInventory().getItemInMainHand();
-        for (Block log : logs) {
-            if (log.equals(origin)) continue; // origin is broken by the vanilla event
-            log.breakNaturally(toolItem);
-        }
-        plugin.progression().addXp(p, SkillType.WOODCUTTING,
-                SkillEffects.xpPerAction(SkillType.WOODCUTTING) * Math.max(0, logs.size() - 1));
-        if (Perk.hasPerk(prog, Perk.ARBORIST)) {
-            origin.getWorld().dropItemNaturally(origin.getLocation().add(0.5, 0.5, 0.5),
-                    new ItemStack(saplingFor(origin.getType())));
-        }
-        Msg.actionBar(p, "<#D9A066>Tree Feller! <gray>" + logs.size() + " logs");
     }
 
     private Material saplingFor(Material log) {
