@@ -41,6 +41,13 @@ skills:
     xp-per-action: 12
   combat:
     passive: { per-level: 0.0020, cap: 0.20 }   # bonus boss-damage fraction
+  magic:
+    passive: { per-level: 0.0015, cap: 0.15 }   # chance an enchant rolls +1 level
+    xp-per-action: 8                            # PER LEVEL the enchant costs (table-30 = 240 XP)
+    # Perk tuning for the enchanting perks (Lapis Affinity Lv15, Soul Siphon Lv40).
+    enchanting:
+      lapis-refund-chance: 0.35                 # Lapis Affinity: chance to refund the lapis spent
+      xp-refund-fraction: 0.30                  # Soul Siphon: share of the level cost handed back
 
 # Active abilities — right-click the matching tool to ready, then strike.
 # duration = min(duration-max-ticks, duration-base-ticks + duration-per-level-ticks * level)
@@ -67,6 +74,8 @@ perks:
   magic:
     riftwalker-rate-multiplier: 1.20
     arcane-lure-xp-multiplier: 1.10
+    # Runesmith / Cursebreaker take no numbers; Lapis Affinity and Soul Siphon
+    # are tuned under skills.magic.enchanting above (those keys ARE read).
   luck:
     four-leaf-reroll-chance: 0.05
     jackpot-coin-multiplier: 1.25

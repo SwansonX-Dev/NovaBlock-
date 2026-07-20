@@ -181,6 +181,8 @@ public final class NovaBlock extends JavaPlugin {
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.listener.SkillActionListener(this), this);
         getServer().getPluginManager().registerEvents(
+                new com.nova.novablock.listener.EnchantingListener(this), this);
+        getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.ability.AbilityListener(this), this);
         getServer().getPluginManager().registerEvents(placedLogTracker, this);
         getServer().getPluginManager().registerEvents(

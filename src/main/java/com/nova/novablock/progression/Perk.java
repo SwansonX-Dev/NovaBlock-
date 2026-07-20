@@ -21,8 +21,12 @@ public enum Perk {
     // Magic
     AETHER_SIGHT(SkillType.MAGIC, 5, "Aether Sight", "See 12 upcoming blocks"),
     RIFTWALKER(SkillType.MAGIC, 10, "Riftwalker", "Loot rooms appear 20% more"),
+    LAPIS_AFFINITY(SkillType.MAGIC, 15, "Lapis Affinity", "Chance to refund the lapis you enchant with"),
     ARCANE_LURE(SkillType.MAGIC, 20, "Arcane Lure", "+10% XP from all skills"),
+    RUNESMITH(SkillType.MAGIC, 25, "Runesmith", "Your enchant proc can beat the vanilla cap by 1"),
     TIMESHIFT(SkillType.MAGIC, 30, "Timeshift", "Reroll your prophecy once / day"),
+    SOUL_SIPHON(SkillType.MAGIC, 40, "Soul Siphon", "Refund part of the levels an enchant costs"),
+    CURSEBREAKER(SkillType.MAGIC, 50, "Cursebreaker", "Enchanting never applies curses"),
 
     // Luck
     FOUR_LEAF(SkillType.LUCK, 5, "Four-Leaf", "+5% rare block weight"),

@@ -24,12 +24,22 @@ public final class SkillEffects {
         }
     }
 
+    /**
+     * Enchanting-table tuning for the Magic skill. {@code lapisRefundChance} and
+     * {@code xpRefundFraction} are gated behind the LAPIS_AFFINITY / SOUL_SIPHON
+     * perks; the bonus-enchant-level proc itself is the Magic scaling passive.
+     */
+    public record EnchantCfg(double lapisRefundChance, double xpRefundFraction) {}
+
     // chance = min(cap, perLevel * level); index 0 = perLevel, index 1 = cap.
     private static final Map<SkillType, double[]> PASSIVE = new EnumMap<>(SkillType.class);
     private static final Map<SkillType, Long> XP = new EnumMap<>(SkillType.class);
     private static final Map<String, AbilityCfg> ABILITIES = new HashMap<>();
 
     private static final AbilityCfg DEFAULT_ABILITY = new AbilityCfg(40, 4, 240, 4800, 2);
+    private static final EnchantCfg DEFAULT_ENCHANT = new EnchantCfg(0.35, 0.30);
+
+    private static EnchantCfg enchant = DEFAULT_ENCHANT;
 
     static {
         applyDefaults();
@@ -39,6 +49,7 @@ public final class SkillEffects {
         PASSIVE.clear();
         XP.clear();
         ABILITIES.clear();
+        enchant = DEFAULT_ENCHANT;
 
         // Level-scaling passive "primary" chance per skill (per-level, cap).
         PASSIVE.put(SkillType.MINING, new double[]{0.0010, 0.10});      // double ore/stone drop
@@ -47,7 +58,7 @@ public final class SkillEffects {
         PASSIVE.put(SkillType.FARMING, new double[]{0.0015, 0.15});     // double harvest
         PASSIVE.put(SkillType.FISHING, new double[]{0.0010, 0.10});     // treasure / extra catch
         PASSIVE.put(SkillType.COMBAT, new double[]{0.0020, 0.20});      // bonus boss-damage fraction
-        PASSIVE.put(SkillType.MAGIC, new double[]{0.0, 0.0});
+        PASSIVE.put(SkillType.MAGIC, new double[]{0.0015, 0.15});       // bonus enchant level
         PASSIVE.put(SkillType.LUCK, new double[]{0.0, 0.0});
 
         // Base XP granted per qualifying action for the gathering skills.
@@ -57,6 +68,7 @@ public final class SkillEffects {
         XP.put(SkillType.EXCAVATION, 4L);
         XP.put(SkillType.MINING, 3L);   // non-OneBlock ore/stone breaks (center handled in BlockListener)
         XP.put(SkillType.COMBAT, 5L);   // per mob kill; player kills grant a multiple (see SkillActionListener)
+        XP.put(SkillType.MAGIC, 8L);    // per LEVEL an enchant costs (see EnchantingListener)
 
         // Active abilities: ready your tool (right-click), next action triggers a timed buff.
         ABILITIES.put("super_breaker", new AbilityCfg(40, 4, 240, 4800, 3));   // Mining   (pickaxe)
@@ -80,6 +92,12 @@ public final class SkillEffects {
                 XP.put(s, Math.max(0L, c.getLong(base + ".xp-per-action", XP.get(s))));
             }
         }
+
+        enchant = new EnchantCfg(
+                Math.max(0, c.getDouble("skills.magic.enchanting.lapis-refund-chance",
+                        DEFAULT_ENCHANT.lapisRefundChance())),
+                Math.max(0, c.getDouble("skills.magic.enchanting.xp-refund-fraction",
+                        DEFAULT_ENCHANT.xpRefundFraction())));
 
         for (Map.Entry<String, AbilityCfg> e : new HashMap<>(ABILITIES).entrySet()) {
             String base = "abilities." + e.getKey();
@@ -107,5 +125,10 @@ public final class SkillEffects {
 
     public static AbilityCfg ability(String id) {
         return ABILITIES.getOrDefault(id, DEFAULT_ABILITY);
+    }
+
+    /** Enchanting-table tuning for the Magic skill's perks. */
+    public static EnchantCfg enchanting() {
+        return enchant;
     }
 }
