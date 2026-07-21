@@ -285,7 +285,9 @@ public class QuestManager {
             coins = Math.round(coins * 1.50);
             xp = Math.round(xp * 1.50);
         }
-        var island = plugin.islands().ofPlayer(p);
+        // Context island: quest progress is player-scoped, but the payout goes to the
+        // island the work was done on rather than whichever one is active.
+        var island = plugin.islands().contextIsland(p);
         if (island != null) plugin.economy().award(island, coins);
         plugin.progression().addXp(p, SkillType.MINING, xp);
         Msg.title(p, "<gold>★ Quest Complete",

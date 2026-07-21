@@ -23,6 +23,9 @@ import com.nova.novablock.island.InviteManager;
 import com.nova.novablock.island.IslandManager;
 import com.nova.novablock.island.IslandVisitService;
 import com.nova.novablock.island.IslandWorldManager;
+import com.nova.novablock.island.IslandMarketService;
+import com.nova.novablock.island.IslandPurgeService;
+import com.nova.novablock.island.IslandValuation;
 import com.nova.novablock.island.OneBlockRepairService;
 import com.nova.novablock.island.PreviewHologramManager;
 import com.nova.novablock.listener.BlockListener;
@@ -87,6 +90,9 @@ public final class NovaBlock extends JavaPlugin {
     private com.nova.novablock.backpack.BackpackManager backpackManager;
     private MainMenuConfig menuConfig;
     private OneBlockRepairService oneBlockRepairService;
+    private IslandPurgeService islandPurgeService;
+    private IslandValuation islandValuation;
+    private IslandMarketService islandMarketService;
     private PreviewHologramManager previewHologramManager;
     private SpawnManager spawnManager;
     private PlayerSpawnManager playerSpawnManager;
@@ -154,6 +160,10 @@ public final class NovaBlock extends JavaPlugin {
         this.backpackManager = new com.nova.novablock.backpack.BackpackManager(this);
         this.menuConfig = new MainMenuConfig(this);
         this.oneBlockRepairService = new OneBlockRepairService(this);
+        this.islandPurgeService = new IslandPurgeService(this);
+        this.islandValuation = new IslandValuation(this);
+        this.islandMarketService = new IslandMarketService(this);
+        this.islandMarketService.load();
         this.previewHologramManager = new PreviewHologramManager(this);
         this.spawnManager = new SpawnManager(this);
         // SpawnManager is the preferred evacuation target for any players
@@ -386,6 +396,9 @@ public final class NovaBlock extends JavaPlugin {
     public com.nova.novablock.backpack.BackpackManager backpacks() { return backpackManager; }
     public MainMenuConfig menuConfig() { return menuConfig; }
     public OneBlockRepairService repairs() { return oneBlockRepairService; }
+    public IslandPurgeService purges() { return islandPurgeService; }
+    public IslandValuation valuations() { return islandValuation; }
+    public IslandMarketService market() { return islandMarketService; }
     public SpawnManager spawn() { return spawnManager; }
     public PlayerSpawnManager playerSpawns() { return playerSpawnManager; }
     public FriendManager friends() { return friendManager; }

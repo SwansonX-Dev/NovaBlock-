@@ -18,7 +18,13 @@ import static com.nova.novablock.island.IslandWorldManager.SLOT_SIZE;
 public class IslandData {
 
     private final UUID id;
-    private final UUID owner;
+    /**
+     * Not final: an island can change hands via the island market
+     * ({@link com.nova.novablock.island.IslandMarketService}). Mutate only through
+     * {@link IslandManager#transferOwnership}, which also fixes the owner→island index,
+     * the member set and the role map — setting this field alone leaves those stale.
+     */
+    private UUID owner;
     private final String worldName;
     private final int slotX;
     private final int slotZ;
@@ -37,6 +43,15 @@ public class IslandData {
     private long bankBalance;
     /** Material names of smithing templates this island has already earned from prestige. */
     private final Set<String> receivedPrestigeTemplates = new HashSet<>();
+
+    /**
+     * Epoch millis when a member of this island was last online. Refreshed on join and
+     * quit, so it survives restarts and reflects the island rather than any one player —
+     * a co-op island stays "active" as long as anybody on it plays. Drives the inactivity
+     * purge ({@link com.nova.novablock.island.IslandPurgeService}). 0 means "never seen",
+     * which is treated as active so pre-existing islands aren't purged for lacking data.
+     */
+    private long lastActiveMillis;
 
     private long blocksBroken;
     private int phaseIndex;
@@ -103,6 +118,8 @@ public class IslandData {
 
     public UUID getId() { return id; }
     public UUID getOwner() { return owner; }
+    /** @see #owner — go through {@link IslandManager#transferOwnership} instead. */
+    void setOwner(UUID newOwner) { this.owner = newOwner; markDirty(); }
     public String getWorldName() { return worldName; }
     public int getSlotX() { return slotX; }
     public int getSlotZ() { return slotZ; }
@@ -187,6 +204,19 @@ public class IslandData {
 
     public long getBlocksBroken() { return blocksBroken; }
     public void setBlocksBroken(long v) { this.blocksBroken = v; markDirty(); }
+
+    public long getLastActiveMillis() { return lastActiveMillis; }
+    public void setLastActiveMillis(long v) { this.lastActiveMillis = v; markDirty(); }
+    /** Stamps this island as active now. Called when any member joins or quits. */
+    public void touchActivity() { setLastActiveMillis(System.currentTimeMillis()); }
+    /**
+     * Days since a member was last online, or 0 if the island has never been stamped
+     * (treated as active so islands predating this field are never auto-purged).
+     */
+    public long daysInactive() {
+        if (lastActiveMillis <= 0L) return 0L;
+        return java.time.Duration.ofMillis(System.currentTimeMillis() - lastActiveMillis).toDays();
+    }
     public void incrementBlocksBroken() { this.blocksBroken++; markDirty(); }
 
     public int getPhaseIndex() { return phaseIndex; }

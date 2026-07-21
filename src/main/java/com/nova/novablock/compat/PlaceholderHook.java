@@ -49,7 +49,17 @@ public class PlaceholderHook extends PlaceholderExpansion {
             return String.valueOf(Math.max(0, (plugin.seasons().activeUntil() - System.currentTimeMillis()) / 1000));
         }
 
-        Island island = plugin.islands().ofPlayer(player.getUniqueId());
+        // Every %novablock_*% island placeholder flows from this one lookup. Use the
+        // context island when the player is online so holograms, chat formats and the
+        // tab list describe the island they're actually on; offline players (and any
+        // async placeholder request) fall back to their active island.
+        // Only resolve by position on the main thread: PlaceholderAPI serves requests from
+        // async contexts (other plugins' holograms, chat formatters), and contextIsland
+        // reads the player's location. Async callers get the active island instead —
+        // slightly less precise, but never an off-thread world read.
+        Island island = (player.getPlayer() != null && org.bukkit.Bukkit.isPrimaryThread())
+                ? plugin.islands().contextIsland(player.getPlayer())
+                : plugin.islands().ofPlayer(player.getUniqueId());
 
         switch (key) {
             case "phase" -> { return island == null ? "0" : String.valueOf(island.data().getPhaseIndex() + 1); }

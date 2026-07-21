@@ -79,6 +79,14 @@ public enum IslandFlag {
             "Non-members can open chests, barrels, hoppers, etc.",
             "Default off — protects your loot from passers-by."),
 
+    VISITOR_USE_DOORS(
+            false,
+            "novablock.flag.visitor_use_doors",
+            Material.LEVER,
+            "Visitors Can Use Doors",
+            "Non-members can use doors, trapdoors, gates, levers and buttons.",
+            "Default off — stops passers-by walking into your base."),
+
     OPEN_VISITS(
             false,
             "novablock.flag.open_visits",

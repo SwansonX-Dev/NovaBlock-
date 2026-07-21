@@ -33,6 +33,8 @@ public class PlayerListener implements Listener {
         if (prog.getLastLoginDay() != lastLoginDay) {
             plugin.seasonalPaths().award(p, SeasonalPathManager.PathSource.LOGIN, 50);
         }
+        // Restore their /ob islands choice before anything reads "their" island.
+        plugin.islands().restoreActiveIsland(p.getUniqueId());
         Island island = plugin.islands().ofPlayer(p);
         boolean firstJoin = false;
         if (island == null) {
@@ -44,6 +46,10 @@ public class PlayerListener implements Listener {
             Msg.send(p, com.nova.novablock.util.Messages.of("welcome-back",
                     "<gray>Welcome back."));
         }
+        // Keep the island's inactivity clock fresh — this is what stops an island a
+        // member still plays on from ever being seen as purgeable.
+        Island active = plugin.islands().ofPlayer(p);
+        if (active != null) active.data().touchActivity();
         boolean showFirstJoin = firstJoin;
         // Notify online friends — gated by the joining player's own opt-out so they
         // can hide their join from friends without affecting incoming visibility.
@@ -74,6 +80,10 @@ public class PlayerListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
+        // Stamp the island active on the way out as well as on join, so a long session
+        // counts from when it ended rather than when it started.
+        Island quitting = plugin.islands().ofPlayer(event.getPlayer());
+        if (quitting != null) quitting.data().touchActivity();
         plugin.progression().save(event.getPlayer().getUniqueId());
         plugin.rankNameplates().remove(event.getPlayer());
         plugin.scoreboards().clear(event.getPlayer());

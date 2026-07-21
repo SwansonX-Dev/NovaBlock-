@@ -24,7 +24,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
             "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
-            "giveoneblock", "givecommunityblock", "giveminion", "nodepool", "flags", "storage", "menu", "path", "sprint", "hub", "freshstart", "fix", "setspawn");
+            "giveoneblock", "givecommunityblock", "giveminion", "nodepool", "flags", "storage", "menu", "path", "sprint", "hub", "freshstart", "fix", "setspawn", "purge", "verify");
     private static final List<String> EVENTS = List.of(
             "diamond_hour", "double_coins", "blood_moon", "lush_bloom", "rift_storm", "stop");
 
@@ -213,6 +213,32 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 Island island = plugin.islands().ofPlayer(target);
                 if (island == null) { Msg.send(sender, "<red>Target has no island."); return true; }
                 plugin.islandStorage().openFor(viewer, island);
+            }
+            case "purge" -> handlePurge(sender, args);
+            case "verify" -> {
+                var problems = plugin.islands().verifyIntegrity();
+                if (problems.isEmpty()) {
+                    Msg.send(sender, "<green>✔ Island indexes are consistent ("
+                            + plugin.islands().all().size() + " islands checked).");
+                } else {
+                    Msg.send(sender, "<red>✘ " + problems.size() + " index problem(s):");
+                    int shown = 0;
+                    for (String problem : problems) {
+                        if (shown++ >= 15) {
+                            Msg.send(sender, "<dark_gray>…and " + (problems.size() - 15) + " more.");
+                            break;
+                        }
+                        Msg.send(sender, "<gray>· " + problem);
+                    }
+                    Msg.send(sender, "<yellow>Repair with <white>/obadmin verify rebuild");
+                }
+                if (args.length > 1 && args[1].equalsIgnoreCase("rebuild")) {
+                    int n = plugin.islands().rebuildIndexes();
+                    var after = plugin.islands().verifyIntegrity();
+                    Msg.send(sender, "<green>Rebuilt indexes for " + n + " island(s). "
+                            + (after.isEmpty() ? "All consistent now."
+                            : "<red>" + after.size() + " problem(s) remain — that means island DATA is wrong, not the index."));
+                }
             }
             case "menu" -> handleMenuEdit(sender, args);
             case "path" -> handlePath(sender, args);
@@ -640,6 +666,91 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
         }
         if (!Bukkit.getWorlds().isEmpty()) {
             player.teleport(Bukkit.getWorlds().getFirst().getSpawnLocation());
+        }
+    }
+
+    /**
+     * {@code /obadmin purge [list | <player> | all] [confirm]}
+     *
+     * <p>Preview-first by design: every destructive form requires a literal
+     * {@code confirm} argument, so a mistyped command reports instead of deleting. The
+     * preview and the confirmation are evaluated separately, so an island whose member
+     * logged in between the two is skipped rather than purged.
+     */
+    private void handlePurge(CommandSender sender, String[] args) {
+        var purges = plugin.purges();
+        int threshold = purges.thresholdDays();
+        String mode = args.length < 2 ? "list" : args[1].toLowerCase();
+        boolean confirmed = args.length > 2 && args[2].equalsIgnoreCase("confirm");
+
+        if (mode.equals("list")) {
+            var candidates = purges.findPurgeable();
+            if (candidates.isEmpty()) {
+                Msg.send(sender, "<green>No islands have been idle for " + threshold + "+ days.");
+                return;
+            }
+            Msg.send(sender, "<gold>" + candidates.size() + " island(s) idle " + threshold + "+ days:");
+            int shown = 0;
+            for (var c : candidates) {
+                if (shown++ >= 20) {
+                    Msg.send(sender, "<dark_gray>…and " + (candidates.size() - 20) + " more.");
+                    break;
+                }
+                Msg.send(sender, "<gray>· <white>" + c.ownerName() + " <dark_gray>— <yellow>"
+                        + c.daysInactive() + "d idle<dark_gray>, <gray>lv " + c.level()
+                        + ", " + c.blocksBroken() + " blocks");
+            }
+            Msg.send(sender, "<gray>Purge them with <yellow>/obadmin purge all confirm");
+            return;
+        }
+
+        if (mode.equals("all")) {
+            var candidates = purges.findPurgeable();
+            if (candidates.isEmpty()) {
+                Msg.send(sender, "<green>Nothing to purge.");
+                return;
+            }
+            if (!confirmed) {
+                Msg.send(sender, "<yellow>" + candidates.size() + " island(s) would be purged. "
+                        + "Review with <white>/obadmin purge list<yellow>, then run "
+                        + "<white>/obadmin purge all confirm<yellow>.");
+                return;
+            }
+            int purged = purges.purgeAll();
+            Msg.send(sender, "<green>Purged " + purged + " island(s).");
+            if (purged < candidates.size()) {
+                Msg.send(sender, "<gray>" + (candidates.size() - purged)
+                        + " skipped — a member came online.");
+            }
+            // Slots stay occupied in the shared world; be explicit so nobody expects
+            // this to have freed disk space.
+            Msg.send(sender, "<dark_gray>Slot terrain is left in place; no disk was freed.");
+            return;
+        }
+
+        // Per-player form.
+        OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
+        var candidate = purges.inspect(target.getUniqueId());
+        if (candidate == null) {
+            Msg.send(sender, "<red>" + args[1] + " has no island.");
+            return;
+        }
+        if (!confirmed) {
+            Msg.send(sender, "<yellow>" + candidate.ownerName() + "'s island: <white>"
+                    + candidate.daysInactive() + "d idle<yellow>, level " + candidate.level()
+                    + ", " + candidate.blocksBroken() + " blocks broken.");
+            if (candidate.daysInactive() < threshold) {
+                Msg.send(sender, "<gray>Below the " + threshold
+                        + "-day threshold — confirm to purge anyway.");
+            }
+            Msg.send(sender, "<gray>Run <yellow>/obadmin purge " + args[1] + " confirm<gray> to purge.");
+            return;
+        }
+        if (purges.purge(candidate.islandId())) {
+            Msg.send(sender, "<green>Purged " + candidate.ownerName() + "'s island.");
+            Msg.send(sender, "<dark_gray>Slot terrain is left in place; no disk was freed.");
+        } else {
+            Msg.send(sender, "<red>Not purged — a member is online.");
         }
     }
 

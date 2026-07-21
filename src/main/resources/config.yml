@@ -18,6 +18,44 @@ endIslandWorld: oneblock_end
 # End progress is preserved but inert.
 endEnabled: true
 
+# Inactive-island purging. An island's clock is stamped whenever any of its
+# members joins or quits, so a co-op island stays active as long as anybody
+# plays on it. Islands saved before this existed report 0 days idle and are
+# never selected until their members log in once.
+#
+# NOTE: purging unregisters the island and deletes its data file, but does NOT
+# free disk. Islands are 256-block slots inside the shared oneblock worlds, so
+# the abandoned build stays in the region files until it is cleared manually.
+islands:
+  # How many islands one player may OWN. Islands they're only a member of don't
+  # count. Grant more per rank with novablock.islands.max.<n> — the highest
+  # matching node wins, so novablock.islands.max.5 gives five.
+  #
+  # Players pick which island their /ob commands act on with /ob islands <n>;
+  # anything tied to where they're standing (block breaks, quest payouts,
+  # questline progress, minion caps) follows their feet instead.
+  max-owned: 2
+
+  purge:
+    after-days: 30
+
+  # Player-to-player island market (/ob sellisland, /ob market).
+  #
+  # The floor price is a MINIMUM, not a valuation — it exists so a maxed island
+  # can't be handed to an alt for one coin. Owners list at or above it.
+  #
+  # Only permanent, earned progress counts. The island bank and the storage
+  # vault are deliberately excluded, so a seller emptying them before listing
+  # cannot crash the floor.
+  market:
+    valuation:
+      base: 10000
+      per-level: 2500
+      per-phase: 1500            # summed across Overworld + Nether + End
+      per-prestige: 15000        # total prestige across all three dimensions
+      per-upgrade-level: 5000
+      per-1000-blocks: 250       # lifetime blocks broken, all dimensions
+
 # At startup, unload the vanilla Nether and End worlds (if present) so the
 # server is OneBlock-only. Players in those worlds are evacuated to /spawn
 # before the unload. Set false to keep them around for admin use.

@@ -110,10 +110,16 @@ public class IslandQuestlineManager {
 
     // --- Activity hooks --------------------------------------------------------
 
-    /** Credit activity by {@code p} to {@code p}'s own island. */
+    /**
+     * Credit activity by {@code p} to the island they are standing on.
+     *
+     * <p>Uses the CONTEXT island, not the active one: with several islands, mining on
+     * island B must advance island B's questline. Resolving via {@code ofPlayer} would
+     * funnel every island's progress into whichever one happened to be active.
+     */
     public void record(Player p, IslandObjective type, int amount) {
         if (p == null) return;
-        Island island = plugin.islands().ofPlayer(p);
+        Island island = plugin.islands().contextIsland(p);
         if (island != null) add(island, type, amount, p);
     }
 

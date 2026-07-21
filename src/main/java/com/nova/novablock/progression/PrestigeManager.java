@@ -192,8 +192,17 @@ public class PrestigeManager {
      * owner). Works for offline players (sell chests tick while the owner is away).
      */
     public double sellMultiplierFor(java.util.UUID playerId) {
-        Island island = plugin.islands().ofPlayer(playerId);
-        return 1.0 + sellBoostPerLevel * cappedTotalLevel(island);
+        // Derived from the player's BEST island, deliberately — not the active one and not
+        // the context one. This is a player-level economy effect that must also work while
+        // they're offline (sell chests tick without them), so it can't depend on where they
+        // are standing, and picking whichever island the index happened to return first
+        // made the rate arbitrary. Taking the maximum is deterministic and unexploitable:
+        // owning more islands never stacks the boost, it stays one multiplier.
+        int best = 0;
+        for (Island island : plugin.islands().islandsOf(playerId)) {
+            best = Math.max(best, cappedTotalLevel(island));
+        }
+        return 1.0 + sellBoostPerLevel * best;
     }
 
     // --- Preview helpers for the prestige GUI (operate on a stacked total) ----

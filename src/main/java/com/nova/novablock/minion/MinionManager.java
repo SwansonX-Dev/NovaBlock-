@@ -151,7 +151,14 @@ public class MinionManager implements Listener {
         return world.getName().equals(plugin.community().communityWorldName());
     }
 
-    public int limit(Player player) { return limit(player, plugin.islands().ofPlayer(player)); }
+    /**
+     * Minion cap for the island the player is standing on.
+     *
+     * <p>Context island, not active: the cap is enforced per-island, so deriving the
+     * prestige bonus from a different island would let one prestiged island raise the cap
+     * on every other island the player owns.
+     */
+    public int limit(Player player) { return limit(player, plugin.islands().contextIsland(player)); }
 
     public int limit(Player player, Island island) {
         if (player.hasPermission("novablock.minions.admin") || player.hasPermission("novablock.admin")) return Integer.MAX_VALUE;

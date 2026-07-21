@@ -33,7 +33,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             "visit", "setvisit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
             "setspawn", "friend", "friends", "sprint", "minion", "minions", "hub", "community",
             "team", "members", "roster", "promote", "demote", "kick", "trust", "untrust",
-            "bank", "autosell", "backpack", "help");
+            "bank", "autosell", "backpack", "sellisland", "market", "islands", "help");
     private static final List<String> FRIEND_SUBS = List.of("add", "accept", "deny", "remove", "list");
     private static final List<String> BANK_SUBS = List.of("deposit", "withdraw", "balance");
     private static final long DELETE_CONFIRM_WINDOW_MS = 30_000L;
@@ -56,8 +56,10 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
         switch (args[0].toLowerCase()) {
             case "create" -> {
                 if (!p.hasPermission("novablock.create")) { denied(p); return true; }
-                if (plugin.islands().ofPlayer(p) != null) {
-                    Msg.send(p, "<red>You already have an island. Use /ob home.");
+                if (!plugin.islands().canCreateAnother(p)) {
+                    Msg.send(p, "<red>You're at your island limit ("
+                            + plugin.islands().maxIslands(p) + "). <gray>See <yellow>/ob islands<gray>, "
+                            + "or sell one with <yellow>/ob sellisland<gray>.");
                     return true;
                 }
                 Island island = plugin.islands().create(p);
@@ -114,6 +116,9 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                         + " <gray>(<white>" + island.data().getPhaseProgress() + "/" + phase.getRequiredBlocks() + "<gray>).");
             }
             case "prestige" -> openPrestige(p, args);
+            case "sellisland", "listisland" -> handleSellIsland(p, args);
+            case "market" -> new com.nova.novablock.gui.IslandMarketGui(plugin).open(p);
+            case "islands" -> handleIslands(p, args);
             case "invite" -> invite(p, args);
             case "accept" -> accept(p);
             case "leave" -> leave(p);
@@ -537,21 +542,52 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                 + "<gray>(<yellow>/ob setvisit clear</yellow> to undo)");
     }
 
+    /**
+     * {@code /ob visit <player> [n]} — the optional index picks which of the target's
+     * islands to visit. Without it you get their active island, and the command tells them
+     * the others exist rather than silently choosing.
+     */
     private void visit(Player p, String[] args) {
-        if (args.length < 2) { Msg.send(p, "<gray>Usage: <yellow>/ob visit <player>"); return; }
-        Player target = org.bukkit.Bukkit.getPlayerExact(args[1]);
-        if (target == null) {
-            // Allow visiting offline players too — look up by name in the island cache.
-            var offline = org.bukkit.Bukkit.getOfflinePlayer(args[1]);
-            if (!offline.hasPlayedBefore()) { Msg.send(p, "<red>Never seen that player."); return; }
-            Island offlineIsland = plugin.islands().ofPlayer(offline.getUniqueId());
-            if (offlineIsland == null) { Msg.send(p, "<red>They don't have an island."); return; }
-            tryVisit(p, offlineIsland, offline.getName());
+        if (args.length < 2) { Msg.send(p, "<gray>Usage: <yellow>/ob visit <player> [number]"); return; }
+        var offline = org.bukkit.Bukkit.getOfflinePlayer(args[1]);
+        Player online = org.bukkit.Bukkit.getPlayerExact(args[1]);
+        if (online == null && !offline.hasPlayedBefore()) {
+            Msg.send(p, "<red>Never seen that player.");
             return;
         }
-        Island targetIsland = plugin.islands().ofPlayer(target);
-        if (targetIsland == null) { Msg.send(p, "<red>" + target.getName() + " has no island."); return; }
-        tryVisit(p, targetIsland, target.getName());
+        java.util.UUID targetId = online != null ? online.getUniqueId() : offline.getUniqueId();
+        String targetName = online != null ? online.getName() : offline.getName();
+
+        var theirIslands = plugin.islands().islandsOf(targetId);
+        if (theirIslands.isEmpty()) {
+            Msg.send(p, "<red>" + targetName + " has no island.");
+            return;
+        }
+
+        Island chosen;
+        if (args.length >= 3) {
+            int index;
+            try {
+                index = Integer.parseInt(args[2]);
+            } catch (NumberFormatException e) {
+                Msg.send(p, "<red>'" + args[2] + "' isn't a number.");
+                return;
+            }
+            if (index < 1 || index > theirIslands.size()) {
+                Msg.send(p, "<red>" + targetName + " has " + theirIslands.size() + " island(s).");
+                return;
+            }
+            chosen = theirIslands.get(index - 1);
+        } else {
+            chosen = plugin.islands().ofPlayer(targetId);
+            if (chosen == null) chosen = theirIslands.get(0);
+            if (theirIslands.size() > 1) {
+                Msg.send(p, "<gray>" + targetName + " has " + theirIslands.size()
+                        + " islands — visiting their main. <yellow>/ob visit " + targetName
+                        + " <number><gray> for the others.");
+            }
+        }
+        tryVisit(p, chosen, targetName);
     }
 
     private void tryVisit(Player p, Island target, String ownerName) {
@@ -590,6 +626,115 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             return;
         }
         new com.nova.novablock.gui.HubGui(plugin).open(p);
+    }
+
+    /**
+     * {@code /ob sellisland [price | cancel]}
+     *
+     * <p>With no argument this only quotes the floor and the current listing — listing an
+     * island is never a side effect of an incomplete command.
+     */
+    /**
+     * {@code /ob islands [n]} — list the player's islands, or switch which one their
+     * player-scoped commands (/ob home, upgrades, bank, storage) act on.
+     */
+    private void handleIslands(Player p, String[] args) {
+        var owned = plugin.islands().islandsOf(p);
+        if (owned.isEmpty()) { Msg.send(p, "<red>You have no islands."); return; }
+        Island active = plugin.islands().ofPlayer(p);
+
+        if (args.length >= 2) {
+            int index;
+            try {
+                index = Integer.parseInt(args[1]);
+            } catch (NumberFormatException e) {
+                Msg.send(p, "<red>Usage: /ob islands [number]");
+                return;
+            }
+            if (index < 1 || index > owned.size()) {
+                Msg.send(p, "<red>Pick a number between 1 and " + owned.size() + ".");
+                return;
+            }
+            Island pick = owned.get(index - 1);
+            plugin.islands().setActiveIsland(p.getUniqueId(), pick.data().getId());
+            Msg.send(p, "<green>Now working with island <white>#" + index
+                    + "<green>. <gray>/ob home takes you there.");
+            return;
+        }
+
+        Msg.send(p, "<gold>Your islands <dark_gray>(" + owned.size() + "/"
+                + plugin.islands().maxIslands(p) + " owned slots)");
+        for (int i = 0; i < owned.size(); i++) {
+            var d = owned.get(i).data();
+            boolean isActive = active != null && active.data().getId().equals(d.getId());
+            boolean isOwner = d.getOwner().equals(p.getUniqueId());
+            Msg.send(p, (isActive ? "<green>▶ " : "<gray>  ") + "<white>#" + (i + 1)
+                    + " <gray>· level <white>" + d.getLevel()
+                    + " <gray>· phase <white>" + (d.getPhaseIndex() + 1)
+                    + " <gray>· " + (isOwner ? "<yellow>owner" : "<aqua>member")
+                    + (plugin.market().isListed(d.getId()) ? " <dark_gray>[listed]" : ""));
+        }
+        Msg.send(p, "<gray>Switch with <yellow>/ob islands <number>");
+    }
+
+    private void handleSellIsland(Player p, String[] args) {
+        Island island = plugin.islands().ofPlayer(p);
+        if (island == null) { Msg.send(p, "<red>You have no island to sell."); return; }
+        var data = island.data();
+        var market = plugin.market();
+
+        if (args.length >= 2 && args[1].equalsIgnoreCase("cancel")) {
+            Msg.send(p, market.unlist(data.getId())
+                    ? "<green>Listing cancelled."
+                    : "<red>Your island isn't listed.");
+            return;
+        }
+
+        long floor = market.floorPrice(data);
+        if (args.length < 2) {
+            var b = plugin.valuations().breakdown(data);
+            Msg.send(p, "<gray>Minimum price for your island: <gold>"
+                    + plugin.economy().format(floor));
+            Msg.send(p, "<dark_gray>base " + b.base() + " · level " + b.fromLevel()
+                    + " · phases " + b.fromPhases() + " · prestige " + b.fromPrestige()
+                    + " · upgrades " + b.fromUpgrades() + " · blocks " + b.fromBlocks());
+            var existing = market.listingFor(data.getId());
+            if (existing != null) {
+                Msg.send(p, "<yellow>Currently listed at <gold>"
+                        + plugin.economy().format(existing.price())
+                        + "<yellow>. <gray>Cancel with <yellow>/ob sellisland cancel");
+            } else {
+                Msg.send(p, "<gray>List it with <yellow>/ob sellisland <price>");
+            }
+            Msg.send(p, "<dark_gray>Selling transfers the island and everything on it. "
+                    + "You'll get a fresh island on your next join.");
+            return;
+        }
+
+        long price;
+        try {
+            price = Long.parseLong(args[1]);
+        } catch (NumberFormatException e) {
+            Msg.send(p, "<red>'" + args[1] + "' isn't a number.");
+            return;
+        }
+        if (price <= 0) { Msg.send(p, "<red>Price must be positive."); return; }
+
+        switch (market.list(p, price)) {
+            case OK -> {
+                Msg.send(p, "<green>Island listed for <gold>" + plugin.economy().format(price)
+                        + "<green>. Cancel with <yellow>/ob sellisland cancel<green>.");
+                org.bukkit.Bukkit.broadcast(Msg.mm("<#7B61FF>✦ <white>" + p.getName()
+                        + " <gray>listed their island for <gold>" + plugin.economy().format(price)
+                        + "<gray>. <dark_gray>(/ob market)"));
+            }
+            case BELOW_FLOOR -> Msg.send(p, "<red>Too low — the minimum is <gold>"
+                    + plugin.economy().format(floor) + "<red>.");
+            case ALREADY_LISTED -> Msg.send(p,
+                    "<red>Already listed. Cancel first with <yellow>/ob sellisland cancel<red>.");
+            case NOT_OWNER -> Msg.send(p, "<red>Only the island owner can sell it.");
+            default -> Msg.send(p, "<red>Couldn't list your island.");
+        }
     }
 
     private void openPrestige(Player p, String[] args) {

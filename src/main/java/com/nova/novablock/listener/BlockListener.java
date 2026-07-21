@@ -255,6 +255,8 @@ public class BlockListener implements Listener {
             Bukkit.getScheduler().runTask(plugin, () -> fillPhaseChest(center.getBlock(), phase));
         }
         playPlaceSound(center.getBlock());
+        // Correct any ghost left by the cancel-then-replace (see resyncCenter).
+        resyncCenter(player, center);
         // Maintain the bedrock anchor underneath at all times.
         Location anchor = center.clone().add(0, -1, 0);
         if (anchor.getBlock().getType() != Material.BEDROCK) {
@@ -420,6 +422,30 @@ public class BlockListener implements Listener {
 
     private boolean isUnsafeOneBlockMaterial(Material material) {
         return material == null || UNSAFE_ONEBLOCK_MATERIALS.contains(material);
+    }
+
+    /**
+     * Re-sends the centre's true state to the breaking player on the NEXT tick.
+     *
+     * <p>Both OneBlock paths cancel the vanilla break and re-place the centre inside the
+     * same tick. On 1.19+ the client predicts the break locally and the server confirms it
+     * with a sequence acknowledgment; cancelling the event makes that ack tell the client to
+     * restore the OLD block. The replacement block-change and the ack travel by different
+     * paths (chunk tracker vs. the player's connection), so when the ack lands last the
+     * client is left rendering the block that was just mined — a ghost. The player then mines
+     * that ghost, and the server quite correctly hands them the drops of whatever is really
+     * there, which reads as "I mined end stone and got obsidian".
+     *
+     * <p>Sending the real state a tick later lands unambiguously after the ack and snaps the
+     * client back. This is purely a client correction — no world state changes — the same
+     * cure used for the xPets dismount desync.
+     */
+    public void resyncCenter(Player player, Location center) {
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline() || center.getWorld() == null) return;
+            Block b = center.getBlock();
+            player.sendBlockChange(b.getLocation(), b.getBlockData());
+        });
     }
 
     private void playBreakSound(Block block) {

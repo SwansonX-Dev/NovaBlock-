@@ -4,6 +4,8 @@ import com.nova.novablock.NovaBlock;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.block.data.Openable;
+import org.bukkit.block.data.type.Switch;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Enderman;
 import org.bukkit.entity.Entity;
@@ -361,6 +363,33 @@ public class IslandFlagsManager implements Listener {
             event.getPlayer().sendActionBar(
                     net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
                             .deserialize("<red>That container belongs to this island."));
+        }
+    }
+
+    // ---- VISITOR_USE_DOORS ----
+
+    /**
+     * Doors, trapdoors, fence gates, levers and buttons. Containers are skipped first:
+     * a barrel's block data is Openable too, and those belong to VISITOR_CONTAINER_ACCESS
+     * so a visitor allowed containers but not doors can still open one.
+     *
+     * <p>Pressure plates and tripwires aren't covered — those fire on PHYSICAL, not a click.
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onVisitorUseDoor(PlayerInteractEvent event) {
+        if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) return;
+        var block = event.getClickedBlock();
+        if (block == null) return;
+        // Crouching with an item places a block instead of opening; leave that to canBuild.
+        if (event.getPlayer().isSneaking() && event.hasItem()) return;
+        if (block.getState() instanceof InventoryHolder) return;
+        var data = block.getBlockData();
+        if (!(data instanceof Openable || data instanceof Switch)) return;
+        if (!plugin.islands().canUseDoors(event.getPlayer(), block.getLocation())) {
+            event.setCancelled(true);
+            event.getPlayer().sendActionBar(
+                    net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                            .deserialize("<red>That belongs to this island."));
         }
     }
 

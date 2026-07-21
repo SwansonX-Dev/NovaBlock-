@@ -370,6 +370,8 @@ public class CommunityBlock {
         if (anchor.getBlock().getType() != Material.BEDROCK) {
             anchor.getBlock().setType(Material.BEDROCK, false);
         }
+        // Correct any ghost left by the cancel-then-replace (see BlockListener.resyncCenter).
+        if (plugin.blockListener() != null) plugin.blockListener().resyncCenter(player, center);
 
         // Per-break bonus always goes 100% into the pool; rare-block coin value
         // is taxed at the configured fraction so chests/beacons feel impactful

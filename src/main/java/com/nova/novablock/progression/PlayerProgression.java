@@ -22,6 +22,8 @@ public class PlayerProgression {
     private boolean menuItemEnabled = true;
     private boolean scoreboardEnabled = true;
     private boolean autoSellEnabled = false;
+    /** Island the player last chose with /ob islands, or null for "first island". */
+    private java.util.UUID activeIslandId;
     private boolean backpackItemEnabled = false;
     private String backpackBase64 = "";
     private String depositChestWorld = "";
@@ -79,6 +81,9 @@ public class PlayerProgression {
     public void setScoreboardEnabled(boolean v) { this.scoreboardEnabled = v; }
 
     /** When enabled, common drops mined on the Community OneBlock are auto-sold for coins. */
+    public java.util.UUID getActiveIslandId() { return activeIslandId; }
+    public void setActiveIslandId(java.util.UUID v) { this.activeIslandId = v; }
+
     public boolean isAutoSellEnabled() { return autoSellEnabled; }
     public void setAutoSellEnabled(boolean v) { this.autoSellEnabled = v; }
 

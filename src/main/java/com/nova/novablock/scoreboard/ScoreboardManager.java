@@ -183,7 +183,10 @@ public class ScoreboardManager {
     }
 
     private List<String> buildLines(Player p) {
-        Island island = plugin.islands().ofPlayer(p);
+        // Context island: the sidebar already derives its dimension from the world the
+        // player is in, so it must derive the island from where they are standing too —
+        // otherwise standing on island B renders island A's phase, level and progress.
+        Island island = plugin.islands().contextIsland(p);
         PlayerProgression prog = plugin.progression().get(p);
         List<String> lines = new ArrayList<>();
         if (island != null) {

@@ -150,6 +150,9 @@ public class YamlStorage implements DataStorage {
 
                 IslandData data = new IslandData(id, owner, worldName, slotX, slotZ);
                 data.setBlocksBroken(blocksBroken);
+                // 0 when absent (islands saved before activity tracking existed) —
+                // IslandData treats that as active, so no legacy island is auto-purged.
+                data.setLastActiveMillis(y.getLong("lastActiveMillis", 0L));
                 data.setPhaseIndex(phaseIndex);
                 data.setPhaseProgress(phaseProgress);
                 data.setPrestigeLevel(prestigeLevel);
@@ -253,6 +256,7 @@ public class YamlStorage implements DataStorage {
             y.set("visit.pitch", data.getVisitPitch());
         }
         y.set("blocksBroken", data.getBlocksBroken());
+        y.set("lastActiveMillis", data.getLastActiveMillis());
         y.set("phaseIndex", data.getPhaseIndex());
         y.set("phaseProgress", data.getPhaseProgress());
         y.set("prestigeLevel", data.getPrestigeLevel());
@@ -348,6 +352,11 @@ public class YamlStorage implements DataStorage {
         p.setMenuItemEnabled(y.getBoolean("ui.menuItem", true));
         p.setScoreboardEnabled(y.getBoolean("ui.scoreboard", true));
         p.setAutoSellEnabled(y.getBoolean("ui.autoSell", false));
+        String activeIsland = y.getString("ui.activeIsland");
+        if (activeIsland != null) {
+            try { p.setActiveIslandId(java.util.UUID.fromString(activeIsland)); }
+            catch (IllegalArgumentException ignored) {}
+        }
         p.setBackpackItemEnabled(y.getBoolean("ui.backpackItem", backpackDefault));
         p.setBackpackBase64(y.getString("backpack.data", ""));
         String dcWorld = y.getString("community.depositChest.world", "");
@@ -397,6 +406,7 @@ public class YamlStorage implements DataStorage {
         y.set("ui.menuItem", p.isMenuItemEnabled());
         y.set("ui.scoreboard", p.isScoreboardEnabled());
         y.set("ui.autoSell", p.isAutoSellEnabled());
+        y.set("ui.activeIsland", p.getActiveIslandId() == null ? null : p.getActiveIslandId().toString());
         y.set("ui.backpackItem", p.isBackpackItemEnabled());
         if (!p.getBackpackBase64().isEmpty()) y.set("backpack.data", p.getBackpackBase64());
         if (p.hasDepositChest()) {

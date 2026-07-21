@@ -34,7 +34,9 @@ public class ActionBarNudger implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
-        Island island = plugin.islands().ofPlayer(player);
+        // The nudge describes the block they just broke, so it belongs to the island
+        // they broke it on.
+        Island island = plugin.islands().contextIsland(player);
         if (island == null) return;
         com.nova.novablock.island.Dimension dim = com.nova.novablock.island.Dimension.OVERWORLD;
         if (player.getWorld() != null) {

@@ -36,7 +36,15 @@ public class LeaderboardGui extends ChestGui {
 
     @Override
     protected void build(Player viewer) {
-        List<Island> sorted = plugin.islands().all().values().stream()
+        // One entry per OWNER, not per island: with multi-island a single player would
+        // otherwise occupy several places on the board under the same name. Each owner is
+        // represented by their strongest island.
+        java.util.Map<java.util.UUID, Island> bestPerOwner = new java.util.HashMap<>();
+        for (Island i : plugin.islands().all().values()) {
+            bestPerOwner.merge(i.data().getOwner(), i,
+                    (a, b) -> a.data().getBlocksBroken() >= b.data().getBlocksBroken() ? a : b);
+        }
+        List<Island> sorted = bestPerOwner.values().stream()
                 .sorted(Comparator.comparingLong((Island i) -> i.data().getBlocksBroken()).reversed())
                 .limit(45)
                 .collect(Collectors.toList());

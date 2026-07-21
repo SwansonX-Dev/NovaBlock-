@@ -162,6 +162,12 @@ permissions:
   novablock.flag.visitor_build:
     description: Allows toggling the visitor-build flag
     default: op
+  novablock.flag.visitor_container_access:
+    description: Allows toggling the visitor-container-access flag
+    default: op
+  novablock.flag.visitor_use_doors:
+    description: Allows toggling the visitor-use-doors flag
+    default: op
   novablock.flag.open_visits:
     description: Allows toggling the open-visits flag
     default: true

@@ -7,7 +7,10 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -15,9 +18,26 @@ public class IslandManager {
 
     private final NovaBlock plugin;
     private final Map<UUID, Island> byId = new HashMap<>();
-    private final Map<UUID, UUID> playerToIsland = new HashMap<>();
+    /**
+     * Every island a player belongs to, in join order. Replaces the old
+     * {@code Map<UUID,UUID>} one-island index. Insertion-ordered so "first island" is
+     * stable — it's the fallback when no active island has been chosen.
+     */
+    private final Map<UUID, LinkedHashSet<UUID>> playerToIslands = new HashMap<>();
+    /**
+     * Which of a player's islands their player-scoped commands act on. Not persisted on
+     * the island (it's a per-player preference) — see {@link #setActiveIsland}. Absent
+     * means "use the first island", so a single-island player never has to choose.
+     */
+    private final Map<UUID, UUID> activeIsland = new HashMap<>();
+    /** Slot-keyed index so {@link #atLocation} is O(1) instead of scanning every island. */
+    private final Map<Long, UUID> bySlot = new HashMap<>();
     private int nextSlotX;
     private int nextSlotZ;
+
+    private static long slotKey(int slotX, int slotZ) {
+        return ((long) slotX << 32) ^ (slotZ & 0xFFFFFFFFL);
+    }
 
     public IslandManager(NovaBlock plugin) {
         this.plugin = plugin;
@@ -137,9 +157,115 @@ public class IslandManager {
         }
     }
 
+    /**
+     * Checks the in-memory indexes against the islands themselves, which are the source of
+     * truth (each island's member list is what's on disk). The multi-island change replaced
+     * a one-entry-per-player index with several derived maps, and a bug there wouldn't throw
+     * — it would quietly hand someone the wrong island, or none. This makes that visible.
+     *
+     * @return human-readable problems; empty means every index agrees with the island data
+     */
+    public List<String> verifyIntegrity() {
+        List<String> problems = new ArrayList<>();
+
+        // Two islands must never occupy one slot — that would make atLocation ambiguous
+        // and let one island's breaks be credited to the other.
+        Map<Long, UUID> seenSlots = new HashMap<>();
+        for (Island i : byId.values()) {
+            IslandData d = i.data();
+            long key = slotKey(d.getSlotX(), d.getSlotZ());
+            UUID clash = seenSlots.put(key, d.getId());
+            if (clash != null) {
+                problems.add("slot (" + d.getSlotX() + "," + d.getSlotZ() + ") shared by islands "
+                        + clash + " and " + d.getId());
+            }
+            if (!d.getId().equals(bySlot.get(key))) {
+                problems.add("island " + d.getId() + " missing or wrong in the slot index");
+            }
+            if (!d.getMembers().contains(d.getOwner())) {
+                problems.add("island " + d.getId() + " owner " + d.getOwner() + " is not in its member list");
+            }
+            // Every member must be able to find this island through the player index.
+            for (UUID m : d.getMembers()) {
+                LinkedHashSet<UUID> owned = playerToIslands.get(m);
+                if (owned == null || !owned.contains(d.getId())) {
+                    problems.add("member " + m + " is not indexed against island " + d.getId());
+                }
+            }
+        }
+
+        // And the reverse: nothing in the player index may point at a stale island.
+        for (var e : playerToIslands.entrySet()) {
+            for (UUID islandId : e.getValue()) {
+                Island i = byId.get(islandId);
+                if (i == null) {
+                    problems.add("player " + e.getKey() + " indexed against missing island " + islandId);
+                } else if (!i.data().getMembers().contains(e.getKey())) {
+                    problems.add("player " + e.getKey() + " indexed against island " + islandId
+                            + " they are not a member of");
+                }
+            }
+        }
+
+        // An active pointer aimed at an island they left would silently strand them.
+        for (var e : activeIsland.entrySet()) {
+            LinkedHashSet<UUID> owned = playerToIslands.get(e.getKey());
+            if (owned == null || !owned.contains(e.getValue())) {
+                problems.add("player " + e.getKey() + " has an active island they don't belong to");
+            }
+        }
+
+        // Stale slot entries pointing at islands that no longer exist.
+        for (var e : bySlot.entrySet()) {
+            if (!byId.containsKey(e.getValue())) {
+                problems.add("slot index holds deleted island " + e.getValue());
+            }
+        }
+        return problems;
+    }
+
+    /**
+     * Rebuilds every derived index from the islands themselves. Safe to run at any time —
+     * it only touches in-memory lookups, never island data or files, so a bad index can be
+     * repaired without a restart and without risking the data behind it.
+     *
+     * @return the number of islands reindexed
+     */
+    public int rebuildIndexes() {
+        playerToIslands.clear();
+        bySlot.clear();
+        for (Island i : byId.values()) {
+            IslandData d = i.data();
+            bySlot.put(slotKey(d.getSlotX(), d.getSlotZ()), d.getId());
+            for (UUID m : d.getMembers()) {
+                playerToIslands.computeIfAbsent(m, k -> new LinkedHashSet<>()).add(d.getId());
+            }
+        }
+        // Drop active pointers that no longer resolve.
+        activeIsland.entrySet().removeIf(e -> {
+            LinkedHashSet<UUID> owned = playerToIslands.get(e.getKey());
+            return owned == null || !owned.contains(e.getValue());
+        });
+        recalculateNextSlot();
+        return byId.size();
+    }
+
     private void register(Island island) {
-        byId.put(island.data().getId(), island);
-        for (UUID m : island.data().getMembers()) playerToIsland.put(m, island.data().getId());
+        IslandData data = island.data();
+        byId.put(data.getId(), island);
+        bySlot.put(slotKey(data.getSlotX(), data.getSlotZ()), data.getId());
+        for (UUID m : data.getMembers()) {
+            playerToIslands.computeIfAbsent(m, k -> new LinkedHashSet<>()).add(data.getId());
+        }
+    }
+
+    private void unregisterMember(UUID playerId, UUID islandId) {
+        LinkedHashSet<UUID> owned = playerToIslands.get(playerId);
+        if (owned == null) return;
+        owned.remove(islandId);
+        if (owned.isEmpty()) playerToIslands.remove(playerId);
+        // Never leave the active pointer aimed at an island they no longer belong to.
+        if (islandId.equals(activeIsland.get(playerId))) activeIsland.remove(playerId);
     }
 
     private void recalculateNextSlot() {
@@ -152,11 +278,106 @@ public class IslandManager {
     }
 
     public Island get(UUID islandId) { return byId.get(islandId); }
+
+    /**
+     * The player's <b>active</b> island — the one their player-scoped commands and UI act
+     * on. Falls back to their first island when they haven't chosen, so a single-island
+     * player behaves exactly as before multi-island existed.
+     *
+     * <p>This deliberately keeps the old signature and old meaning for the ~78 existing
+     * call sites: "the player's island" is now "the island they're currently working with".
+     * Anything that should follow the player's <em>feet</em> instead — block breaks, quest
+     * credit, scoreboards — must use {@link #contextIsland} rather than this.
+     */
     public Island ofPlayer(UUID playerId) {
-        UUID id = playerToIsland.get(playerId);
-        return id == null ? null : byId.get(id);
+        LinkedHashSet<UUID> owned = playerToIslands.get(playerId);
+        if (owned == null || owned.isEmpty()) return null;
+        UUID active = activeIsland.get(playerId);
+        if (active != null && owned.contains(active)) return byId.get(active);
+        return byId.get(owned.iterator().next());
     }
     public Island ofPlayer(Player p) { return ofPlayer(p.getUniqueId()); }
+
+    /** Every island the player belongs to, in join order. Never null. */
+    public List<Island> islandsOf(UUID playerId) {
+        LinkedHashSet<UUID> owned = playerToIslands.get(playerId);
+        if (owned == null) return List.of();
+        List<Island> out = new ArrayList<>(owned.size());
+        for (UUID id : owned) {
+            Island i = byId.get(id);
+            if (i != null) out.add(i);
+        }
+        return out;
+    }
+    public List<Island> islandsOf(Player p) { return islandsOf(p.getUniqueId()); }
+
+    /**
+     * The island the player is actually standing on, if they belong to it; otherwise their
+     * active island. This is the correct lookup for anything that should be attributed to
+     * where the player is — quest credit, questline progress, scoreboard contents — because
+     * with several islands "the player's island" and "the island under their feet" diverge.
+     */
+    public Island contextIsland(Player p) {
+        Island here = atLocation(p.getLocation());
+        if (here != null && here.data().getMembers().contains(p.getUniqueId())) return here;
+        return ofPlayer(p);
+    }
+
+    /**
+     * Points the player's player-scoped commands at one of their islands.
+     *
+     * @return false if they don't belong to that island
+     */
+    public boolean setActiveIsland(UUID playerId, UUID islandId) {
+        LinkedHashSet<UUID> owned = playerToIslands.get(playerId);
+        if (owned == null || !owned.contains(islandId)) return false;
+        activeIsland.put(playerId, islandId);
+        // Persist the choice so it survives a restart — otherwise everyone silently
+        // reverts to their first island whenever the server comes back up.
+        var prog = plugin.progression().get(playerId);
+        if (prog != null) {
+            prog.setActiveIslandId(islandId);
+            plugin.progression().save(playerId);
+        }
+        return true;
+    }
+
+    /**
+     * Restores a player's saved active-island choice into the live index. Called on join,
+     * once their progression is loaded. Silently ignores a saved id they no longer belong
+     * to (island sold, purged, or they were kicked).
+     */
+    public void restoreActiveIsland(UUID playerId) {
+        var prog = plugin.progression().get(playerId);
+        if (prog == null || prog.getActiveIslandId() == null) return;
+        LinkedHashSet<UUID> owned = playerToIslands.get(playerId);
+        if (owned != null && owned.contains(prog.getActiveIslandId())) {
+            activeIsland.put(playerId, prog.getActiveIslandId());
+        }
+    }
+
+    /** How many islands this player may own, from config plus {@code novablock.islands.max.<n>}. */
+    public int maxIslands(Player p) {
+        int max = Math.max(1, plugin.getConfig().getInt("islands.max-owned", 2));
+        // Highest matching permission wins, mirroring the community-minion limit nodes.
+        for (int n = 64; n > max; n--) {
+            if (p.hasPermission("novablock.islands.max." + n)) return n;
+        }
+        return max;
+    }
+
+    /** Islands this player OWNS (excludes ones they're only a member of), for the cap. */
+    public int ownedCount(UUID playerId) {
+        int n = 0;
+        for (Island i : islandsOf(playerId)) {
+            if (i.data().getOwner().equals(playerId)) n++;
+        }
+        return n;
+    }
+
+    public boolean canCreateAnother(Player p) {
+        return ownedCount(p.getUniqueId()) < maxIslands(p);
+    }
 
     /**
      * Resolve which island a location belongs to by checking grid slot. The
@@ -170,15 +391,17 @@ public class IslandManager {
         String worldName = loc.getWorld().getName();
         String netherWorldName = plugin.worlds().netherWorldName();
         String endWorldName = plugin.worlds().endWorldName();
-        for (Island i : byId.values()) {
-            String islandWorld = i.data().getWorldName();
-            boolean worldMatches = worldName.equals(islandWorld)
-                    || worldName.equals(netherWorldName)
-                    || worldName.equals(endWorldName);
-            if (!worldMatches) continue;
-            if (i.data().getSlotX() == slotX && i.data().getSlotZ() == slotZ) return i;
-        }
-        return null;
+        // Slot-keyed lookup — this runs on every block break, and multi-island multiplies
+        // the island count, so the old linear scan over every island is not affordable.
+        UUID id = bySlot.get(slotKey(slotX, slotZ));
+        if (id == null) return null;
+        Island i = byId.get(id);
+        if (i == null) return null;
+        String islandWorld = i.data().getWorldName();
+        boolean worldMatches = worldName.equals(islandWorld)
+                || worldName.equals(netherWorldName)
+                || worldName.equals(endWorldName);
+        return worldMatches ? i : null;
     }
 
     private int nearestSlot(int blockCoord) {
@@ -228,11 +451,30 @@ public class IslandManager {
                 || island.data().isFlag(IslandFlag.VISITOR_CONTAINER_ACCESS);
     }
 
+    /** True if the player may use doors, trapdoors, gates, levers and buttons at this location. */
+    public boolean canUseDoors(Player player, Location loc) {
+        if (player.hasPermission("novablock.build.bypass") || player.hasPermission("novablock.admin")) return true;
+        Island island = atLocation(loc);
+        if (island == null) return true;
+        return island.isMember(player) || island.isTrusted(player)
+                || island.data().isFlag(IslandFlag.VISITOR_USE_DOORS);
+    }
+
     /** Starter bank gift for new island owners. 100 coins, or the bank's min deposit — whichever is larger. */
     private static final long STARTER_BANK_COINS = 100L;
 
+    /**
+     * Creates an island for {@code owner} and makes it their active one.
+     *
+     * <p>Returns the existing active island when they're already at their cap, so the
+     * auto-create on join stays a no-op for established players. Use
+     * {@link #canCreateAnother} to tell "made a new one" from "hit the cap".
+     */
     public Island create(Player owner) {
-        if (ofPlayer(owner) != null) return ofPlayer(owner);
+        if (!canCreateAnother(owner)) {
+            Island existing = ofPlayer(owner);
+            if (existing != null) return existing;
+        }
         String islandWorldName = plugin.worlds().worldName();
         if (plugin.worlds().ensureWorld(islandWorldName) == null) {
             throw new IllegalStateException("OneBlock island world is not loaded: " + islandWorldName);
@@ -245,6 +487,8 @@ public class IslandManager {
         Phase first = plugin.phases().get(0);
         if (first != null) island.refillUpcoming(first, 10);
         register(island);
+        // A freshly made island becomes the one they're working with.
+        activeIsland.put(owner.getUniqueId(), data.getId());
         plugin.storage().saveIsland(data);
         seedStarterBank(owner);
         return island;
@@ -273,7 +517,13 @@ public class IslandManager {
     }
 
     public void delete(Island island) {
-        for (UUID m : island.data().getMembers()) playerToIsland.remove(m);
+        // Drop any market listing first, or a purge/wipe leaves a live offer for an
+        // island that no longer exists.
+        if (plugin.market() != null) plugin.market().unlist(island.data().getId());
+        // Unregister each member from THIS island only — a member with other islands
+        // must keep them (the old index removed the player wholesale).
+        for (UUID m : island.data().getMembers()) unregisterMember(m, island.data().getId());
+        bySlot.remove(slotKey(island.data().getSlotX(), island.data().getSlotZ()));
         byId.remove(island.data().getId());
         if (plugin.minions() != null) plugin.minions().removeIsland(island.data().getId());
         plugin.storage().deleteIsland(island.data().getId());
@@ -289,9 +539,49 @@ public class IslandManager {
         }
     }
 
+    /**
+     * Hands an island to a new owner, keeping every index consistent.
+     *
+     * <p>The old owner is removed from the island entirely (members, roles and the
+     * owner→island index) and becomes islandless — they get a fresh island the next time
+     * they join. The buyer is added as a member and takes the OWNER role. Other members
+     * are left in place, so a co-op island survives a sale with its roster intact.
+     *
+     * <p>Refuses if the buyer already has an island, since the current index maps a player
+     * to exactly one island; that restriction lifts with multi-island support.
+     *
+     * @return true if ownership moved
+     */
+    public boolean transferOwnership(Island island, UUID newOwner) {
+        IslandData data = island.data();
+        UUID oldOwner = data.getOwner();
+        if (oldOwner.equals(newOwner)) return false;
+        // The buyer must have room under their own cap — they're gaining an island, not
+        // swapping one. (Offline buyers can't be permission-checked, so they get the
+        // config default via ownedCount vs. the base cap.)
+        Player buyer = Bukkit.getPlayer(newOwner);
+        int cap = buyer != null
+                ? maxIslands(buyer)
+                : Math.max(1, plugin.getConfig().getInt("islands.max-owned", 2));
+        if (ownedCount(newOwner) >= cap) return false;
+
+        data.getMembers().remove(oldOwner);
+        data.getRoles().remove(oldOwner);
+        unregisterMember(oldOwner, data.getId());
+
+        data.setOwner(newOwner);
+        data.getMembers().add(newOwner);
+        data.getRoles().put(newOwner, IslandRole.OWNER);
+        playerToIslands.computeIfAbsent(newOwner, k -> new LinkedHashSet<>()).add(data.getId());
+        activeIsland.put(newOwner, data.getId());
+
+        plugin.storage().saveIsland(data);
+        return true;
+    }
+
     public void addMember(Island island, UUID playerId) {
         island.data().getMembers().add(playerId);
-        playerToIsland.put(playerId, island.data().getId());
+        playerToIslands.computeIfAbsent(playerId, k -> new LinkedHashSet<>()).add(island.data().getId());
         plugin.storage().saveIsland(island.data());
     }
 
@@ -300,7 +590,7 @@ public class IslandManager {
         if (island.data().getOwner().equals(playerId)) return false;
         if (!island.data().getMembers().remove(playerId)) return false;
         island.data().getRoles().remove(playerId);
-        playerToIsland.remove(playerId);
+        unregisterMember(playerId, island.data().getId());
         plugin.storage().saveIsland(island.data());
         return true;
     }
