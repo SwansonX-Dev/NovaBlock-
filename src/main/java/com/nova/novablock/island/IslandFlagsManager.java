@@ -6,6 +6,9 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.block.data.Openable;
 import org.bukkit.block.data.type.Switch;
+import org.bukkit.entity.AbstractVillager;
+import org.bukkit.entity.Animals;
+import org.bukkit.entity.AreaEffectCloud;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Enderman;
 import org.bukkit.entity.Entity;
@@ -14,6 +17,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Ravager;
+import org.bukkit.entity.Tameable;
 import org.bukkit.entity.TNTPrimed;
 import org.bukkit.entity.Wither;
 import org.bukkit.entity.WitherSkull;
@@ -33,6 +37,7 @@ import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityPlaceEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.hanging.HangingPlaceEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
@@ -254,9 +259,19 @@ public class IslandFlagsManager implements Listener {
         if (flagOff(island, IslandFlag.PVP)) event.setCancelled(true);
     }
 
+    /**
+     * Who is actually behind a hit: a direct blow, a projectile's shooter, a
+     * lingering cloud's source, or the owner of a tamed mob that was set on the
+     * target. Returns null when no player is responsible, so mob-on-mob damage
+     * stays vanilla.
+     */
     private Player resolvePlayer(Entity damager) {
         if (damager instanceof Player p) return p;
         if (damager instanceof Projectile proj && proj.getShooter() instanceof Player p) return p;
+        if (damager instanceof AreaEffectCloud cloud && cloud.getSource() instanceof Player p) return p;
+        if (damager instanceof Tameable tame && tame.getOwner() != null) {
+            return Bukkit.getPlayer(tame.getOwner().getUniqueId());
+        }
         return null;
     }
 
@@ -436,6 +451,58 @@ public class IslandFlagsManager implements Listener {
     private void denyItemFrame(Player p) {
         p.sendActionBar(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
                 .deserialize("<red>You can't touch item frames on this island."));
+    }
+
+    // ---- ANIMALS & VILLAGERS (protected like blocks: only members/trusted may harm them) ----
+    // A visitor who bridged over from a neighbouring slot could otherwise slaughter a pen
+    // of cows or a trading hall, which is grief in everything but name. Routed through the
+    // same canBuild rule as item frames, so VISITOR_BUILD islands still allow it. Damage
+    // only — breeding, shearing, trading and mounting stay vanilla. Hostile mobs are left
+    // alone so a visitor can still defend themselves.
+
+    @EventHandler(ignoreCancelled = true)
+    public void onLivestockDamage(EntityDamageByEntityEvent event) {
+        if (!isLivestock(event.getEntity())) return;
+        Location loc = event.getEntity().getLocation();
+        if (islandAt(loc) == null) return;
+        Player attacker = resolvePlayer(event.getDamager());
+        if (attacker == null) return;
+        if (!plugin.islands().canBuild(attacker, loc)) {
+            event.setCancelled(true);
+            denyLivestock(attacker);
+        }
+    }
+
+    /**
+     * Splash and lingering harm potions clear a whole pen at once and never fire a
+     * damage event we can attribute, so the affected livestock is filtered out here.
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onLivestockPotionSplash(PotionSplashEvent event) {
+        Player thrower = resolvePlayer(event.getPotion());
+        if (thrower == null) return;
+        boolean warned = false;
+        for (LivingEntity affected : new HashSet<>(event.getAffectedEntities())) {
+            if (!isLivestock(affected)) continue;
+            Location loc = affected.getLocation();
+            if (islandAt(loc) == null) continue;
+            if (plugin.islands().canBuild(thrower, loc)) continue;
+            event.setIntensity(affected, 0.0);
+            if (!warned) {
+                denyLivestock(thrower);
+                warned = true;
+            }
+        }
+    }
+
+    /** Farm animals, horses, bees and tamed pets, plus villagers and wandering traders. */
+    private boolean isLivestock(Entity entity) {
+        return entity instanceof Animals || entity instanceof AbstractVillager;
+    }
+
+    private void denyLivestock(Player p) {
+        p.sendActionBar(net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                .deserialize("<red>You can't harm animals on this island."));
     }
 
     // ---- KEEP_INVENTORY ----
