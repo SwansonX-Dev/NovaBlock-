@@ -30,6 +30,9 @@ commands:
     description: Open your personal backpack, or 'toggle' pickup auto-grab into it
     usage: /<command> [toggle]
     aliases: [bp]
+  obchatview:
+    description: Open a chat-tag inventory preview. Triggered by clicking [inv]/[ender] in chat, not typed.
+    usage: /<command> <token>
   novahelp:
     description: Open the NovaBlock help GUI
     usage: /<command>
@@ -104,6 +107,15 @@ permissions:
     default: op
   novablock.backpack:
     description: Allows opening your personal backpack (/backpack)
+    default: true
+  novablock.chat.item:
+    description: Allows showing your held item in chat with [item]
+    default: true
+  novablock.chat.inv:
+    description: Allows showing your inventory in chat with [inv]
+    default: true
+  novablock.chat.ender:
+    description: Allows showing your ender chest in chat with [ender]
     default: true
   novablock.allays.admin:
     description: Exempts an island owner's island from the allay cap. Raise it instead with novablock.allays.limit.<number>.

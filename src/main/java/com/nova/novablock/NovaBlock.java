@@ -77,6 +77,7 @@ public final class NovaBlock extends JavaPlugin {
     private PaxelManager paxelManager;
     private BlockListener blockListener;
     private LegacyHotbarItemCleanup legacyItemCleanup;
+    private com.nova.novablock.chat.ChatTagManager chatTagManager;
     private EconomyManager economyManager;
     private GuiManager guiManager;
     private EventManager eventManager;
@@ -147,6 +148,7 @@ public final class NovaBlock extends JavaPlugin {
         this.islandQuestlineManager = new com.nova.novablock.questline.IslandQuestlineManager(this);
         this.paxelManager = new PaxelManager(this);
         this.legacyItemCleanup = new LegacyHotbarItemCleanup(this);
+        this.chatTagManager = new com.nova.novablock.chat.ChatTagManager(this);
         this.guiManager = new GuiManager(this);
         this.eventManager = new EventManager(this);
         this.seasonManager = new SeasonManager(this);
@@ -215,6 +217,7 @@ public final class NovaBlock extends JavaPlugin {
         getCommand("obadmin").setExecutor(adminCmd);
         getCommand("obadmin").setTabCompleter(adminCmd);
         getCommand("sb").setExecutor(new ScoreboardCommand(this));
+        getCommand("obchatview").setExecutor(new com.nova.novablock.command.ChatViewCommand(this));
         getCommand("backpack").setExecutor(new BackpackCommand(this));
         getCommand("novahelp").setExecutor(new HelpCommand(this));
         getCommand("spawn").setExecutor(new SpawnCommand(this));
@@ -385,6 +388,7 @@ public final class NovaBlock extends JavaPlugin {
     public PaxelManager paxels() { return paxelManager; }
     public BlockListener blockListener() { return blockListener; }
     public LegacyHotbarItemCleanup legacyItemCleanup() { return legacyItemCleanup; }
+    public com.nova.novablock.chat.ChatTagManager chatTags() { return chatTagManager; }
     public EconomyManager economy() { return economyManager; }
     public GuiManager guis() { return guiManager; }
     public EventManager events() { return eventManager; }

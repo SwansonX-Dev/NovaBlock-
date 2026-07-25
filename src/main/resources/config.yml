@@ -81,6 +81,24 @@ backpack:
 allays:
   island-limit: 30
 
+# Chat tags: typing [item], [inv] or [ender] shows off what you're carrying.
+# [item] becomes the held item's name with the normal tooltip on hover; [inv] and
+# [ender] become clickable text -- hover for a summary, click for a read-only GUI.
+#
+# Contents are snapshotted when the message is SENT, not when someone clicks, so the
+# preview shows what the sender had at the time and can't be used to watch them later.
+# Snapshots expire after snapshot-minutes and only max-snapshots are kept at once
+# (oldest evicted first), so a busy chat can't grow memory without bound.
+#
+# Per-tag permissions: novablock.chat.item / .inv / .ender (all default true).
+chat:
+  tags:
+    enabled: true
+    # Per-player cooldown across all three tags. 0 disables the cooldown.
+    cooldown-seconds: 5
+    snapshot-minutes: 10
+    max-snapshots: 200
+
 # Worlds the Paxel may be carried and used in. This is an ALLOWLIST: any world not
 # listed here is foreign, so other gamemodes (Boxed, Hardcore, ...) never inherit the
 # paxel just by existing. Carrying one into a foreign world strips it, and returning
