@@ -71,6 +71,16 @@ vanillaEndWorld: world_the_end
 backpack:
   default-auto-grab: false
 
+# Maximum allays alive on one island, counted across its overworld, nether and
+# end. Allays only multiply by being handed an amethyst shard while dancing at a
+# jukebox, so that duplication is what gets blocked at the cap -- allays already
+# alive are never removed (they carry player items). The cap is read from the
+# island OWNER, so grant novablock.allays.limit.<n> to raise it for a donor rank;
+# the highest matching node wins. Allays outside any island are not counted or
+# capped. Set high to effectively disable.
+allays:
+  island-limit: 30
+
 # Distance in blocks between island slots in the OneBlock world.
 # Default keeps islands well-separated to avoid TNT/projectile crossover.
 slotSize: 256

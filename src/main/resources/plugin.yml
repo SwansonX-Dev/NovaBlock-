@@ -105,6 +105,9 @@ permissions:
   novablock.backpack:
     description: Allows opening your personal backpack (/backpack)
     default: true
+  novablock.allays.admin:
+    description: Exempts an island owner's island from the allay cap. Raise it instead with novablock.allays.limit.<number>.
+    default: op
   novablock.minions.use:
     description: Allows using NovaBlock minions. Dynamic limit nodes use novablock.minions.limit.<number>.
     default: true

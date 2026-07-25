@@ -201,6 +201,8 @@ public final class NovaBlock extends JavaPlugin {
                 new com.nova.novablock.listener.OneBlockGrantListener(this), this);
         getServer().getPluginManager().registerEvents(
                 new com.nova.novablock.listener.CommunityBlockGrantListener(this), this);
+        getServer().getPluginManager().registerEvents(
+                new com.nova.novablock.listener.AllayLimitListener(this), this);
         getServer().getPluginManager().registerEvents(communityNodeManager, this);
         getServer().getPluginManager().registerEvents(guiManager, this);
         getServer().getPluginManager().registerEvents(
