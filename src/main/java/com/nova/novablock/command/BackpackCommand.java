@@ -8,7 +8,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
-/** Opens the player's personal backpack. */
+/** Opens the player's personal backpack, or toggles auto-grab into it. */
 public class BackpackCommand implements CommandExecutor {
 
     private final NovaBlock plugin;
@@ -22,12 +22,13 @@ public class BackpackCommand implements CommandExecutor {
             sender.sendMessage("Players only.");
             return true;
         }
-        if (args.length >= 1 && (args[0].equalsIgnoreCase("toggle") || args[0].equalsIgnoreCase("item"))) {
+        if (args.length >= 1 && (args[0].equalsIgnoreCase("toggle")
+                || args[0].equalsIgnoreCase("autograb") || args[0].equalsIgnoreCase("item"))) {
             if (!p.hasPermission("novablock.backpack")) {
                 com.nova.novablock.util.Msg.send(p, "<red>You don't have permission to use the backpack.");
                 return true;
             }
-            plugin.backpacks().toggleItem(p);
+            plugin.backpacks().toggleAutoGrab(p);
             return true;
         }
         BackpackManager.tryOpen(plugin, p);

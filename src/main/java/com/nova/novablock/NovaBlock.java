@@ -18,7 +18,7 @@ import com.nova.novablock.economy.EconomyManager;
 import com.nova.novablock.event.EventManager;
 import com.nova.novablock.gui.GuiManager;
 import com.nova.novablock.help.HelpRegistrar;
-import com.nova.novablock.hotbar.HotbarMenuManager;
+import com.nova.novablock.hotbar.LegacyHotbarItemCleanup;
 import com.nova.novablock.island.InviteManager;
 import com.nova.novablock.island.IslandManager;
 import com.nova.novablock.island.IslandVisitService;
@@ -76,7 +76,7 @@ public final class NovaBlock extends JavaPlugin {
     private com.nova.novablock.questline.IslandQuestlineManager islandQuestlineManager;
     private PaxelManager paxelManager;
     private BlockListener blockListener;
-    private HotbarMenuManager hotbarManager;
+    private LegacyHotbarItemCleanup legacyItemCleanup;
     private EconomyManager economyManager;
     private GuiManager guiManager;
     private EventManager eventManager;
@@ -146,7 +146,7 @@ public final class NovaBlock extends JavaPlugin {
         this.farmingComboManager = new com.nova.novablock.farming.FarmingComboManager(this);
         this.islandQuestlineManager = new com.nova.novablock.questline.IslandQuestlineManager(this);
         this.paxelManager = new PaxelManager(this);
-        this.hotbarManager = new HotbarMenuManager(this);
+        this.legacyItemCleanup = new LegacyHotbarItemCleanup(this);
         this.guiManager = new GuiManager(this);
         this.eventManager = new EventManager(this);
         this.seasonManager = new SeasonManager(this);
@@ -382,7 +382,7 @@ public final class NovaBlock extends JavaPlugin {
     public com.nova.novablock.questline.IslandQuestlineManager islandQuestline() { return islandQuestlineManager; }
     public PaxelManager paxels() { return paxelManager; }
     public BlockListener blockListener() { return blockListener; }
-    public HotbarMenuManager hotbar() { return hotbarManager; }
+    public LegacyHotbarItemCleanup legacyItemCleanup() { return legacyItemCleanup; }
     public EconomyManager economy() { return economyManager; }
     public GuiManager guis() { return guiManager; }
     public EventManager events() { return eventManager; }

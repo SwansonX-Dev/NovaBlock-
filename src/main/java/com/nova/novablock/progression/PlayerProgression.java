@@ -19,12 +19,11 @@ public class PlayerProgression {
     private long lastRerollDay;
     private long lastLoginDay;
     private int loginStreak;
-    private boolean menuItemEnabled = true;
     private boolean scoreboardEnabled = true;
     private boolean autoSellEnabled = false;
     /** Island the player last chose with /ob islands, or null for "first island". */
     private java.util.UUID activeIslandId;
-    private boolean backpackItemEnabled = false;
+    private boolean autoGrabEnabled = false;
     private String backpackBase64 = "";
     private String depositChestWorld = "";
     private int depositChestX;
@@ -74,9 +73,6 @@ public class PlayerProgression {
     public int getLoginStreak() { return loginStreak; }
     public void setLoginStreak(int v) { this.loginStreak = v; }
 
-    public boolean isMenuItemEnabled() { return menuItemEnabled; }
-    public void setMenuItemEnabled(boolean v) { this.menuItemEnabled = v; }
-
     public boolean isScoreboardEnabled() { return scoreboardEnabled; }
     public void setScoreboardEnabled(boolean v) { this.scoreboardEnabled = v; }
 
@@ -87,9 +83,9 @@ public class PlayerProgression {
     public boolean isAutoSellEnabled() { return autoSellEnabled; }
     public void setAutoSellEnabled(boolean v) { this.autoSellEnabled = v; }
 
-    /** When enabled, the backpack hotbar item is shown and picked-up items auto-grab into the backpack. */
-    public boolean isBackpackItemEnabled() { return backpackItemEnabled; }
-    public void setBackpackItemEnabled(boolean v) { this.backpackItemEnabled = v; }
+    /** When enabled, picked-up items auto-grab into the backpack. Toggled with /bp toggle. */
+    public boolean isAutoGrabEnabled() { return autoGrabEnabled; }
+    public void setAutoGrabEnabled(boolean v) { this.autoGrabEnabled = v; }
 
     /** Base64-serialised contents of this player's personal backpack ("" when empty). */
     public String getBackpackBase64() { return backpackBase64 == null ? "" : backpackBase64; }

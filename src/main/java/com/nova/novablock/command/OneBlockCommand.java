@@ -30,7 +30,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBCOMMANDS = List.of(
             "create", "delete", "home", "menu", "prophecy", "skills", "flags", "storage",
             "quest", "leaderboard", "phase", "prestige", "invite", "accept", "leave",
-            "visit", "setvisit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "toggle", "fix",
+            "visit", "setvisit", "upgrades", "upgrade", "path", "atlas", "pet", "pets", "fix",
             "setspawn", "friend", "friends", "sprint", "minion", "minions", "hub", "community",
             "team", "members", "roster", "promote", "demote", "kick", "trust", "untrust",
             "bank", "autosell", "backpack", "sellisland", "market", "islands", "help");
@@ -164,14 +164,10 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
                         : "<gray>Auto-sell <bold>OFF</bold><gray>. Community drops go to your inventory again.");
             }
             case "backpack", "bp" -> {
-                if (args.length >= 2 && args[1].equalsIgnoreCase("toggle")) plugin.backpacks().toggleItem(p);
+                if (args.length >= 2 && args[1].equalsIgnoreCase("toggle")) plugin.backpacks().toggleAutoGrab(p);
                 else com.nova.novablock.backpack.BackpackManager.tryOpen(plugin, p);
             }
             case "depositchest", "dchest" -> plugin.depositChests().giveLinkTool(p);
-            case "toggle" -> {
-                if (!p.hasPermission("novablock.toggle")) { denied(p); return true; }
-                plugin.hotbar().toggle(p);
-            }
             case "help", "?" -> new HelpGui(plugin).open(p);
             default -> new HelpGui(plugin).open(p);
         }

@@ -60,7 +60,7 @@ Player command (`/ob`, aliases `oneblock`, `nb`, `novablock`):
 - `/ob flags` / `/ob storage` — island settings + shared 54-slot vault
 - `/ob invite <player>` + `/ob accept` / `/ob leave` — co-op
 - `/ob pets` — bridge to xPets (if installed)
-- `/ob toggle` — hide/show hotbar menu item
+- `/bp` — open your personal backpack (`/bp toggle` for pickup auto-grab)
 - `/ob help` — open the in-game guide
 
 Admin command (`/obadmin`, `novablock.admin`):

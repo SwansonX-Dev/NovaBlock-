@@ -16,7 +16,7 @@ softdepend: [floodgate, Geyser-Spigot, PlaceholderAPI, LuckPerms, xPets, xTags, 
 commands:
   oneblock:
     description: Main NovaBlock command
-    usage: /<command> [create|delete|home [nether]|hub|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|trust|untrust|toggle|setspawn|friend|minions|sprint|help]
+    usage: /<command> [create|delete|home [nether]|hub|fix|phase|menu|prophecy|skills|flags|storage|quests|leaderboard|path|atlas|pets|prestige|invite|accept|leave|visit|trust|untrust|setspawn|friend|minions|sprint|help]
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command
@@ -27,7 +27,7 @@ commands:
     usage: /<command>
     aliases: [scoreboard, sidebar]
   backpack:
-    description: Open your personal backpack, or 'toggle' the hotbar item + auto-grab
+    description: Open your personal backpack, or 'toggle' pickup auto-grab into it
     usage: /<command> [toggle]
     aliases: [bp]
   novahelp:
@@ -95,9 +95,6 @@ permissions:
     default: true
   novablock.leaderboard:
     description: Allows viewing the leaderboard
-    default: true
-  novablock.toggle:
-    description: Allows toggling the hotbar menu item and sidebar
     default: true
   novablock.flags:
     description: Allows opening the island flags GUI (toggling individual flags still requires per-flag perms)

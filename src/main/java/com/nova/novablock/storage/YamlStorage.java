@@ -326,7 +326,7 @@ public class YamlStorage implements DataStorage {
         File f = new File(playerDir, playerId + ".yml");
         PlayerProgression p = new PlayerProgression(playerId);
         boolean backpackDefault = plugin.getConfig().getBoolean("backpack.default-auto-grab", false);
-        p.setBackpackItemEnabled(backpackDefault);
+        p.setAutoGrabEnabled(backpackDefault);
         if (!f.exists()) return p;
         YamlConfiguration y = YamlConfiguration.loadConfiguration(f);
         ConfigurationSection skills = y.getConfigurationSection("skills");
@@ -349,7 +349,6 @@ public class YamlStorage implements DataStorage {
         p.setLastRerollDay(y.getLong("prophecy.lastRerollDay", 0));
         p.setLastLoginDay(y.getLong("login.lastDay", 0));
         p.setLoginStreak(y.getInt("login.streak", 0));
-        p.setMenuItemEnabled(y.getBoolean("ui.menuItem", true));
         p.setScoreboardEnabled(y.getBoolean("ui.scoreboard", true));
         p.setAutoSellEnabled(y.getBoolean("ui.autoSell", false));
         String activeIsland = y.getString("ui.activeIsland");
@@ -357,7 +356,9 @@ public class YamlStorage implements DataStorage {
             try { p.setActiveIslandId(java.util.UUID.fromString(activeIsland)); }
             catch (IllegalArgumentException ignored) {}
         }
-        p.setBackpackItemEnabled(y.getBoolean("ui.backpackItem", backpackDefault));
+        // Key kept as ui.backpackItem so preferences saved before the hotbar item was
+        // retired carry straight over to the auto-grab toggle it now controls.
+        p.setAutoGrabEnabled(y.getBoolean("ui.backpackItem", backpackDefault));
         p.setBackpackBase64(y.getString("backpack.data", ""));
         String dcWorld = y.getString("community.depositChest.world", "");
         if (dcWorld != null && !dcWorld.isEmpty()) {
@@ -403,11 +404,10 @@ public class YamlStorage implements DataStorage {
         y.set("prophecy.lastRerollDay", p.getLastRerollDay());
         y.set("login.lastDay", p.getLastLoginDay());
         y.set("login.streak", p.getLoginStreak());
-        y.set("ui.menuItem", p.isMenuItemEnabled());
         y.set("ui.scoreboard", p.isScoreboardEnabled());
         y.set("ui.autoSell", p.isAutoSellEnabled());
         y.set("ui.activeIsland", p.getActiveIslandId() == null ? null : p.getActiveIslandId().toString());
-        y.set("ui.backpackItem", p.isBackpackItemEnabled());
+        y.set("ui.backpackItem", p.isAutoGrabEnabled());
         if (!p.getBackpackBase64().isEmpty()) y.set("backpack.data", p.getBackpackBase64());
         if (p.hasDepositChest()) {
             y.set("community.depositChest.world", p.getDepositChestWorld());

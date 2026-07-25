@@ -1,33 +1,19 @@
 package com.nova.novablock.backpack;
 
 import com.nova.novablock.NovaBlock;
-import com.nova.novablock.util.ItemBuilder;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityPickupItemEvent;
-import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.inventory.InventoryDragEvent;
-import org.bukkit.event.inventory.InventoryMoveItemEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.event.player.PlayerRespawnEvent;
-import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.PlayerInventory;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.io.BukkitObjectInputStream;
 import org.bukkit.util.io.BukkitObjectOutputStream;
 
@@ -44,10 +30,9 @@ import java.util.UUID;
  * survives relogs. Built to relieve inventory pressure from the high-variety
  * Community OneBlock pool: offload here instead of shuttling to a chest.
  *
- * <p>Two ways in: {@code /backpack} opens it directly, and {@code /bp toggle} adds a
- * soulbound "Backpack" item to the hotbar. While that item is held (the per-player
- * flag is on), items the player picks up are auto-grabbed straight into the backpack,
- * keeping the main inventory clear.
+ * <p>{@code /backpack} (alias {@code /bp}) opens it. {@code /bp toggle} flips the
+ * per-player auto-grab preference: while it is on, items the player picks up go
+ * straight into the backpack, keeping the main inventory clear.
  *
  * <p>Mirrors {@link com.nova.novablock.island.IslandStorageManager} but keyed by
  * player UUID; contents are base64-encoded {@code BukkitObjectOutputStream} bytes
@@ -56,8 +41,6 @@ import java.util.UUID;
 public class BackpackManager implements Listener {
 
     public static final int SIZE = 54;
-    public static final NamespacedKey ITEM_KEY = new NamespacedKey("novablock", "backpack_item");
-    private static final int ITEM_SLOT = 7; // slot 8 is the menu item; sit just left of it
 
     private final NovaBlock plugin;
     /** Live inventory per online player; loaded on demand, mutated by viewer/auto-grab, persisted on close/quit. */
@@ -115,60 +98,17 @@ public class BackpackManager implements Listener {
         plugin.progression().save(playerId);
     }
 
-    // ---------------- hotbar item ----------------
+    // ---------------- auto-grab ----------------
 
-    public ItemStack buildItem() {
-        ItemStack stack = ItemBuilder.of(Material.BUNDLE)
-                .name("<#FFB347><bold>Backpack")
-                .lore("<gray>Right-click to open your 54-slot backpack.",
-                        "<gray>Picked-up items auto-grab into it while held.",
-                        "<dark_gray>/bp toggle to hide.")
-                .build();
-        ItemMeta meta = stack.getItemMeta();
-        meta.getPersistentDataContainer().set(ITEM_KEY, PersistentDataType.BYTE, (byte) 1);
-        stack.setItemMeta(meta);
-        return stack;
-    }
-
-    public boolean isBackpackItem(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return false;
-        return item.getItemMeta().getPersistentDataContainer().has(ITEM_KEY, PersistentDataType.BYTE);
-    }
-
-    /** Place the backpack item in slot 7 if free, else any free hotbar slot, else anywhere. */
-    public void giveItem(Player p) {
-        if (!plugin.progression().get(p).isBackpackItemEnabled()) return;
-        PlayerInventory inv = p.getInventory();
-        for (ItemStack s : inv.getContents()) if (isBackpackItem(s)) return;
-        ItemStack stack = buildItem();
-        if (isAir(inv.getItem(ITEM_SLOT))) { inv.setItem(ITEM_SLOT, stack); return; }
-        for (int i = 0; i <= 8; i++) {
-            if (isAir(inv.getItem(i))) { inv.setItem(i, stack); return; }
-        }
-        inv.addItem(stack);
-    }
-
-    /** Remove the backpack item from anywhere in the player's inventory. */
-    public void removeItem(Player p) {
-        PlayerInventory inv = p.getInventory();
-        for (int i = 0; i < inv.getSize(); i++) {
-            if (isBackpackItem(inv.getItem(i))) inv.setItem(i, null);
-        }
-    }
-
-    /** Toggle the backpack item (and its auto-grab) on/off, persisting the preference. */
-    public void toggleItem(Player p) {
+    /** Toggle auto-grab on/off, persisting the preference. */
+    public void toggleAutoGrab(Player p) {
         var prog = plugin.progression().get(p);
-        boolean enabled = prog.isBackpackItemEnabled();
-        prog.setBackpackItemEnabled(!enabled);
+        boolean enabled = prog.isAutoGrabEnabled();
+        prog.setAutoGrabEnabled(!enabled);
         plugin.progression().save(p.getUniqueId());
-        if (enabled) {
-            removeItem(p);
-            Msg.actionBar(p, "<gray>Backpack item hidden — auto-grab off. <yellow>/bp toggle<gray> to re-enable.");
-        } else {
-            giveItem(p);
-            Msg.actionBar(p, "<green>Backpack item added — picked-up items now auto-grab into your backpack.");
-        }
+        Msg.actionBar(p, enabled
+                ? "<gray>Auto-grab <bold>OFF</bold><gray>. <yellow>/bp toggle<gray> to re-enable."
+                : "<green>Auto-grab <bold>ON</bold><green>. Picked-up items now go into your backpack.");
     }
 
     private boolean isAir(ItemStack s) { return s == null || s.getType() == Material.AIR; }
@@ -184,7 +124,7 @@ public class BackpackManager implements Listener {
      */
     public ItemStack routeToBackpack(Player p, ItemStack item) {
         if (isAir(item)) return null;
-        if (!plugin.progression().get(p).isBackpackItemEnabled()) return item;
+        if (!plugin.progression().get(p).isAutoGrabEnabled()) return item;
         Inventory bp = inventory(p.getUniqueId());
         Map<Integer, ItemStack> overflow = bp.addItem(item.clone());
         persistObject(p.getUniqueId());
@@ -194,31 +134,10 @@ public class BackpackManager implements Listener {
     // ---------------- listeners ----------------
 
     @EventHandler
-    public void onJoin(PlayerJoinEvent event) {
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (event.getPlayer().isOnline()) giveItem(event.getPlayer());
-        }, 25L);
-    }
-
-    @EventHandler
-    public void onRespawn(PlayerRespawnEvent event) {
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (event.getPlayer().isOnline()) giveItem(event.getPlayer());
-        }, 5L);
-    }
-
-    @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         UUID id = event.getPlayer().getUniqueId();
         Inventory inv = live.remove(id);
         if (inv != null) persistDisk(id, inv);
-    }
-
-    @EventHandler
-    public void onInteract(PlayerInteractEvent event) {
-        if (!isBackpackItem(event.getItem())) return;
-        event.setCancelled(true); // also suppresses vanilla bundle behaviour
-        openFor(event.getPlayer());
     }
 
     @EventHandler
@@ -227,62 +146,17 @@ public class BackpackManager implements Listener {
         persistDisk(h.playerId, event.getInventory()); // keep the live ref while the player is online
     }
 
-    @EventHandler
-    public void onDrop(PlayerDropItemEvent event) {
-        if (isBackpackItem(event.getItemDrop().getItemStack())) {
-            event.setCancelled(true);
-            Msg.actionBar(event.getPlayer(), "<gray>Use <yellow>/bp toggle<gray> to remove the backpack item.");
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
-    public void onClick(InventoryClickEvent event) {
-        boolean involves = isBackpackItem(event.getCurrentItem()) || isBackpackItem(event.getCursor());
-        if (!involves && event.getHotbarButton() >= 0 && event.getWhoClicked() instanceof Player hp) {
-            involves = isBackpackItem(hp.getInventory().getItem(event.getHotbarButton()));
-        }
-        if (!involves) return;
-        event.setCancelled(true);
-        if (event.getWhoClicked() instanceof Player p) Msg.actionBar(p, "<red>The backpack item can't be moved.");
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    public void onDrag(InventoryDragEvent event) {
-        if (!isBackpackItem(event.getOldCursor()) && !isBackpackItem(event.getCursor())) return;
-        event.setCancelled(true);
-        if (event.getWhoClicked() instanceof Player p) Msg.actionBar(p, "<red>The backpack item can't be moved.");
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    public void onSwapHand(PlayerSwapHandItemsEvent event) {
-        if (isBackpackItem(event.getMainHandItem()) || isBackpackItem(event.getOffHandItem())) {
-            event.setCancelled(true);
-        }
-    }
-
-    /** Last line of defence for hopper / dropper moves involving the backpack item. */
-    @EventHandler(ignoreCancelled = true)
-    public void onContainerMove(InventoryMoveItemEvent event) {
-        if (isBackpackItem(event.getItem())) event.setCancelled(true);
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onDeath(PlayerDeathEvent event) {
-        event.getDrops().removeIf(this::isBackpackItem);
-    }
-
     /**
-     * Auto-grab: while the backpack item is enabled, route picked-up items straight into
-     * the backpack (keeping the main inventory clear). The backpack item itself and the
-     * soulbound paxel are never swallowed. When the backpack is full, the remainder falls
-     * through to normal pickup.
+     * Auto-grab: while the preference is on, route picked-up items straight into the
+     * backpack (keeping the main inventory clear). The soulbound paxel is never
+     * swallowed. When the backpack is full, the remainder falls through to normal pickup.
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPickup(EntityPickupItemEvent event) {
         if (!(event.getEntity() instanceof Player p)) return;
         ItemStack stack = event.getItem().getItemStack();
-        if (isBackpackItem(stack) || plugin.paxels().isPaxel(stack)) return;
-        if (!plugin.progression().get(p).isBackpackItemEnabled()) return;
+        if (plugin.paxels().isPaxel(stack)) return;
+        if (!plugin.progression().get(p).isAutoGrabEnabled()) return;
 
         Inventory bp = inventory(p.getUniqueId());
         Map<Integer, ItemStack> overflow = bp.addItem(stack.clone());
