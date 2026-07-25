@@ -20,7 +20,7 @@ commands:
     aliases: [ob, nb, novablock]
   obadmin:
     description: NovaBlock admin command
-    usage: /<command> [reload|setphase|spawnboss|givecoins|event|wipe|hub|fix|givepaxel|flags|storage|menu|path|sprint|freshstart|setspawn]
+    usage: /<command> [reload|setphase|spawnboss|givecoins|event|wipe|hub|fix|givepaxel|paxel|flags|storage|menu|path|sprint|freshstart|setspawn]
     permission: novablock.admin
   sb:
     description: Toggle the NovaBlock sidebar scoreboard

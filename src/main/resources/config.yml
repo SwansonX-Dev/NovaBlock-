@@ -81,6 +81,30 @@ backpack:
 allays:
   island-limit: 30
 
+# Worlds the Paxel may be carried and used in. This is an ALLOWLIST: any world not
+# listed here is foreign, so other gamemodes (Boxed, Hardcore, ...) never inherit the
+# paxel just by existing. Carrying one into a foreign world strips it, and returning
+# to a listed world hands it straight back at your current tier -- nothing is lost,
+# the paxel is rebuilt from your phase progress. It also keeps none of its powers
+# (telekinesis, auto-smelt, vein-mine) outside these worlds.
+#
+# Names are matched case-insensitively and must be the real Bukkit world names.
+# An EMPTY list turns the restriction off entirely and the paxel works everywhere;
+# REMOVING this key is different -- the paxel then falls back to NovaBlock's own
+# configured worlds (islandWorld + nether + end + community) plus oneblock2 and
+# resources, so a server that never adds this block is still restricted.
+#
+# community_oneblock is listed because the Community OneBlock break path runs through
+# the paxel for telekinesis -- drop it only if you want the hub mined bare-handed.
+paxel:
+  worlds:
+    - oneblock
+    - oneblock_nether
+    - oneblock_end
+    - community_oneblock
+    - oneblock2
+    - resources
+
 # Distance in blocks between island slots in the OneBlock world.
 # Default keeps islands well-separated to avoid TNT/projectile crossover.
 slotSize: 256

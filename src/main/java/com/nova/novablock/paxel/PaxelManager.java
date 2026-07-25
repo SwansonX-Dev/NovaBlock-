@@ -254,16 +254,121 @@ public class PaxelManager implements Listener {
 
     /** True when the player is currently inside the OG OneBlock world — NovaBlock should
      *  leave their inventory alone there (OG OneBlock issues its own paxel). */
-    private boolean isInOgWorld(Player p) {
-        var ogPlugin = Bukkit.getPluginManager().getPlugin("OGOneBlock");
-        if (ogPlugin == null || !ogPlugin.isEnabled()) return false;
-        String ogWorld = ogPlugin.getConfig().getString("world.name", "OGOBworld");
-        return p.getWorld().getName().equals(ogWorld);
+    // ---------------- world gating ----------------
+
+    /**
+     * Worlds the paxel is allowed to exist and work in, from {@code paxel.worlds}.
+     *
+     * <p>An allowlist rather than a blocklist: this server runs several unrelated
+     * gamemodes (Boxed, Hardcore, …) in their own worlds, and a blocklist would need
+     * updating every time one is added — a new world would silently inherit the paxel.
+     *
+     * <p>An explicitly empty list disables the restriction entirely (paxel works
+     * everywhere). A <em>missing</em> key is different and falls back to the default
+     * below — the packaged config never overwrites a live one, so reading an absent key
+     * as "allow everywhere" would leave every already-running server unprotected.
+     *
+     * <p>The default is NovaBlock's own configured worlds — resolved live, so renaming
+     * {@code islandWorld} can't strand the paxel — plus the secondary OneBlock and
+     * resource worlds.
+     */
+    private List<String> paxelWorlds() {
+        if (plugin.getConfig().isSet("paxel.worlds")) {
+            return plugin.getConfig().getStringList("paxel.worlds");
+        }
+        List<String> defaults = new ArrayList<>();
+        defaults.add(plugin.worlds().worldName());
+        defaults.add(plugin.worlds().netherWorldName());
+        defaults.add(plugin.worlds().endWorldName());
+        if (plugin.community() != null) defaults.add(plugin.community().communityWorldName());
+        defaults.add("oneblock2");
+        defaults.add("resources");
+        return defaults;
+    }
+
+    /** The allowlist actually in force — the config override if set, else the code default. */
+    public List<String> allowedWorlds() { return new ArrayList<>(paxelWorlds()); }
+
+    /** True when {@code paxel.worlds} is set in config; false means the code default is in force. */
+    public boolean worldsConfigured() { return plugin.getConfig().isSet("paxel.worlds"); }
+
+    /**
+     * Persist a new allowlist and apply it to everyone online in the same breath, so an
+     * admin never has to restart or ask players to relog for a change to bite.
+     *
+     * @return how many players had a paxel taken off them by the new list
+     */
+    public int setAllowedWorlds(List<String> worlds) {
+        plugin.getConfig().set("paxel.worlds", worlds);
+        plugin.saveConfig();
+        return reconcileAll();
+    }
+
+    /** Drop the config override so the code default applies again, and reconcile immediately. */
+    public int resetAllowedWorlds() {
+        plugin.getConfig().set("paxel.worlds", null);
+        plugin.saveConfig();
+        return reconcileAll();
+    }
+
+    /**
+     * Bring every online player in line with the current allowlist: strip paxels from anyone
+     * standing in a world that is no longer allowed, and issue one to anyone in a world that
+     * now is. Called after any live edit and on {@code /obadmin reload}.
+     *
+     * @return how many players had a paxel stripped
+     */
+    public int reconcileAll() {
+        int stripped = 0;
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (isPaxelWorld(p)) {
+                give(p);
+                refreshTier(p);
+            } else if (stripPaxels(p) > 0) {
+                stripped++;
+                Msg.actionBar(p, "<gray>Your Paxel stays behind — it only works in the OneBlock worlds.");
+            }
+        }
+        return stripped;
+    }
+
+    /** True if the paxel may be carried and used in this world. */
+    public boolean isPaxelWorld(org.bukkit.World world) {
+        if (world == null) return false;
+        var allowed = paxelWorlds();
+        if (allowed.isEmpty()) return true; // restriction disabled
+        for (String name : allowed) {
+            if (name != null && name.equalsIgnoreCase(world.getName())) return true;
+        }
+        return false;
+    }
+
+    private boolean isPaxelWorld(Player p) { return isPaxelWorld(p.getWorld()); }
+
+    /**
+     * Strip every paxel this player is carrying. Safe to do freely: the paxel holds no
+     * state of its own — {@link #build} regenerates it from the player's phase-driven
+     * tier — so {@link #give} hands back an identical one on return.
+     *
+     * <p>The ender chest is included because it follows the player across worlds, so
+     * leaving it out would make the whole restriction one drag-and-drop wide.
+     */
+    private int stripPaxels(Player p) {
+        int removed = 0;
+        PlayerInventory inv = p.getInventory();
+        for (int i = 0; i < inv.getSize(); i++) {
+            if (isPaxel(inv.getItem(i))) { inv.setItem(i, null); removed++; }
+        }
+        var ec = p.getEnderChest();
+        for (int i = 0; i < ec.getSize(); i++) {
+            if (isPaxel(ec.getItem(i))) { ec.setItem(i, null); removed++; }
+        }
+        return removed;
     }
 
     /** Give the player a paxel if they don't already have one in inventory, ender chest, or island storage. */
     public void give(Player p) {
-        if (isInOgWorld(p)) return;
+        if (!isPaxelWorld(p)) return;
         PlayerInventory inv = p.getInventory();
         for (ItemStack it : inv.getContents()) {
             if (isOwner(it, p)) return;
@@ -295,7 +400,7 @@ public class PaxelManager implements Listener {
      * their paxel in island storage. Use {@link #give(Player)} to issue.
      */
     public void refreshTier(Player p) {
-        if (isInOgWorld(p)) return;
+        if (!isPaxelWorld(p)) return;
         PlayerInventory inv = p.getInventory();
         int target = tierFor(p);
         for (int i = 0; i < inv.getSize(); i++) {
@@ -396,6 +501,10 @@ public class PaxelManager implements Listener {
         Player p = event.getPlayer();
         ItemStack tool = p.getInventory().getItemInMainHand();
         if (!isOwner(tool, p)) return;
+        // Outside its allowed worlds the paxel keeps none of its powers — no telekinesis,
+        // auto-smelt or vein-mine. Belt and braces alongside the carry restriction: a paxel
+        // that reaches a foreign world by any route we haven't thought of is still inert.
+        if (!isPaxelWorld(p)) return;
         org.bukkit.block.Block block = event.getBlock();
 
         // Skip the OneBlock center — BlockListener owns its regen and its own drop path.
@@ -584,10 +693,13 @@ public class PaxelManager implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         // Slight delay so progression cache is warm.
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
-            if (event.getPlayer().isOnline()) {
-                give(event.getPlayer());
-                refreshTier(event.getPlayer());
-            }
+            Player p = event.getPlayer();
+            if (!p.isOnline()) return;
+            // Logging in inside a foreign world is the other way a paxel crosses over —
+            // most obviously for anyone who logged out holding one before this restriction.
+            if (!isPaxelWorld(p)) { stripPaxels(p); return; }
+            give(p);
+            refreshTier(p);
         }, 25L);
     }
 
@@ -596,6 +708,29 @@ public class PaxelManager implements Listener {
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             if (event.getPlayer().isOnline()) give(event.getPlayer());
         }, 5L);
+    }
+
+    /**
+     * Keep the paxel inside its own worlds. Leaving for a foreign world (another gamemode,
+     * a hub, the vanilla overworld) strips it; coming back re-issues it at the player's
+     * current tier via {@link #give}. Nothing is lost — the paxel carries no state that
+     * {@link #build} can't reconstruct — so this is a move, not a confiscation.
+     *
+     * <p>Deferred a tick so it lands after whatever per-world inventory plugin is swapping
+     * the player's contents; stripping before that swap would just be overwritten.
+     */
+    @EventHandler
+    public void onWorldChange(org.bukkit.event.player.PlayerChangedWorldEvent event) {
+        Player p = event.getPlayer();
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            if (!p.isOnline()) return;
+            if (isPaxelWorld(p)) {
+                give(p);
+                refreshTier(p);
+            } else if (stripPaxels(p) > 0) {
+                Msg.actionBar(p, "<gray>Your Paxel stays behind — it only works in the OneBlock worlds.");
+            }
+        }, 2L);
     }
 
     @EventHandler

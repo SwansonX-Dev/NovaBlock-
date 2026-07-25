@@ -68,6 +68,7 @@ Admin command (`/obadmin`, `novablock.admin`):
 - `reload | setphase <player> <idx> | spawnboss <id> | givecoins <player> <amt>`
 - `event <name|stop> [minutes] | wipe <player> | fix <player|all>`
 - `givepaxel <player> | flags <player> | storage <player>`
+- `paxel <list|add [world]|remove <world>|reset>` — edit the paxel's world allowlist, applied live
 - `menu <add|remove|rename|list>` — manage custom main-menu buttons
 - `freshstart <player> confirm` — wipe NovaBlock + xEconomy player data
 

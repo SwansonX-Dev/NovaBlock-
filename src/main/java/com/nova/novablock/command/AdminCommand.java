@@ -24,7 +24,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = List.of(
             "reload", "setphase", "spawnboss", "givecoins", "event", "wipe", "givepaxel",
-            "giveoneblock", "givecommunityblock", "giveminion", "nodepool", "flags", "storage", "menu", "path", "sprint", "hub", "freshstart", "fix", "setspawn", "purge", "verify");
+            "giveoneblock", "givecommunityblock", "giveminion", "nodepool", "flags", "storage", "menu", "path", "sprint", "hub", "paxel", "freshstart", "fix", "setspawn", "purge", "verify");
     private static final List<String> EVENTS = List.of(
             "diamond_hour", "double_coins", "blood_moon", "lush_bloom", "rift_storm", "stop");
 
@@ -59,6 +59,8 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 plugin.seasonalPaths().ensureTags();
                 if (plugin.minions() != null) plugin.minions().reloadSettings();
                 plugin.scoreboards().reload();
+                // Hand-edited paxel.worlds takes effect here too, not just via /obadmin paxel.
+                plugin.paxels().reconcileAll();
                 Msg.send(sender, "<green>Reloaded.");
             }
             case "setphase" -> {
@@ -240,6 +242,7 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                             : "<red>" + after.size() + " problem(s) remain — that means island DATA is wrong, not the index."));
                 }
             }
+            case "paxel" -> handlePaxelWorlds(sender, args);
             case "menu" -> handleMenuEdit(sender, args);
             case "path" -> handlePath(sender, args);
             case "sprint" -> handleSprint(sender, args);
@@ -487,6 +490,81 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 Msg.send(sender, "<green>Reloaded community config and refreshed hub displays.");
             }
             default -> Msg.send(sender, "<yellow>/obadmin hub <status|create|resetworld|payout|raid|resetweekly|setblock|setspawn|oneblock|reload>");
+        }
+    }
+
+    /**
+     * Live editor for the paxel's world allowlist ({@code paxel.worlds}).
+     *
+     * <p>Every change writes the config and immediately reconciles online players, so the
+     * new list is in force the moment the command returns — no reload, no relog.
+     */
+    private void handlePaxelWorlds(CommandSender sender, String[] args) {
+        var paxels = plugin.paxels();
+        if (args.length < 2) {
+            Msg.send(sender, "<yellow>/obadmin paxel <list|add [world]|remove <world>|reset>");
+            return;
+        }
+        switch (args[1].toLowerCase()) {
+            case "list" -> {
+                List<String> worlds = paxels.allowedWorlds();
+                if (worlds.isEmpty()) {
+                    Msg.send(sender, "<gray>The allowlist is empty — the paxel works in <white>every<gray> world.");
+                    return;
+                }
+                Msg.send(sender, "<gold>Paxel worlds <gray>(" + worlds.size() + ")"
+                        + (paxels.worldsConfigured() ? "" : " <dark_gray>[built-in default — not yet in config]") + ":");
+                for (String w : worlds) {
+                    boolean loaded = Bukkit.getWorld(w) != null;
+                    Msg.send(sender, "<gray>· <white>" + w
+                            + (loaded ? "" : " <dark_gray>(no such world loaded)"));
+                }
+            }
+            case "add" -> {
+                String world = args.length >= 3 ? args[2]
+                        : (sender instanceof Player p ? p.getWorld().getName() : null);
+                if (world == null) { Msg.send(sender, "<red>/obadmin paxel add <world>"); return; }
+                // Materialise the effective list first: adding to an unset key would otherwise
+                // write a list of one and silently drop every built-in default.
+                List<String> worlds = paxels.allowedWorlds();
+                for (String w : worlds) {
+                    if (w.equalsIgnoreCase(world)) {
+                        Msg.send(sender, "<red>" + world + " is already on the list.");
+                        return;
+                    }
+                }
+                if (Bukkit.getWorld(world) == null) {
+                    Msg.send(sender, "<yellow>Warning: no world named <white>" + world
+                            + "<yellow> is loaded. Added anyway — check the spelling.");
+                }
+                worlds.add(world);
+                int stripped = paxels.setAllowedWorlds(worlds);
+                Msg.send(sender, "<green>Added <white>" + world + "<green> — paxels now work there. "
+                        + "<gray>(" + worlds.size() + " worlds; " + stripped + " player(s) affected)");
+            }
+            case "remove", "delete" -> {
+                if (args.length < 3) { Msg.send(sender, "<red>/obadmin paxel remove <world>"); return; }
+                String world = args[2];
+                List<String> worlds = paxels.allowedWorlds();
+                if (!worlds.removeIf(w -> w.equalsIgnoreCase(world))) {
+                    Msg.send(sender, "<red>" + world + " isn't on the list. <gray>Try /obadmin paxel list.");
+                    return;
+                }
+                int stripped = paxels.setAllowedWorlds(worlds);
+                Msg.send(sender, "<green>Removed <white>" + world + "<green>. "
+                        + "<gray>(" + worlds.size() + " worlds; stripped " + stripped + " player(s) standing there)");
+                if (worlds.isEmpty()) {
+                    Msg.send(sender, "<yellow>The list is now empty, which means <white>no restriction at all"
+                            + "<yellow> — the paxel works everywhere. Use <white>/obadmin paxel reset"
+                            + "<yellow> if you meant to go back to the defaults.");
+                }
+            }
+            case "reset" -> {
+                int stripped = paxels.resetAllowedWorlds();
+                Msg.send(sender, "<green>Reset to the built-in defaults. <gray>("
+                        + String.join(", ", paxels.allowedWorlds()) + "; " + stripped + " player(s) affected)");
+            }
+            default -> Msg.send(sender, "<yellow>/obadmin paxel <list|add [world]|remove <world>|reset>");
         }
     }
 
@@ -841,6 +919,9 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                 case "hub" -> List.of("status", "create", "resetworld", "payout", "raid", "resetweekly", "setblock", "setspawn", "oneblock", "reload").stream()
                         .filter(n -> n.startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
+                case "paxel" -> List.of("list", "add", "remove", "reset").stream()
+                        .filter(n -> n.startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
                 case "fix" -> {
                     java.util.List<String> tabs = Bukkit.getOnlinePlayers().stream()
                             .map(Player::getName)
@@ -860,6 +941,21 @@ public class AdminCommand implements CommandExecutor, TabCompleter {
                         .collect(Collectors.toList());
                 default -> Collections.emptyList();
             };
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("paxel")) {
+            String sub = args[1].toLowerCase();
+            // add offers loaded worlds not yet listed; remove offers exactly what's listed.
+            java.util.List<String> pool = switch (sub) {
+                case "add" -> Bukkit.getWorlds().stream()
+                        .map(org.bukkit.World::getName)
+                        .filter(n -> plugin.paxels().allowedWorlds().stream().noneMatch(w -> w.equalsIgnoreCase(n)))
+                        .collect(Collectors.toList());
+                case "remove", "delete" -> plugin.paxels().allowedWorlds();
+                default -> Collections.emptyList();
+            };
+            return pool.stream()
+                    .filter(n -> n.toLowerCase().startsWith(args[2].toLowerCase()))
+                    .collect(Collectors.toList());
         }
         if (args.length == 3 && args[0].equalsIgnoreCase("freshstart")) {
             return "confirm".startsWith(args[2].toLowerCase()) ? List.of("confirm") : Collections.emptyList();
