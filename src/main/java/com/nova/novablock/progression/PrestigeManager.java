@@ -5,6 +5,7 @@ import com.nova.novablock.island.Dimension;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.phase.Phase;
 import com.nova.novablock.prophecy.ProphecyManager;
+import com.nova.novablock.util.Broadcast;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -172,7 +173,7 @@ public class PrestigeManager {
         player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 0.8f);
         plugin.seasonalPaths().award(player, com.nova.novablock.season.SeasonalPathManager.PathSource.PRESTIGE, 500);
 
-        Bukkit.broadcast(Msg.mm("<gold>" + title + " <gray>— <yellow>"
+        Broadcast.send(Msg.mm("<gold>" + title + " <gray>— <yellow>"
                 + player.getName() + " <gray>has prestiged their " + dimName(dim) + "!"));
     }
 

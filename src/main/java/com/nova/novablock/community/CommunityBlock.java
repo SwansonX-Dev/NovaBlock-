@@ -4,6 +4,7 @@ import com.nova.novablock.NovaBlock;
 import com.nova.novablock.phase.Phase;
 import com.nova.novablock.phase.PhaseBlock;
 import com.nova.novablock.season.SeasonManager;
+import com.nova.novablock.util.Broadcast;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -402,7 +403,7 @@ public class CommunityBlock {
                 // phase folds into PaxelManager.tierFor via max()).
                 plugin.paxels().refreshAllTiers();
                 if (cfg.getBoolean("community.block.broadcast.phase-advance", true)) {
-                    Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Community OneBlock <gray>advanced to <"
+                    Broadcast.send(Msg.mm("<gold>✦ <yellow>Community OneBlock <gray>advanced to <"
                             + nextPhase.getThemeColor() + ">" + nextPhase.getDisplayName() + "<gray>!"));
                 }
             }
@@ -410,7 +411,7 @@ public class CommunityBlock {
 
         long everyN = Math.max(1, cfg.getLong("community.block.broadcast.every-nth-break", 500));
         if (blocksBroken % everyN == 0) {
-            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>" + player.getName()
+            Broadcast.send(Msg.mm("<gold>✦ <yellow>" + player.getName()
                     + " <gray>mined the <gold>" + blocksBroken + "th <gray>community block!"));
             player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1.1f);
         }
@@ -461,7 +462,7 @@ public class CommunityBlock {
         // A lone contributor getting their own coins back already gets the personal
         // message above; broadcasting it spammed global chat.
         if (qualifying.size() >= 2) {
-            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Community pool paid out <white>" + distributed
+            Broadcast.send(Msg.mm("<gold>✦ <yellow>Community pool paid out <white>" + distributed
                     + " <yellow>coins <gray>to " + qualifying.size() + " contributors."));
         }
         return distributed;

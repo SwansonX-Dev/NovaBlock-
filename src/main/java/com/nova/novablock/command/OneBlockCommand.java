@@ -10,6 +10,7 @@ import com.nova.novablock.gui.QuestGui;
 import com.nova.novablock.gui.SeasonalPathGui;
 import com.nova.novablock.gui.SkillsGui;
 import com.nova.novablock.island.Island;
+import com.nova.novablock.util.Broadcast;
 import com.nova.novablock.util.Msg;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -720,7 +721,7 @@ public class OneBlockCommand implements CommandExecutor, TabCompleter {
             case OK -> {
                 Msg.send(p, "<green>Island listed for <gold>" + plugin.economy().format(price)
                         + "<green>. Cancel with <yellow>/ob sellisland cancel<green>.");
-                org.bukkit.Bukkit.broadcast(Msg.mm("<#7B61FF>✦ <white>" + p.getName()
+                Broadcast.send(Msg.mm("<#7B61FF>✦ <white>" + p.getName()
                         + " <gray>listed their island for <gold>" + plugin.economy().format(price)
                         + "<gray>. <dark_gray>(/ob market)"));
             }

@@ -18,6 +18,28 @@ endIslandWorld: oneblock_end
 # End progress is preserved but inert.
 endEnabled: true
 
+# Which worlds count as "playing NovaBlock", and who its announcements reach.
+#
+# The server runs several gamemodes in their own worlds, so "everyone online" is
+# no longer the same audience as "everyone playing OneBlock" — a Hardcore player
+# has no use for a community raid call, and shouldn't get the OneBlock AFK check
+# for holding a pickaxe in their own world.
+#
+# NovaBlock's worlds are detected automatically: islandWorld, netherIslandWorld,
+# endIslandWorld, the community hub, and the private loot-room instances. Add any
+# other world that should count as part of the gamemode — the shared hub/spawn,
+# for instance — to extra-worlds.
+gamemode:
+  extra-worlds: []
+
+  # Who hears announcements: prestiges, community raids, weekly goals and podiums,
+  # timed server events, island level-ups, 1-of-1 claims.
+  #
+  #   world   - only players standing in a NovaBlock world (default)
+  #   members - the above, plus any online island member wherever they are
+  #   server  - everyone online (the old behaviour)
+  broadcast-scope: world
+
 # Inactive-island purging. An island's clock is stamped whenever any of its
 # members joins or quits, so a co-op island stays active as long as anybody
 # plays on it. Islands saved before this existed report 0 days idle and are

@@ -1,6 +1,7 @@
 package com.nova.novablock.season;
 
 import com.nova.novablock.NovaBlock;
+import com.nova.novablock.util.GamemodeScope;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
@@ -69,7 +70,7 @@ public class SeasonManager {
         // Clamp minutes so multiplying never overflows int * long arithmetic.
         long safeMinutes = Math.max(1L, Math.min((long) minutes, 24L * 60L));
         this.activeUntil = System.currentTimeMillis() + safeMinutes * 60_000L;
-        for (Player p : Bukkit.getOnlinePlayers()) {
+        for (Player p : GamemodeScope.audience()) {
             Msg.title(p, e.color + "▶ " + e.displayName, "<gray>" + e.description);
             Msg.send(p, e.color + "<bold>SERVER EVENT</bold> <gray>– " + e.displayName + " <dark_gray>(" + minutes + "m)");
             p.playSound(p.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.6f, 1.4f);
@@ -78,7 +79,7 @@ public class SeasonManager {
 
     public void endEvent() {
         if (active == null) return;
-        for (Player p : Bukkit.getOnlinePlayers()) {
+        for (Player p : GamemodeScope.audience()) {
             Msg.send(p, "<gray>" + active.displayName + " has ended.");
         }
         this.active = null;

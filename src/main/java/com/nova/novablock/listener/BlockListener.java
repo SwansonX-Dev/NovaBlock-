@@ -7,6 +7,7 @@ import com.nova.novablock.phase.Phase;
 import com.nova.novablock.progression.Perk;
 import com.nova.novablock.progression.SkillType;
 import com.nova.novablock.season.SeasonManager;
+import com.nova.novablock.util.Broadcast;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -293,7 +294,7 @@ public class BlockListener implements Listener {
             Msg.title(player, "<gold>✦ 1,000 Blocks ✦",
                     "<yellow>+5000 coins · <green>Totem of Undying · <aqua>+100 XP");
             player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 0.8f);
-            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>" + player.getName()
+            Broadcast.send(Msg.mm("<gold>✦ <yellow>" + player.getName()
                     + " <gray>has mined their <gold>1,000th block<gray>!"));
         }
         double xpMult = plugin.prestige().xpMultiplier(island);
@@ -688,7 +689,7 @@ public class BlockListener implements Listener {
             island.ensureNetherPlatform();
             String ownerName = Bukkit.getOfflinePlayer(island.data().getOwner()).getName();
             if (ownerName == null) ownerName = player.getName();
-            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>" + ownerName
+            Broadcast.send(Msg.mm("<gold>✦ <yellow>" + ownerName
                     + "<gray>'s island has <red>breached the Nether<gray>! <dark_gray>(/ob home nether)"));
             Msg.title(player, "<red>The Nether is open",
                     "<gray>Use <yellow>/ob home nether</yellow> to enter.");

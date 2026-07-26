@@ -1,6 +1,7 @@
 package com.nova.novablock.sprint;
 
 import com.nova.novablock.NovaBlock;
+import com.nova.novablock.util.Broadcast;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -240,15 +241,15 @@ public class WeeklySprintManager {
         List<Long> caCoins = casualCoinRewards();
         List<WinnerRow> winners = new ArrayList<>();
 
-        Bukkit.broadcast(Msg.mm("<gradient:#7B61FF:#4FC3F7><bold>Weekly Sprint Podium"));
+        Broadcast.send(Msg.mm("<gradient:#7B61FF:#4FC3F7><bold>Weekly Sprint Podium"));
         if (!hcTop.isEmpty()) {
-            Bukkit.broadcast(Msg.mm("<red>Hardcore <gray>(blocks broken)"));
+            Broadcast.send(Msg.mm("<red>Hardcore <gray>(blocks broken)"));
             for (int i = 0; i < hcTop.size(); i++) {
                 HardcoreRow row = hcTop.get(i);
                 var owner = ownerOfIsland(row.islandUuid());
                 String name = owner == null ? "Unknown" : (owner.getName() == null ? "Unknown" : owner.getName());
                 long coins = at(hcCoins, i);
-                Bukkit.broadcast(Msg.mm("  " + medal(i) + " <yellow>" + name
+                Broadcast.send(Msg.mm("  " + medal(i) + " <yellow>" + name
                         + " <gray>– <white>" + row.blocks() + " blocks"
                         + (coins > 0 ? " <dark_gray>(<gold>+" + coins + "<dark_gray>)" : "")));
                 winners.add(new WinnerRow("hardcore", i + 1, name, row.blocks(), coins));
@@ -256,13 +257,13 @@ public class WeeklySprintManager {
             }
         }
         if (!caTop.isEmpty()) {
-            Bukkit.broadcast(Msg.mm("<aqua>Casual <gray>(daily quests)"));
+            Broadcast.send(Msg.mm("<aqua>Casual <gray>(daily quests)"));
             for (int i = 0; i < caTop.size(); i++) {
                 CasualRow row = caTop.get(i);
                 OfflinePlayer op = Bukkit.getOfflinePlayer(row.playerUuid());
                 String name = op.getName() == null ? "Unknown" : op.getName();
                 long coins = at(caCoins, i);
-                Bukkit.broadcast(Msg.mm("  " + medal(i) + " <yellow>" + name
+                Broadcast.send(Msg.mm("  " + medal(i) + " <yellow>" + name
                         + " <gray>– <white>" + row.quests() + "/" + CASUAL_MAX
                         + (coins > 0 ? " <dark_gray>(<gold>+" + coins + "<dark_gray>)" : "")));
                 winners.add(new WinnerRow("casual", i + 1, name, row.quests(), coins));

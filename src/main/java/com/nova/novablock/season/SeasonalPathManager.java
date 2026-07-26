@@ -4,6 +4,7 @@ import com.nova.novablock.NovaBlock;
 import com.nova.novablock.island.Island;
 import com.nova.novablock.progression.PlayerProgression;
 import com.nova.novablock.util.ItemBuilder;
+import com.nova.novablock.util.Broadcast;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -223,7 +224,7 @@ public final class SeasonalPathManager {
                 grantTag(player, prog, path.firstTagId());
                 giveItem(player, rewardItem(path, tier, true));
                 save();
-                Bukkit.broadcast(Msg.mm("<gold>1-of-1 claimed: <yellow>" + player.getName()
+                Broadcast.send(Msg.mm("<gold>1-of-1 claimed: <yellow>" + player.getName()
                         + " <gray>completed <white>" + path.name() + " <gray>first."));
             }
         }

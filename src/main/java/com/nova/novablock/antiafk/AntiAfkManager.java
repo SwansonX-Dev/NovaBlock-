@@ -1,6 +1,7 @@
 package com.nova.novablock.antiafk;
 
 import com.nova.novablock.NovaBlock;
+import com.nova.novablock.util.GamemodeScope;
 import com.nova.novablock.util.Msg;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -102,6 +103,17 @@ public class AntiAfkManager implements Listener {
         long now = System.currentTimeMillis();
         for (Player p : Bukkit.getOnlinePlayers()) {
             State s = states.computeIfAbsent(p.getUniqueId(), id -> new State());
+            // The AFK check guards OneBlock mining, so it has no business following a
+            // player into another gamemode's world — a pickaxe in hand there is just a
+            // pickaxe. A challenge that was already open is CANCELLED rather than left
+            // to time out: failing it warps them to spawn, which would yank them out of
+            // whatever they walked into.
+            if (!GamemodeScope.isPlaying(p)) {
+                s.challengePending = false;
+                s.challengeIssuedAt = 0;
+                s.holdingSince = 0;
+                continue;
+            }
             if (s.challengePending) {
                 if (warpOnTimeout && now - s.challengeIssuedAt > challengeTimeoutMs) failChallenge(p, s);
                 continue;

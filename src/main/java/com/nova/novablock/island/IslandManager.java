@@ -2,6 +2,7 @@ package com.nova.novablock.island;
 
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.phase.Phase;
+import com.nova.novablock.util.Broadcast;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -102,7 +103,7 @@ public class IslandManager {
         String ownerName = Bukkit.getOfflinePlayer(island.data().getOwner()).getName();
         if (ownerName == null && fallbackName != null) ownerName = fallbackName.getName();
         if (ownerName == null) return true;
-        Bukkit.broadcast(Msg.mm("<#9C27B0>✦ <light_purple>" + ownerName
+        Broadcast.send(Msg.mm("<#9C27B0>✦ <light_purple>" + ownerName
                 + "<gray>'s island has <#B47BFF>torn open the End<gray>! <dark_gray>(/ob home end)"));
         return true;
     }

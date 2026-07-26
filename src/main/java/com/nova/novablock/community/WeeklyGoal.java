@@ -1,6 +1,7 @@
 package com.nova.novablock.community;
 
 import com.nova.novablock.NovaBlock;
+import com.nova.novablock.util.Broadcast;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -96,11 +97,11 @@ public class WeeklyGoal {
 
     private void broadcastMilestone(int pct) {
         if (pct >= 100) {
-            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Weekly community goal complete! <gray>"
+            Broadcast.send(Msg.mm("<gold>✦ <yellow>Weekly community goal complete! <gray>"
                     + progress + " / " + target() + " blocks."));
             return;
         }
-        Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Weekly goal: <white>" + pct
+        Broadcast.send(Msg.mm("<gold>✦ <yellow>Weekly goal: <white>" + pct
                 + "% <gray>(" + progress + " / " + target() + ")"));
     }
 
@@ -144,11 +145,11 @@ public class WeeklyGoal {
             }
             rank++;
         }
-        Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Goal rewards distributed to <white>"
+        Broadcast.send(Msg.mm("<gold>✦ <yellow>Goal rewards distributed to <white>"
                 + Math.min(qualifyingPlayers, ranked.size()) + "<yellow> contributors."));
         if (!podiumLines.isEmpty()) {
-            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Weekly community podium:"));
-            for (String line : podiumLines) Bukkit.broadcast(Msg.mm(line));
+            Broadcast.send(Msg.mm("<gold>✦ <yellow>Weekly community podium:"));
+            for (String line : podiumLines) Broadcast.send(Msg.mm(line));
         }
     }
 

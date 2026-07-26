@@ -3,6 +3,8 @@ package com.nova.novablock.community;
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.boss.BossFight;
 import com.nova.novablock.boss.BossManager;
+import com.nova.novablock.util.Broadcast;
+import com.nova.novablock.util.GamemodeScope;
 import com.nova.novablock.util.Msg;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -80,7 +82,7 @@ public class RaidScheduler implements Listener {
                 e.remove();
                 it.remove();
                 lastRaidEndedAt = now;
-                Bukkit.broadcast(Msg.mm("<gray>The community raid boss withdrew — nobody showed up."));
+                Broadcast.send(Msg.mm("<gray>The community raid boss withdrew — nobody showed up."));
                 nextRaidAt = computeNextRaidTime(now);
                 resetWarnings();
                 markDirty();
@@ -148,12 +150,12 @@ public class RaidScheduler implements Listener {
     private void announceRaid(BossFight fight, Location at) {
         var bossName = fight.boss().displayName();
         var color = fight.boss().themeColor();
-        Bukkit.broadcast(Msg.mm("<gold>✦ <" + color + "><bold>COMMUNITY RAID<reset><gold> ✦"));
-        Bukkit.broadcast(Msg.mm("<" + color + ">" + bossName + " <gray>has appeared at <yellow>/warp community<gray>!"));
+        Broadcast.send(Msg.mm("<gold>✦ <" + color + "><bold>COMMUNITY RAID<reset><gold> ✦"));
+        Broadcast.send(Msg.mm("<" + color + ">" + bossName + " <gray>has appeared at <yellow>/warp community<gray>!"));
         Component tp = Component.text("[Teleport to raid]", NamedTextColor.YELLOW)
                 .clickEvent(ClickEvent.runCommand("/warp community"));
-        Bukkit.broadcast(tp);
-        for (Player p : Bukkit.getOnlinePlayers()) {
+        Broadcast.send(tp);
+        for (Player p : GamemodeScope.audience()) {
             p.playSound(p.getLocation(), org.bukkit.Sound.EVENT_RAID_HORN, 1f, 1f);
         }
     }
@@ -172,12 +174,12 @@ public class RaidScheduler implements Listener {
         long remaining = nextRaidAt - now;
         if (!warnedFiveMinutes && remaining <= 5L * 60_000L && remaining > 60_000L) {
             warnedFiveMinutes = true;
-            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Community raid in <white>5 minutes<yellow>. <gray>Meet at <yellow>/warp community<gray>."));
+            Broadcast.send(Msg.mm("<gold>✦ <yellow>Community raid in <white>5 minutes<yellow>. <gray>Meet at <yellow>/warp community<gray>."));
             return;
         }
         if (!warnedOneMinute && remaining <= 60_000L && remaining > 0L) {
             warnedOneMinute = true;
-            Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Community raid in <white>1 minute<yellow>. <gray>Meet at <yellow>/warp community<gray>."));
+            Broadcast.send(Msg.mm("<gold>✦ <yellow>Community raid in <white>1 minute<yellow>. <gray>Meet at <yellow>/warp community<gray>."));
         }
     }
 
@@ -224,14 +226,14 @@ public class RaidScheduler implements Listener {
 
         double totalDamage = ctx.damageByPlayer.values().stream().mapToDouble(Double::doubleValue).sum();
         if (totalDamage <= 0) {
-            Bukkit.broadcast(Msg.mm("<gold>✦ <gray>Raid boss defeated, but nobody contributed damage."));
+            Broadcast.send(Msg.mm("<gold>✦ <gray>Raid boss defeated, but nobody contributed damage."));
             return;
         }
 
         List<Map.Entry<UUID, Double>> ranked = new ArrayList<>(ctx.damageByPlayer.entrySet());
         ranked.sort(Comparator.comparingDouble((Map.Entry<UUID, Double> e) -> e.getValue()).reversed());
 
-        Bukkit.broadcast(Msg.mm("<gold>✦ <yellow>Community raid boss defeated! <gray>Loot distributing..."));
+        Broadcast.send(Msg.mm("<gold>✦ <yellow>Community raid boss defeated! <gray>Loot distributing..."));
         boolean topGetsSpecial = true;
         for (var e : ranked) {
             double share = e.getValue() / totalDamage;
