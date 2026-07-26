@@ -32,6 +32,8 @@ import java.util.Collection;
 import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -56,6 +58,15 @@ public class SkillActionListener implements Listener {
             Material.SAND, Material.RED_SAND, Material.GRAVEL, Material.CLAY, Material.MUD,
             Material.SOUL_SAND, Material.SOUL_SOIL, Material.SNOW_BLOCK, Material.SNOW,
             Material.MOSS_BLOCK, Material.MUDDY_MANGROVE_ROOTS);
+
+    /** Ground a sapling can be planted on, for the Lumberjack auto-replant. */
+    private static final Set<Material> SAPLING_SOIL = EnumSet.of(
+            Material.DIRT, Material.GRASS_BLOCK, Material.COARSE_DIRT, Material.ROOTED_DIRT,
+            Material.PODZOL, Material.MYCELIUM, Material.MOSS_BLOCK, Material.PALE_MOSS_BLOCK,
+            Material.MUD, Material.MUDDY_MANGROVE_ROOTS, Material.FARMLAND);
+
+    /** Cap on how many saplings one Tree Feller activation replants (grief/lag guard). */
+    private static final int MAX_REPLANTS_PER_FELL = 64;
 
     /** Core stone/ore set that counts as Mining (off the OneBlock centre). */
     private static final Set<Material> MINING_EXTRA = EnumSet.of(
@@ -201,6 +212,31 @@ public class SkillActionListener implements Listener {
             if (Perk.hasPerk(prog, Perk.LUMBERJACK)) extra += 1;
         }
         dropExtra(block, block.getDrops(p.getInventory().getItemInMainHand()), extra);
+
+        // LUMBERJACK: chopping the log a tree stands on replants its sapling.
+        if (Perk.hasPerk(prog, Perk.LUMBERJACK)) {
+            scheduleSaplingReplant(block, block.getType());
+        }
+    }
+
+    /**
+     * Replants {@code log}'s sapling next tick, if the block came free and is still
+     * sitting on plantable ground. Mirrors the Farming {@link Perk#GREEN_THUMB} replant:
+     * the sapling is a freebie, the player keeps every drop the tree gave.
+     */
+    private void scheduleSaplingReplant(Block log, Material logType) {
+        if (!isTreeBase(log)) return;
+        Material sapling = saplingFor(logType);
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            if (!log.getType().isAir()) return;
+            if (!SAPLING_SOIL.contains(log.getRelative(0, -1, 0).getType())) return;
+            log.setType(sapling, false);
+        });
+    }
+
+    /** True if {@code log} rests directly on ground a sapling can be planted on. */
+    private boolean isTreeBase(Block log) {
+        return SAPLING_SOIL.contains(log.getRelative(0, -1, 0).getType());
     }
 
     /**
@@ -213,8 +249,15 @@ public class SkillActionListener implements Listener {
     private void fellTree(Player p, PlayerProgression prog, Block origin, Material tool) {
         final ItemStack toolItem = p.getInventory().getItemInMainHand().clone();
         final boolean arborist = Perk.hasPerk(prog, Perk.ARBORIST);
+        final boolean replant = Perk.hasPerk(prog, Perk.LUMBERJACK);
         final Material originType = origin.getType(); // still the log at MONITOR time
         final long xpPerLog = SkillEffects.xpPerAction(SkillType.WOODCUTTING);
+
+        // LUMBERJACK: every trunk the fell takes down is replanted where it stood, so a
+        // whole stand of trees comes back. Collected as the fell runs, planted at the end
+        // (planting mid-fell would just get broken again by the flood-fill).
+        final Map<Block, Material> replantSites = new LinkedHashMap<>();
+        if (replant && isTreeBase(origin)) replantSites.put(origin, originType);
 
         // Flood-fill state, seeded from the origin's neighbours (origin itself is
         // being removed by the vanilla break event that triggered this).
@@ -248,6 +291,11 @@ public class SkillActionListener implements Listener {
                     // canopies of neighbouring trees so an adjacent stand comes down too.
                     queueTreeNeighbors(b, frontier, seen);
 
+                    // Remember trunk bases before the block goes, so the tree can be replanted.
+                    if (replant && isLog && replantSites.size() < MAX_REPLANTS_PER_FELL && isTreeBase(b)) {
+                        replantSites.put(b, t);
+                    }
+
                     // Break the block (leaves too, for a clean fell) and throttle on both.
                     b.breakNaturally(toolItem);
                     brokeThisTick++;
@@ -260,6 +308,12 @@ public class SkillActionListener implements Listener {
 
                 if (frontier.isEmpty() || felled >= TREE_FELLER_MAX) {
                     if (felled > 0) {
+                        for (var site : replantSites.entrySet()) {
+                            Block base = site.getKey();
+                            if (!base.getType().isAir()) continue;
+                            if (!SAPLING_SOIL.contains(base.getRelative(0, -1, 0).getType())) continue;
+                            base.setType(saplingFor(site.getValue()), false);
+                        }
                         if (arborist) {
                             // Roughly one sapling back per tree felled.
                             int saplings = Math.max(1, felled / 8);

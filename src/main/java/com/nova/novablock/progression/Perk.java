@@ -43,7 +43,7 @@ public enum Perk {
     ANGLERS_LUCK(SkillType.FISHING, 30, "Angler's Luck", "Doubles your Fishing treasure chance"),
 
     // Woodcutting
-    LUMBERJACK(SkillType.WOODCUTTING, 20, "Lumberjack", "+1 bonus log when your double-drop procs"),
+    LUMBERJACK(SkillType.WOODCUTTING, 20, "Lumberjack", "+1 bonus log on a double-drop, and chopped trees replant themselves"),
     ARBORIST(SkillType.WOODCUTTING, 30, "Arborist", "Felled trees always drop a sapling"),
 
     // Excavation
