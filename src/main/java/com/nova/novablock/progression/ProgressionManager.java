@@ -109,8 +109,10 @@ public class ProgressionManager {
             p.setXp(skill, p.getXp(skill) - PlayerProgression.xpForLevel(p.getLevel(skill)));
             p.setLevel(skill, p.getLevel(skill) + 1);
             int newLevel = p.getLevel(skill);
-            Msg.title(player, "<" + skill.color() + ">+ " + skill.displayName() + " Lv " + newLevel,
-                    "<gray>Check /ob skills for perks");
+            // Chat only — a title on every level-up covers the screen while you're
+            // mid-swing, and gathering skills level often.
+            Msg.send(player, "<" + skill.color() + ">+ " + skill.displayName() + " Lv " + newLevel
+                    + " <gray>– check <yellow>/ob skills</yellow> for perks");
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1.4f);
             // Notify if perk unlocked at this level
             for (Perk perk : Perk.values()) {

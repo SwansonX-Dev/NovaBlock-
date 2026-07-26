@@ -9,6 +9,7 @@ import com.nova.novablock.progression.PlayerProgression;
 import com.nova.novablock.progression.SkillEffects;
 import com.nova.novablock.progression.SkillType;
 import com.nova.novablock.util.Msg;
+import org.bukkit.Effect;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.Tag;
@@ -33,6 +34,7 @@ import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -72,22 +74,20 @@ public class SkillActionListener implements Listener {
             Material.NETHERRACK, Material.BASALT, Material.BLACKSTONE, Material.END_STONE,
             Material.OBSIDIAN, Material.ANCIENT_DEBRIS, Material.AMETHYST_BLOCK);
 
-    // Tree Feller now chops the ENTIRE connected structure — a whole tree plus any
-    // neighbouring trees whose logs or canopies touch it, leaves included — rather
-    // than a single trunk. Because that can be a lot of blocks, the fell is spread
-    // over ticks: a repeating task breaks a small batch each tick (≈50 ms) instead of
-    // everything in one server frame, so felling a stand of trees doesn't stall the server.
+    // Tree Feller chops the ENTIRE connected structure — a whole tree plus any
+    // neighbouring trees whose logs or canopies touch it, leaves included — and does
+    // NOT stop early: there is no ceiling on logs felled or blocks visited, so however
+    // far the connected wood runs, all of it comes down.
     //
-    // TREE_FELLER_MAX  — hard ceiling on logs felled in one activation (grief/lag guard).
-    // FELL_BATCH       — blocks (logs or leaves) broken per tick (a couple dozen).
-    // FELL_STEP_LIMIT  — max blocks examined per tick (bounds work through big leaf canopies
-    //                    even when few of them turn out to be breakable logs).
-    // FELL_MAX_VISITED — cap on total blocks the flood-fill will look at (memory/CPU guard
-    //                    against a continuous jungle canopy chaining forever).
-    private static final int TREE_FELLER_MAX = 2000;
-    private static final int FELL_BATCH = 24;
-    private static final int FELL_STEP_LIMIT = 512;
-    private static final int FELL_MAX_VISITED = 40000;
+    // What remains are per-TICK throttles, not caps: the fell is spread over ticks so a
+    // huge stand never stalls a single server frame. They shape how fast it chews, never
+    // whether it finishes.
+    //
+    // FELL_BATCH      — blocks (logs or leaves) broken per tick.
+    // FELL_STEP_LIMIT — max blocks examined per tick (bounds work through big leaf
+    //                   canopies even when few of them turn out to be breakable logs).
+    private static final int FELL_BATCH = 64;
+    private static final int FELL_STEP_LIMIT = 1024;
 
     /** A player kill is worth this many times a mob kill's Combat XP. */
     private static final long PLAYER_KILL_XP_MULTIPLIER = 5L;
@@ -108,7 +108,7 @@ public class SkillActionListener implements Listener {
         if (isCrop(block)) {
             handleFarming(p, prog, block, m);
         } else if (Tag.LOGS.isTagged(m) && isAxe(tool)) {
-            handleWoodcutting(p, prog, block, tool);
+            handleWoodcutting(event, p, prog, block, tool);
         } else if (EXCAVATION.contains(m) && isShovel(tool)) {
             handleExcavation(p, prog, block, tool);
         } else if ((m.name().endsWith("_ORE") || MINING_EXTRA.contains(m)) && isPickaxe(tool)) {
@@ -187,7 +187,8 @@ public class SkillActionListener implements Listener {
 
     // ---- Woodcutting -------------------------------------------------------
 
-    private void handleWoodcutting(Player p, PlayerProgression prog, Block block, Material tool) {
+    private void handleWoodcutting(BlockBreakEvent event, Player p, PlayerProgression prog,
+                                   Block block, Material tool) {
         // Player-placed logs don't feed the skill: no XP, no passives, and no Tree
         // Feller — otherwise placing logs farms the skill and felling wipes builds.
         // The block is being broken now, so forget it (its slot is free again).
@@ -196,6 +197,13 @@ public class SkillActionListener implements Listener {
             return;
         }
         plugin.progression().addXp(p, SkillType.WOODCUTTING, SkillEffects.xpPerAction(SkillType.WOODCUTTING));
+
+        // Every log this skill pays out lands at the player's feet, so the vanilla drop
+        // is suppressed and re-issued there. Suppressing at MONITOR is safe: the event's
+        // drops are spawned after every handler has run, so the flag still takes.
+        Collection<ItemStack> yield = block.getDrops(p.getInventory().getItemInMainHand());
+        event.setDropItems(false);
+        dropAtFeet(p, block, yield);
 
         if (plugin.abilities().tryActivate(p, ActiveAbility.TREE_FELLER)
                 || plugin.abilities().isActive(p, ActiveAbility.TREE_FELLER)) {
@@ -208,7 +216,7 @@ public class SkillActionListener implements Listener {
             extra += 1;
             if (Perk.hasPerk(prog, Perk.LUMBERJACK)) extra += 1;
         }
-        dropExtra(block, block.getDrops(p.getInventory().getItemInMainHand()), extra);
+        dropExtraAtFeet(p, block, yield, extra);
 
         // LUMBERJACK: chopping the log a tree stands on replants its sapling.
         if (Perk.hasPerk(prog, Perk.LUMBERJACK)) {
@@ -252,9 +260,7 @@ public class SkillActionListener implements Listener {
 
         // LUMBERJACK: every trunk the fell takes down is replanted where it stood, so a
         // whole stand of trees comes back. Collected as the fell runs, planted at the end
-        // (planting mid-fell would just get broken again by the flood-fill). Uncapped —
-        // TREE_FELLER_MAX already bounds how many logs can come down in one activation,
-        // so the site list can never outgrow it.
+        // (planting mid-fell would just get broken again by the flood-fill).
         final Map<Block, Material> replantSites = new LinkedHashMap<>();
         if (replant && isTreeBase(origin)) replantSites.put(origin, originType);
 
@@ -274,7 +280,6 @@ public class SkillActionListener implements Listener {
                 int steps = 0;
                 while (!frontier.isEmpty()
                         && brokeThisTick < FELL_BATCH
-                        && felled < TREE_FELLER_MAX
                         && steps < FELL_STEP_LIMIT) {
                     steps++;
                     Block b = frontier.poll();
@@ -294,7 +299,13 @@ public class SkillActionListener implements Listener {
                     if (replant && isLog && isTreeBase(b)) replantSites.put(b, t);
 
                     // Break the block (leaves too, for a clean fell) and throttle on both.
-                    b.breakNaturally(toolItem);
+                    // Drops are collected and handed to the player rather than left where
+                    // the block stood — a fell can strip a canopy 30 blocks up, and items
+                    // raining across the treetops are the part players actually lose.
+                    Collection<ItemStack> drops = b.getDrops(toolItem);
+                    b.getWorld().playEffect(b.getLocation(), Effect.STEP_SOUND, t);
+                    b.setType(Material.AIR, false);
+                    dropAtFeet(p, b, drops);
                     brokeThisTick++;
                     if (isLog) { felled++; logsThisTick++; }
                 }
@@ -303,7 +314,7 @@ public class SkillActionListener implements Listener {
                     plugin.progression().addXp(p, SkillType.WOODCUTTING, xpPerLog * logsThisTick);
                 }
 
-                if (frontier.isEmpty() || felled >= TREE_FELLER_MAX) {
+                if (frontier.isEmpty()) {
                     if (felled > 0) {
                         for (var site : replantSites.entrySet()) {
                             Block base = site.getKey();
@@ -316,8 +327,7 @@ public class SkillActionListener implements Listener {
                             int saplings = Math.max(1, felled / 8);
                             Material sap = saplingFor(originType);
                             for (int i = 0; i < saplings; i++) {
-                                origin.getWorld().dropItemNaturally(
-                                        origin.getLocation().add(0.5, 0.5, 0.5), new ItemStack(sap));
+                                dropAtFeet(p, origin, List.of(new ItemStack(sap)));
                             }
                         }
                         if (p.isOnline()) {
@@ -331,12 +341,10 @@ public class SkillActionListener implements Listener {
     }
 
     /**
-     * Queues the log/leaf neighbours of {@code b} (26-neighbourhood) that haven't been
-     * seen yet, up to {@link #FELL_MAX_VISITED} total, so the fill can't run away across
-     * a continuous forest canopy.
+     * Queues every not-yet-seen log/leaf neighbour of {@code b} (26-neighbourhood). The
+     * fill is deliberately unbounded, so it follows the connected wood as far as it runs.
      */
     private void queueTreeNeighbors(Block b, Deque<Block> frontier, Set<Block> seen) {
-        if (seen.size() >= FELL_MAX_VISITED) return;
         for (int dx = -1; dx <= 1; dx++) {
             for (int dy = -1; dy <= 1; dy++) {
                 for (int dz = -1; dz <= 1; dz++) {
@@ -347,7 +355,6 @@ public class SkillActionListener implements Listener {
                     if (Tag.LOGS.isTagged(t) || Tag.LEAVES.isTagged(t)) {
                         seen.add(n);
                         frontier.add(n);
-                        if (seen.size() >= FELL_MAX_VISITED) return;
                     }
                 }
             }
@@ -440,6 +447,29 @@ public class SkillActionListener implements Listener {
     }
 
     // ---- helpers -----------------------------------------------------------
+
+    /**
+     * Drops Woodcutting yield at the player's feet instead of where the block stood.
+     * Falls back to {@code where} if the player has logged off or walked into another
+     * world mid-fell — the items still exist, they just land at the tree.
+     */
+    private void dropAtFeet(Player p, Block where, Collection<ItemStack> drops) {
+        if (drops.isEmpty()) return;
+        var loc = (p.isOnline() && p.getWorld().equals(where.getWorld()))
+                ? p.getLocation()
+                : where.getLocation().add(0.5, 0.5, 0.5);
+        for (ItemStack drop : drops) {
+            if (drop != null && !drop.getType().isAir()) {
+                loc.getWorld().dropItem(loc, drop.clone());
+            }
+        }
+    }
+
+    /** Bonus-drop sets, delivered to the player's feet (Woodcutting). */
+    private void dropExtraAtFeet(Player p, Block block, Collection<ItemStack> drops, int sets) {
+        if (sets <= 0 || drops.isEmpty()) return;
+        for (int i = 0; i < sets; i++) dropAtFeet(p, block, drops);
+    }
 
     private void dropExtra(Block block, Collection<ItemStack> drops, int sets) {
         if (sets <= 0 || drops.isEmpty()) return;
