@@ -65,9 +65,6 @@ public class SkillActionListener implements Listener {
             Material.PODZOL, Material.MYCELIUM, Material.MOSS_BLOCK, Material.PALE_MOSS_BLOCK,
             Material.MUD, Material.MUDDY_MANGROVE_ROOTS, Material.FARMLAND);
 
-    /** Cap on how many saplings one Tree Feller activation replants (grief/lag guard). */
-    private static final int MAX_REPLANTS_PER_FELL = 64;
-
     /** Core stone/ore set that counts as Mining (off the OneBlock centre). */
     private static final Set<Material> MINING_EXTRA = EnumSet.of(
             Material.STONE, Material.COBBLESTONE, Material.DEEPSLATE, Material.COBBLED_DEEPSLATE,
@@ -255,7 +252,9 @@ public class SkillActionListener implements Listener {
 
         // LUMBERJACK: every trunk the fell takes down is replanted where it stood, so a
         // whole stand of trees comes back. Collected as the fell runs, planted at the end
-        // (planting mid-fell would just get broken again by the flood-fill).
+        // (planting mid-fell would just get broken again by the flood-fill). Uncapped —
+        // TREE_FELLER_MAX already bounds how many logs can come down in one activation,
+        // so the site list can never outgrow it.
         final Map<Block, Material> replantSites = new LinkedHashMap<>();
         if (replant && isTreeBase(origin)) replantSites.put(origin, originType);
 
@@ -292,9 +291,7 @@ public class SkillActionListener implements Listener {
                     queueTreeNeighbors(b, frontier, seen);
 
                     // Remember trunk bases before the block goes, so the tree can be replanted.
-                    if (replant && isLog && replantSites.size() < MAX_REPLANTS_PER_FELL && isTreeBase(b)) {
-                        replantSites.put(b, t);
-                    }
+                    if (replant && isLog && isTreeBase(b)) replantSites.put(b, t);
 
                     // Break the block (leaves too, for a clean fell) and throttle on both.
                     b.breakNaturally(toolItem);
