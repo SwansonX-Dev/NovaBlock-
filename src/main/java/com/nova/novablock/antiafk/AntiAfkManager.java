@@ -11,7 +11,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
@@ -191,17 +190,18 @@ public class AntiAfkManager implements Listener {
         p.performCommand("warp spawn");
     }
 
-    // Chat answers must be hidden so the letter never broadcasts. We listen on
-    // both the legacy and the Paper chat events (CMI/other plugins may use either)
-    // and cancel whichever fires; submitAnswer() dedupes the verification.
-
-    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
-    public void onChatLegacy(AsyncPlayerChatEvent event) {
-        if (!enabled || !isChallengePending(event.getPlayer())) return;
-        event.setCancelled(true);
-        submitAnswer(event.getPlayer(), event.getMessage());
-    }
-
+    // Chat answers must be hidden so the letter never broadcasts.
+    //
+    // Paper ONLY. There is deliberately no AsyncPlayerChatEvent listener here: Paper
+    // picks its chat pipeline server-wide from whether ANY plugin has registered a
+    // listener on the deprecated event (ChatProcessor.canYouHearMe -> "are there any
+    // registered listeners at all"). Registering one drops the whole server onto the
+    // legacy path, where the finished message is rendered by serialising it to a
+    // legacy section-code string and parsing it back -- which silently destroys every
+    // hover and click event in it, including the [item]/[inv]/[ender] chat tags. The
+    // legacy path still fires AsyncChatEvent (it calls processModern with the message
+    // rebuilt from the legacy string), so this listener catches the answer under
+    // EITHER pipeline and the legacy one bought us nothing. See ChatTagManager.
     @EventHandler(priority = EventPriority.LOWEST)
     public void onChatPaper(AsyncChatEvent event) {
         if (!enabled || !isChallengePending(event.getPlayer())) return;

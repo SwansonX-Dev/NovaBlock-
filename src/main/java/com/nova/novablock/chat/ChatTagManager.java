@@ -48,6 +48,12 @@ public class ChatTagManager implements Listener {
     public record Snapshot(String ownerName, Kind kind, ItemStack[] contents, long expiresAt) {}
 
     private final NovaBlock plugin;
+    /**
+     * The legacy chat format captured for the message currently being processed.
+     * Paper fires the legacy event and then {@code processModern} on the same thread,
+     * synchronously, so a thread-local carries it safely between the two.
+     */
+    private final ThreadLocal<String> legacyFormat = new ThreadLocal<>();
     /** token -> snapshot. Insertion-ordered so the oldest is the one evicted at the cap. */
     private final Map<UUID, Snapshot> snapshots =
             java.util.Collections.synchronizedMap(new LinkedHashMap<>());
@@ -57,6 +63,62 @@ public class ChatTagManager implements Listener {
     public ChatTagManager(NovaBlock plugin) {
         this.plugin = plugin;
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        // One tick in, so every plugin has enabled and registered its listeners.
+        plugin.getServer().getScheduler().runTask(plugin, this::warnIfLegacyChatPipeline);
+    }
+
+    /**
+     * Shout if anything on the server has put chat on Paper's legacy pipeline, because
+     * that silently breaks these tags.
+     *
+     * <p>Paper decides between its modern and legacy chat paths server-wide by asking
+     * whether <i>any</i> plugin has registered a listener on the deprecated
+     * {@code AsyncPlayerChatEvent}/{@code PlayerChatEvent}. If one has, the finished
+     * message is rendered by serialising it to a legacy section-code string and parsing
+     * it straight back. Colours survive that round trip; hover and click events cannot
+     * be represented in legacy text at all, so they are dropped. The tags still appear,
+     * coloured and correct, and simply do nothing.
+     *
+     * <p>Nothing we can do at our end fixes it — the flattening happens after every
+     * chat listener has run — so the only cure is the named plugin dropping its legacy
+     * listener. Naming it here turns a baffling symptom into a one-line log answer.
+     */
+    private void warnIfLegacyChatPipeline() {
+        java.util.Set<String> culprits = new java.util.LinkedHashSet<>();
+        for (var l : org.bukkit.event.player.AsyncPlayerChatEvent.getHandlerList().getRegisteredListeners()) {
+            culprits.add(l.getPlugin().getName());
+        }
+        for (var l : org.bukkit.event.player.PlayerChatEvent.getHandlerList().getRegisteredListeners()) {
+            culprits.add(l.getPlugin().getName());
+        }
+        if (culprits.isEmpty()) return;
+
+        plugin.getLogger().info("Chat is on Paper's LEGACY pipeline because these plugins listen to the "
+                + "deprecated chat event: " + String.join(", ", culprits) + ". That path re-renders every "
+                + "message through legacy colour codes, which strips all hover and click events. "
+                + "Rendering messages that use the [item]/[inv]/[ender] tags ourselves so they keep theirs; "
+                + "all other chat is left alone.");
+        registerLegacyFormatProbe();
+    }
+
+    /**
+     * Watch the legacy event purely to learn the chat format other plugins settled on,
+     * so {@link #preservingRenderer} can reproduce it around our message.
+     *
+     * <p>Registered only once something else has already forced the legacy pipeline —
+     * NovaBlock must never be the plugin that puts chat there. MONITOR so we read the
+     * format after every other plugin has finished changing it, and nothing is modified.
+     */
+    private void registerLegacyFormatProbe() {
+        Listener probe = new Listener() {};
+        plugin.getServer().getPluginManager().registerEvent(
+                org.bukkit.event.player.AsyncPlayerChatEvent.class, probe, EventPriority.MONITOR,
+                (listener, event) -> {
+                    if (event instanceof org.bukkit.event.player.AsyncPlayerChatEvent chat) {
+                        legacyFormat.set(chat.getFormat());
+                    }
+                },
+                plugin, true);
     }
 
     // ---------------- config ----------------
@@ -98,7 +160,51 @@ public class ChatTagManager implements Listener {
         }
 
         event.message(message);
+
+        // If chat is on the legacy pipeline, the default renderer would flatten the
+        // hover and click events we just built straight back out again. Render this one
+        // message ourselves instead. Only messages that actually carry a tag get this
+        // treatment, so ordinary chat keeps rendering exactly as it does today.
+        String format = legacyFormat.get();
+        legacyFormat.remove();
+        if (format != null) event.renderer(preservingRenderer(format));
+
         touchCooldown(p);
+    }
+
+    /**
+     * Rebuilds the chat line from the legacy format string without ever passing our own
+     * message through a legacy serializer.
+     *
+     * <p>The format is rendered with a marker standing in for the message, then split at
+     * the marker: the surrounding text (the other plugin's prefix/suffix, colour codes and
+     * all) is parsed from legacy, and the real message component is appended between them
+     * untouched — so its hover and click events survive.
+     *
+     * <p>Caveat: a trailing colour code in the format meant to colour the message body no
+     * longer bleeds into it, because the message is a sibling rather than a continuation.
+     * Tag messages may therefore render in the default colour where they previously took
+     * the format's. Only tag messages are affected.
+     */
+    private io.papermc.paper.chat.ChatRenderer preservingRenderer(String format) {
+        return (source, sourceDisplayName, message, viewer) -> {
+            var legacy = net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection();
+            String marker = " novablock-message ";
+            String rendered;
+            try {
+                rendered = String.format(format, legacy.serialize(sourceDisplayName), marker);
+            } catch (Exception e) {
+                // A format we can't fill is not worth losing the message over.
+                return message;
+            }
+            int at = rendered.indexOf(marker);
+            if (at < 0) return legacy.deserialize(rendered);
+            return Component.text()
+                    .append(legacy.deserialize(rendered.substring(0, at)))
+                    .append(message)
+                    .append(legacy.deserialize(rendered.substring(at + marker.length())))
+                    .build();
+        };
     }
 
     /**
