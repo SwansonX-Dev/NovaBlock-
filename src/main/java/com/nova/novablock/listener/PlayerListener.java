@@ -27,6 +27,12 @@ public class PlayerListener implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         var p = event.getPlayer();
         var prog = plugin.progression().get(p); // warm cache
+        // Auto-grab is a per-session opt-in: every join starts with it off, whatever
+        // the player left it on as. They can turn it back on with /bp toggle.
+        if (prog.isAutoGrabEnabled()) {
+            prog.setAutoGrabEnabled(false);
+            plugin.progression().save(p.getUniqueId());
+        }
         long lastLoginDay = prog.getLastLoginDay();
         plugin.loginStreaks().recordLogin(p);
         plugin.seasonalPaths().ensureActive(p);

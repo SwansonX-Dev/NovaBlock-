@@ -325,8 +325,9 @@ public class YamlStorage implements DataStorage {
     public PlayerProgression loadProgression(UUID playerId) {
         File f = new File(playerDir, playerId + ".yml");
         PlayerProgression p = new PlayerProgression(playerId);
-        boolean backpackDefault = plugin.getConfig().getBoolean("backpack.default-auto-grab", false);
-        p.setAutoGrabEnabled(backpackDefault);
+        // Auto-grab never survives a session: a freshly loaded record is always off,
+        // whatever ui.backpackItem holds. Only an in-session /bp toggle turns it on.
+        p.setAutoGrabEnabled(false);
         if (!f.exists()) return p;
         YamlConfiguration y = YamlConfiguration.loadConfiguration(f);
         ConfigurationSection skills = y.getConfigurationSection("skills");
@@ -356,9 +357,8 @@ public class YamlStorage implements DataStorage {
             try { p.setActiveIslandId(java.util.UUID.fromString(activeIsland)); }
             catch (IllegalArgumentException ignored) {}
         }
-        // Key kept as ui.backpackItem so preferences saved before the hotbar item was
-        // retired carry straight over to the auto-grab toggle it now controls.
-        p.setAutoGrabEnabled(y.getBoolean("ui.backpackItem", backpackDefault));
+        // ui.backpackItem is still written on save so the file stays readable, but it is
+        // deliberately NOT read back — auto-grab starts off on every join.
         p.setBackpackBase64(y.getString("backpack.data", ""));
         String dcWorld = y.getString("community.depositChest.world", "");
         if (dcWorld != null && !dcWorld.isEmpty()) {
