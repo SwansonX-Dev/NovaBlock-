@@ -232,6 +232,7 @@ public class SkillActionListener implements Listener {
     private void scheduleSaplingReplant(Block log, Material logType) {
         if (!isTreeBase(log)) return;
         Material sapling = saplingFor(logType);
+        if (sapling == null) return;
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             if (!log.getType().isAir()) return;
             if (!SAPLING_SOIL.contains(log.getRelative(0, -1, 0).getType())) return;
@@ -320,12 +321,14 @@ public class SkillActionListener implements Listener {
                             Block base = site.getKey();
                             if (!base.getType().isAir()) continue;
                             if (!SAPLING_SOIL.contains(base.getRelative(0, -1, 0).getType())) continue;
-                            base.setType(saplingFor(site.getValue()), false);
+                            Material sapling = saplingFor(site.getValue());
+                            if (sapling == null) continue;
+                            base.setType(sapling, false);
                         }
-                        if (arborist) {
+                        Material sap = arborist ? saplingFor(originType) : null;
+                        if (sap != null) {
                             // Roughly one sapling back per tree felled.
                             int saplings = Math.max(1, felled / 8);
-                            Material sap = saplingFor(originType);
                             for (int i = 0; i < saplings; i++) {
                                 dropAtFeet(p, origin, List.of(new ItemStack(sap)));
                             }
@@ -361,16 +364,29 @@ public class SkillActionListener implements Listener {
         }
     }
 
+    /**
+     * The sapling {@code log} grows back from, or {@code null} if it has none.
+     *
+     * <p>Derived from the material name instead of a hand-written list: the list only
+     * covered the wood types that existed when it was written and quietly returned oak
+     * for everything else, so pale oak came back as an oak sapling and felling a nether
+     * fungus paid out oak saplings. A wood type added by a later Minecraft version now
+     * replants itself. Only the three that aren't named {@code <WOOD>_SAPLING} are listed.
+     */
     private Material saplingFor(Material log) {
         String n = log.name();
-        if (n.contains("SPRUCE")) return Material.SPRUCE_SAPLING;
-        if (n.contains("BIRCH")) return Material.BIRCH_SAPLING;
-        if (n.contains("JUNGLE")) return Material.JUNGLE_SAPLING;
-        if (n.contains("ACACIA")) return Material.ACACIA_SAPLING;
-        if (n.contains("DARK_OAK")) return Material.DARK_OAK_SAPLING;
-        if (n.contains("CHERRY")) return Material.CHERRY_SAPLING;
-        if (n.contains("MANGROVE")) return Material.MANGROVE_PROPAGULE;
-        return Material.OAK_SAPLING;
+        if (n.startsWith("STRIPPED_")) n = n.substring("STRIPPED_".length());
+        switch (n) {
+            case "CRIMSON_STEM", "CRIMSON_HYPHAE": return Material.CRIMSON_FUNGUS;
+            case "WARPED_STEM", "WARPED_HYPHAE": return Material.WARPED_FUNGUS;
+            case "MANGROVE_LOG", "MANGROVE_WOOD": return Material.MANGROVE_PROPAGULE;
+            default: break;
+        }
+        int cut = n.lastIndexOf('_');   // OAK_LOG -> OAK, PALE_OAK_WOOD -> PALE_OAK
+        if (cut <= 0) return null;
+        // matchMaterial rather than a constant, so a wood type this jar was compiled
+        // before still resolves at runtime.
+        return Material.matchMaterial(n.substring(0, cut) + "_SAPLING");
     }
 
     // ---- Excavation --------------------------------------------------------
