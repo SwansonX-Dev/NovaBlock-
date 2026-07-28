@@ -2,6 +2,7 @@ package com.nova.novablock.listener;
 
 import com.nova.novablock.NovaBlock;
 import com.nova.novablock.island.Island;
+import com.nova.novablock.util.GamemodeScope;
 import com.nova.novablock.util.Msg;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -22,12 +23,20 @@ import org.bukkit.event.player.PlayerTeleportEvent;
  * <ol>
  *   <li>Bridge vanilla Nether portals inside the OneBlock world to the same
  *       island's Nether half (and vice versa).</li>
- *   <li>Disable the vanilla Nether and vanilla End entirely — the OneBlock
- *       Nether is the only Nether on this server, and there is no End. Any
- *       Nether portal that would land outside our worlds, any End portal
- *       teleport, and any Eye-of-Ender activation of an End Portal Frame is
- *       cancelled with a player-facing message.</li>
+ *   <li>Disable the vanilla Nether and vanilla End <b>within this gamemode</b> —
+ *       the OneBlock Nether is the only Nether NovaBlock offers, and its End is
+ *       reached through {@code /ob home end} once the Nether is conquered. A
+ *       Nether portal that would land outside our worlds, an End portal teleport,
+ *       and any Eye-of-Ender activation of an End Portal Frame are cancelled with
+ *       a player-facing message.</li>
  * </ol>
+ *
+ * <p><b>Scope.</b> Both handlers bail out unless the player is standing in a
+ * NovaBlock world ({@link GamemodeScope}). They run at {@link EventPriority#HIGH},
+ * which is <i>after</i> the NORMAL-priority handlers other gamemodes use, so
+ * without that check NovaBlock silently overrode them: every End portal on the
+ * server was refused with "The End is disabled", and any Nether portal outside
+ * these worlds was refused too, no matter which gamemode owned the world.
  *
  * <p>End Portal Frames placed inside loot rooms remain functional as rift
  * markers because that path doesn't go through {@link PlayerInteractEvent}
@@ -45,6 +54,11 @@ public class NetherPortalListener implements Listener {
     public void onPortal(PlayerPortalEvent event) {
         Player player = event.getPlayer();
         if (player.getWorld() == null) return;
+        // Only NovaBlock's own worlds get NovaBlock's portal rules. This handler runs at
+        // HIGH, so before this check it was overriding gamemodes whose portal handlers sit
+        // at NORMAL — every End portal on the server was cancelled with "The End is
+        // disabled", and any Nether portal outside these worlds was refused too.
+        if (!GamemodeScope.isPlaying(player)) return;
         PlayerTeleportEvent.TeleportCause cause = event.getCause();
 
         // The End is disabled entirely. Any END_PORTAL teleport (player walks
@@ -156,8 +170,11 @@ public class NetherPortalListener implements Listener {
         if (event.getClickedBlock() == null) return;
         if (event.getClickedBlock().getType() != Material.END_PORTAL_FRAME) return;
         if (event.getItem() == null || event.getItem().getType() != Material.ENDER_EYE) return;
-        event.setCancelled(true);
         Player player = event.getPlayer();
+        // Same scoping as onPortal: another gamemode's players must be able to build a
+        // real End portal in their own world.
+        if (!GamemodeScope.isPlaying(player)) return;
+        event.setCancelled(true);
         Msg.send(player, "<red>The End is disabled — End Portals can't be assembled.");
     }
 }
