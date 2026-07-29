@@ -199,11 +199,14 @@ public class ChatTagManager implements Listener {
             }
             int at = rendered.indexOf(marker);
             if (at < 0) return legacy.deserialize(rendered);
-            return Component.text()
-                    .append(legacy.deserialize(rendered.substring(0, at)))
-                    .append(message)
-                    .append(legacy.deserialize(rendered.substring(at + marker.length())))
-                    .build();
+            // Deliberately built by appending to a plain Component rather than through
+            // Component.text()'s builder. A builder's build() is a generic method whose
+            // erased return type changed between Adventure 4 and 5, so a jar compiled
+            // against one throws NoSuchMethodError on the other; Component.append is a
+            // plain Component -> Component call with the same descriptor on both.
+            Component before = legacy.deserialize(rendered.substring(0, at));
+            Component after = legacy.deserialize(rendered.substring(at + marker.length()));
+            return before.append(message).append(after);
         };
     }
 

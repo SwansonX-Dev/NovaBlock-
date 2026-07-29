@@ -6,7 +6,7 @@
 
     <groupId>com.nova</groupId>
     <artifactId>novablock</artifactId>
-    <version>0.48.4</version>
+    <version>0.48.5</version>
     <packaging>jar</packaging>
     <name>NovaBlock</name>
 
@@ -29,10 +29,18 @@
     </repositories>
 
     <dependencies>
+        <!-- PINNED, do not turn this back into an open range. The live server is
+             Purpur 26.1.2, whose paper-api ships Adventure 4.x. An open-ended range
+             silently resolved to paper-api 26.2, which ships Adventure 5.x, and the
+             two are NOT binary compatible: `ComponentBuilder<C>`'s type bound moved
+             from BuildableComponent to Component, so every `builder.build()` we
+             compile against 5.x emits a `build()Lnet/kyori/adventure/text/Component;`
+             call that does not exist on 4.x — NoSuchMethodError at runtime, in code
+             that compiled perfectly. Bump this deliberately when the server moves. -->
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
-            <version>[26.1.2.build,)</version>
+            <version>26.1.2.build.74-stable</version>
             <scope>provided</scope>
         </dependency>
         <!-- xEconomy native API. NovaBlock hard-depends on xEconomy for currency;
